@@ -28,11 +28,11 @@ export function PDFCard({ pdf }: PDFCardProps) {
   return (
     <Link href={`/pdf/${pdf.id}`}>
       <Card className="group h-full overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 border-border/50 bg-card">
-        <div className="relative aspect-[3/4] bg-gradient-to-br from-primary/10 via-accent/10 to-primary/5 flex items-center justify-center">
-          <FileText className="h-16 w-16 text-primary/60 transition-transform group-hover:scale-110" />
+        <div className="relative aspect-[4/5] sm:aspect-[3/4] bg-gradient-to-br from-primary/10 via-accent/10 to-primary/5 flex items-center justify-center">
+          <FileText className="h-10 w-10 sm:h-16 sm:w-16 text-primary/60 transition-transform group-hover:scale-110" />
           {pdf.category && (
             <Badge
-              className="absolute top-3 left-3 text-xs"
+              className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[10px] sm:text-xs px-1.5 sm:px-2"
               style={{
                 backgroundColor: pdf.category.color,
                 color: "#fff",
@@ -41,38 +41,38 @@ export function PDFCard({ pdf }: PDFCardProps) {
               {pdf.category.name}
             </Badge>
           )}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 right-2 sm:top-3 sm:right-3 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
             <FavoriteButton pdfId={pdf.id} size="sm" variant="overlay" />
           </div>
         </div>
         
-        <CardContent className="p-4">
-          <h3 className="font-semibold text-foreground line-clamp-2 text-balance group-hover:text-primary transition-colors">
+        <CardContent className="p-2 sm:p-4">
+          <h3 className="font-semibold text-xs sm:text-base text-foreground line-clamp-2 text-balance group-hover:text-primary transition-colors">
             {pdf.title}
           </h3>
           {pdf.description && (
-            <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+            <p className="mt-1 sm:mt-2 text-[10px] sm:text-sm text-muted-foreground line-clamp-2 hidden sm:block">
               {pdf.description}
             </p>
           )}
         </CardContent>
         
-        <CardFooter className="px-4 pb-4 pt-0 flex items-center justify-between text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
+        <CardFooter className="px-2 sm:px-4 pb-2 sm:pb-4 pt-0 flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
+          <span className="flex items-center gap-0.5 sm:gap-1">
             {pdf.average_rating ? (
               <>
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-amber-400 text-amber-400" />
                 {pdf.average_rating.toFixed(1)}
               </>
             ) : (
               <>
-                <Eye className="h-3 w-3" />
+                <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 {pdf.view_count || 0}
               </>
             )}
           </span>
-          <span className="flex items-center gap-1">
-            <Download className="h-3 w-3" />
+          <span className="flex items-center gap-0.5 sm:gap-1">
+            <Download className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             {pdf.download_count}
           </span>
         </CardFooter>
