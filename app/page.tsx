@@ -3,9 +3,12 @@ import { Header } from "@/components/header"
 import { PDFGrid } from "@/components/pdf-grid"
 import type { PDF, Category } from "@/lib/types"
 
-export const revalidate = 60 // Revalidate every 60 seconds
+export const revalidate = 60
 
 async function getPDFs(): Promise<PDF[]> {
+  // Don't attempt to fetch if not configured
+  if (!isSupabaseConfigured()) return []
+  
   const supabase = await createClient()
   if (!supabase) return []
   
@@ -26,6 +29,9 @@ async function getPDFs(): Promise<PDF[]> {
 }
 
 async function getCategories(): Promise<Category[]> {
+  // Don't attempt to fetch if not configured
+  if (!isSupabaseConfigured()) return []
+  
   const supabase = await createClient()
   if (!supabase) return []
   
