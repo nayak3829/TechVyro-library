@@ -11,7 +11,7 @@ interface CategoryFilterProps {
 
 export function CategoryFilter({ categories, selectedCategory, onSelect }: CategoryFilterProps) {
   return (
-    <div className="flex flex-wrap gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+    <div className="flex flex-wrap gap-2">
       <Badge
         variant={selectedCategory === null ? "default" : "outline"}
         className="cursor-pointer transition-all hover:scale-105"
