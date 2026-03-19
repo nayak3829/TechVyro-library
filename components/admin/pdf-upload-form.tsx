@@ -94,35 +94,67 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
     updateEntry(entry.id, { status: "uploading" })
     try {
       const token = sessionStorage.getItem("admin_token")
-      const formData = new FormData()
-      formData.append("file", entry.file)
-      formData.append("title", entry.title.trim() || titleFromFilename(entry.file.name))
-      if (entry.categoryId) formData.append("categoryId", entry.categoryId)
+      const title = entry.title.trim() || titleFromFilename(entry.file.name)
 
-      const res = await fetch("/api/pdfs/upload", {
+      // Step 1: Get signed upload URL from our API
+      const urlRes = await fetch("/api/pdfs/get-upload-url", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          filename: entry.file.name,
+          contentType: "application/pdf"
+        }),
       })
       
-      // Handle non-JSON responses (like "Request Entity Too Large")
-      const contentType = res.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await res.text()
-        throw new Error(text || `Upload failed with status ${res.status}`)
+      if (!urlRes.ok) {
+        const urlData = await urlRes.json().catch(() => ({}))
+        throw new Error(urlData.error || "Failed to get upload URL")
       }
       
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Upload failed")
+      const { signedUrl, filePath } = await urlRes.json()
+
+      // Step 2: Upload file directly to Supabase Storage (bypasses Vercel size limits)
+      const uploadRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/pdf",
+        },
+        body: entry.file,
+      })
+
+      if (!uploadRes.ok) {
+        throw new Error("Failed to upload file to storage")
+      }
+
+      // Step 3: Save metadata to database
+      const metaRes = await fetch("/api/pdfs/save-metadata", {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title,
+          filePath,
+          fileSize: entry.file.size,
+          categoryId: entry.categoryId || null,
+        }),
+      })
+
+      if (!metaRes.ok) {
+        const metaData = await metaRes.json().catch(() => ({}))
+        throw new Error(metaData.error || "Failed to save PDF metadata")
+      }
+
       updateEntry(entry.id, { status: "done" })
       return true
     } catch (err) {
       let errorMsg = "Upload failed"
       if (err instanceof Error) {
-        // Handle common error messages
-        if (err.message.includes("Request Entity Too Large") || err.message.includes("413")) {
-          errorMsg = "File too large - try reducing file size"
-        } else if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
+        if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
           errorMsg = "Network error - check your connection"
         } else {
           errorMsg = err.message
