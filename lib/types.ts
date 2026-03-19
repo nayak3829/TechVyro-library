@@ -6,6 +6,15 @@ export interface Category {
   created_at: string
 }
 
+export interface Review {
+  id: string
+  pdf_id: string
+  user_name: string
+  rating: number
+  comment: string | null
+  created_at: string
+}
+
 export interface PDF {
   id: string
   title: string
@@ -15,7 +24,10 @@ export interface PDF {
   category_id: string | null
   download_count: number
   view_count: number
+  average_rating: number | null
+  review_count: number
   created_at: string
   updated_at: string
   category?: Category | null
+  reviews?: Review[]
 }

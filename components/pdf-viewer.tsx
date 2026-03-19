@@ -2,11 +2,14 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Download, Share2, FileText, Calendar, Eye, Check, Maximize2, Minimize2, X } from "lucide-react"
+import { ArrowLeft, Download, Share2, FileText, Calendar, Eye, Check, Maximize2, X, Star, Facebook, Twitter, Linkedin, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import { ReviewsSection } from "@/components/reviews-section"
+import { StarRating } from "@/components/star-rating"
+import { FavoriteButton } from "@/components/favorite-button"
 import type { PDF } from "@/lib/types"
 
 interface PDFViewerProps {
@@ -139,17 +142,26 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                 <h1 className="text-2xl font-bold text-foreground text-balance">
                   {pdf.title}
                 </h1>
-                {pdf.category && (
-                  <Badge
-                    className="mt-2"
-                    style={{
-                      backgroundColor: pdf.category.color,
-                      color: "#fff",
-                    }}
-                  >
-                    {pdf.category.name}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {pdf.category && (
+                    <Badge
+                      style={{
+                        backgroundColor: pdf.category.color,
+                        color: "#fff",
+                      }}
+                    >
+                      {pdf.category.name}
+                    </Badge>
+                  )}
+                  {pdf.average_rating && (
+                    <div className="flex items-center gap-1 text-sm">
+                      <StarRating rating={pdf.average_rating} size="sm" />
+                      <span className="text-muted-foreground">
+                        ({pdf.review_count || 0})
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {pdf.description && (
@@ -186,6 +198,7 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                   <Download className="h-4 w-4 mr-2" />
                   {downloading ? "Downloading..." : "Download"}
                 </Button>
+                <FavoriteButton pdfId={pdf.id} size="md" />
                 <Button 
                   variant="outline" 
                   size="icon"
@@ -193,6 +206,45 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
                 </Button>
+              </div>
+
+              {/* Social Share Buttons */}
+              <div className="pt-4 border-t border-border/50">
+                <p className="text-sm text-muted-foreground mb-3">Share on</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(pdf.title + " - " + window.location.href)}`, "_blank")}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(pdf.title)}`, "_blank")}
+                  >
+                    <Twitter className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, "_blank")}
+                  >
+                    <Facebook className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`, "_blank")}
+                  >
+                    <Linkedin className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -226,6 +278,9 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Reviews Section */}
+      <ReviewsSection pdfId={pdf.id} />
 
       {/* Fullscreen Modal */}
       {isFullscreen && (

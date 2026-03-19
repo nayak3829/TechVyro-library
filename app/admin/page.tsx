@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut } from "lucide-react"
+import { ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PDFUploadForm } from "@/components/admin/pdf-upload-form"
 import { CategoryManager } from "@/components/admin/category-manager"
 import { PDFList } from "@/components/admin/pdf-list"
+import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard"
 import type { Category, PDF } from "@/lib/types"
 
 export default function AdminPage() {
@@ -94,8 +95,12 @@ export default function AdminPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="upload" className="space-y-6">
+        <Tabs defaultValue="analytics" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="upload" className="gap-2">
               <Upload className="h-4 w-4" />
               Upload PDF
@@ -109,6 +114,10 @@ export default function AdminPage() {
               Categories ({categories.length})
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="analytics">
+            <AnalyticsDashboard pdfs={pdfs} categories={categories} />
+          </TabsContent>
 
           <TabsContent value="upload">
             <Card className="border-border/50">

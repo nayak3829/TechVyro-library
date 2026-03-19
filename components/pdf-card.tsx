@@ -1,7 +1,8 @@
 import Link from "next/link"
-import { FileText, Download, Calendar, Eye } from "lucide-react"
+import { FileText, Download, Calendar, Eye, Star } from "lucide-react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { FavoriteButton } from "@/components/favorite-button"
 import type { PDF } from "@/lib/types"
 
 interface PDFCardProps {
@@ -40,6 +41,9 @@ export function PDFCard({ pdf }: PDFCardProps) {
               {pdf.category.name}
             </Badge>
           )}
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            <FavoriteButton pdfId={pdf.id} size="sm" variant="overlay" />
+          </div>
         </div>
         
         <CardContent className="p-4">
@@ -55,8 +59,17 @@ export function PDFCard({ pdf }: PDFCardProps) {
         
         <CardFooter className="px-4 pb-4 pt-0 flex items-center justify-between text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Eye className="h-3 w-3" />
-            {pdf.view_count || 0} views
+            {pdf.average_rating ? (
+              <>
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                {pdf.average_rating.toFixed(1)}
+              </>
+            ) : (
+              <>
+                <Eye className="h-3 w-3" />
+                {pdf.view_count || 0}
+              </>
+            )}
           </span>
           <span className="flex items-center gap-1">
             <Download className="h-3 w-3" />

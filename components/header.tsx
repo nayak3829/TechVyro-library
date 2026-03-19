@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { FileText, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function Header() {
   return (
@@ -14,6 +15,7 @@ export function Header() {
         </Link>
         
         <nav className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" size="sm" asChild>
             <Link href="/admin">
               <Settings className="h-4 w-4 mr-2" />
