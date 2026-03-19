@@ -58,24 +58,23 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
   async function handleShare() {
     const shareUrl = window.location.href
 
+    // Always fallback to clipboard copy - Web Share API is unreliable in iframes/preview environments
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: pdf.title,
-          text: pdf.description || "Check out this PDF",
-          url: shareUrl,
-        })
-      } else {
-        await navigator.clipboard.writeText(shareUrl)
-        setCopied(true)
-        toast.success("Link copied to clipboard!")
-        setTimeout(() => setCopied(false), 2000)
-      }
-    } catch (error) {
-      // User cancelled or error
-      if ((error as Error).name !== "AbortError") {
-        console.error("[v0] Share error:", error)
-      }
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      toast.success("Link copied to clipboard!")
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea")
+      textArea.value = shareUrl
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textArea)
+      setCopied(true)
+      toast.success("Link copied to clipboard!")
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
