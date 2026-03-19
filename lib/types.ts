@@ -14,6 +14,7 @@ export interface PDF {
   file_size: number | null
   category_id: string | null
   download_count: number
+  view_count: number
   created_at: string
   updated_at: string
   category?: Category | null

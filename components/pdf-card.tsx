@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { FileText, Download, Calendar } from "lucide-react"
+import { FileText, Download, Calendar, Eye } from "lucide-react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { PDF } from "@/lib/types"
@@ -55,12 +55,12 @@ export function PDFCard({ pdf }: PDFCardProps) {
         
         <CardFooter className="px-4 pb-4 pt-0 flex items-center justify-between text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
-            {formatDate(pdf.created_at)}
+            <Eye className="h-3 w-3" />
+            {pdf.view_count || 0} views
           </span>
           <span className="flex items-center gap-1">
             <Download className="h-3 w-3" />
-            {pdf.download_count} downloads
+            {pdf.download_count}
           </span>
         </CardFooter>
       </Card>

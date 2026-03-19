@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Download, Share2, FileText, Calendar, Eye, Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -31,8 +31,22 @@ function formatDate(dateString: string): string {
 export function PDFViewer({ pdf }: PDFViewerProps) {
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [viewCount, setViewCount] = useState(pdf.view_count || 0)
 
   const pdfUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/pdfs/${pdf.file_path}`
+
+  // Track view on component mount
+  useEffect(() => {
+    async function trackView() {
+      try {
+        await fetch(`/api/pdfs/${pdf.id}/view`, { method: "POST" })
+        setViewCount((prev) => prev + 1)
+      } catch (error) {
+        console.error("[v0] Failed to track view:", error)
+      }
+    }
+    trackView()
+  }, [pdf.id])
 
   async function handleDownload() {
     setDownloading(true)
@@ -124,6 +138,10 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   <span>Uploaded {formatDate(pdf.created_at)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  <span>{viewCount} views</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Download className="h-4 w-4" />

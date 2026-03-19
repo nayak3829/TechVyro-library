@@ -1,6 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 
+// Allow large file uploads (no size limit from Next.js side)
+export const maxDuration = 300 // 5 minutes for large uploads
+export const dynamic = "force-dynamic"
+
 export async function POST(request: Request) {
   try {
     // Verify admin token
@@ -47,6 +51,17 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient()
 
+    // Check for duplicate title
+    const { data: existingPdf } = await supabase
+      .from("pdfs")
+      .select("id")
+      .ilike("title", title.trim())
+      .single()
+
+    if (existingPdf) {
+      return NextResponse.json({ error: "A PDF with this title already exists" }, { status: 400 })
+    }
+
     // Generate unique filename
     const timestamp = Date.now()
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
@@ -74,6 +89,7 @@ export async function POST(request: Request) {
         file_path: filePath,
         file_size: file.size,
         category_id: categoryId || null,
+        view_count: 0,
       })
       .select()
       .single()
