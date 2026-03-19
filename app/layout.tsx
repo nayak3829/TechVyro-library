@@ -9,9 +9,25 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'PDF Library - Browse, Download & Share PDFs',
-  description: 'A modern PDF library where you can browse, view, download, and share PDF documents organized by categories.',
+  title: 'TechVyro - PDF Library | Browse, Download & Share PDFs',
+  description: 'TechVyro PDF Library - A modern platform where you can browse, view, download, and share PDF documents organized by categories.',
   generator: 'v0.app',
+  keywords: ['TechVyro', 'PDF', 'Library', 'Download', 'Books', 'Documents', 'Free PDF'],
+  authors: [{ name: 'TechVyro', url: 'https://www.techvyro.in/' }],
+  creator: 'TechVyro',
+  publisher: 'TechVyro',
+  openGraph: {
+    title: 'TechVyro - PDF Library',
+    description: 'Browse, download, and share PDF documents from TechVyro curated collection',
+    url: 'https://www.techvyro.in/',
+    siteName: 'TechVyro',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TechVyro - PDF Library',
+    description: 'Browse, download, and share PDF documents from TechVyro curated collection',
+  },
   icons: {
     icon: [
       {

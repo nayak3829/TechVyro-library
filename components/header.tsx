@@ -11,7 +11,7 @@ export function Header() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
             <FileText className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-balance">PDF Library</span>
+          <span className="text-xl font-bold text-balance">TechVyro</span>
         </Link>
         
         <nav className="flex items-center gap-2">
