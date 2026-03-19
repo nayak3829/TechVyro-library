@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 
 // Get reviews for a PDF
@@ -35,6 +35,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!isAdminConfigured()) {
+      return NextResponse.json({ error: "Database not configured. Please add Supabase environment variables." }, { status: 503 })
+    }
+
     const { id } = await params
     const body = await request.json()
     const { user_name, rating, comment } = body
