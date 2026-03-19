@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
     const supabase = await createClient()
+    if (!supabase) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 503 })
+    }
     
     const { data, error } = await supabase
       .from("categories")

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { Header } from "@/components/header"
 import { PDFGrid } from "@/components/pdf-grid"
 import type { PDF, Category } from "@/lib/types"
@@ -7,6 +7,7 @@ export const revalidate = 60 // Revalidate every 60 seconds
 
 async function getPDFs(): Promise<PDF[]> {
   const supabase = await createClient()
+  if (!supabase) return []
   
   const { data, error } = await supabase
     .from("pdfs")
@@ -26,6 +27,7 @@ async function getPDFs(): Promise<PDF[]> {
 
 async function getCategories(): Promise<Category[]> {
   const supabase = await createClient()
+  if (!supabase) return []
   
   const { data, error } = await supabase
     .from("categories")
@@ -41,7 +43,10 @@ async function getCategories(): Promise<Category[]> {
 }
 
 export default async function HomePage() {
-  const [pdfs, categories] = await Promise.all([getPDFs(), getCategories()])
+  const configured = isSupabaseConfigured()
+  const [pdfs, categories] = configured 
+    ? await Promise.all([getPDFs(), getCategories()])
+    : [[], []]
 
   return (
     <div className="min-h-screen bg-background">
@@ -56,6 +61,20 @@ export default async function HomePage() {
             Browse, download, and share PDF documents from our curated collection
           </p>
         </section>
+
+        {!configured && (
+          <div className="max-w-xl mx-auto mb-8 p-6 rounded-lg border border-amber-500/50 bg-amber-500/10">
+            <h2 className="text-lg font-semibold text-amber-600 mb-2">Setup Required</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add these environment variables to your Vercel project:
+            </p>
+            <ul className="text-sm font-mono space-y-1 text-muted-foreground">
+              <li>NEXT_PUBLIC_SUPABASE_URL</li>
+              <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
+              <li>SUPABASE_SERVICE_ROLE_KEY</li>
+            </ul>
+          </div>
+        )}
 
         <PDFGrid pdfs={pdfs} categories={categories} />
       </main>
