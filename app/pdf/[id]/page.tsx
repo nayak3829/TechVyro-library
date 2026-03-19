@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import { Header } from "@/components/header"
 import { PDFViewer } from "@/components/pdf-viewer"
@@ -10,6 +10,7 @@ interface PageProps {
 
 async function getPDF(id: string): Promise<PDF | null> {
   const supabase = await createClient()
+  if (!supabase) return null
   
   const { data, error } = await supabase
     .from("pdfs")

@@ -104,14 +104,33 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       })
+      
+      // Handle non-JSON responses (like "Request Entity Too Large")
+      const contentType = res.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text()
+        throw new Error(text || `Upload failed with status ${res.status}`)
+      }
+      
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Upload failed")
       updateEntry(entry.id, { status: "done" })
       return true
     } catch (err) {
+      let errorMsg = "Upload failed"
+      if (err instanceof Error) {
+        // Handle common error messages
+        if (err.message.includes("Request Entity Too Large") || err.message.includes("413")) {
+          errorMsg = "File too large - try reducing file size"
+        } else if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
+          errorMsg = "Network error - check your connection"
+        } else {
+          errorMsg = err.message
+        }
+      }
       updateEntry(entry.id, {
         status: "error",
-        error: err instanceof Error ? err.message : "Upload failed",
+        error: errorMsg,
       })
       return false
     }
