@@ -70,26 +70,28 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
   }, [pdfs, search, selectedCategory, sortBy, showFavoritesOnly, favorites])
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Search and Filters - Stack on mobile */}
+      <div className="flex flex-col gap-3 sm:gap-4">
         <SearchBar value={search} onChange={setSearch} />
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isLoaded && favorites.length > 0 && (
             <Button
               variant={showFavoritesOnly ? "default" : "outline"}
               size="sm"
-              className="gap-2"
+              className="gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
             >
-              <Heart className={`h-4 w-4 ${showFavoritesOnly ? "fill-current" : ""}`} />
-              Favorites ({favorites.length})
+              <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${showFavoritesOnly ? "fill-current" : ""}`} />
+              <span className="hidden xs:inline">Favorites</span> ({favorites.length})
             </Button>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <ArrowUpDown className="h-4 w-4" />
-                {sortLabels[sortBy]}
+              <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                <ArrowUpDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">{sortLabels[sortBy]}</span>
+                <span className="sm:hidden">Sort</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -110,7 +112,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground ml-auto">
             {filteredAndSortedPdfs.length} {filteredAndSortedPdfs.length === 1 ? "PDF" : "PDFs"}
           </div>
         </div>
@@ -129,7 +131,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
           description={search || selectedCategory ? "Try adjusting your search or filter" : "No PDFs have been uploaded yet"}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filteredAndSortedPdfs.map((pdf) => (
             <PDFCard key={pdf.id} pdf={pdf} />
           ))}

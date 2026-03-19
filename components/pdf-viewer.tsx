@@ -120,26 +120,26 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Link 
         href="/" 
-        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-2 text-sm sm:text-base text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Library
       </Link>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         {/* PDF Info Sidebar */}
         <Card className="lg:col-span-1 h-fit border-border/50">
-          <CardContent className="p-6 space-y-6">
-            <div className="flex items-center justify-center aspect-square bg-gradient-to-br from-primary/10 via-accent/10 to-primary/5 rounded-lg">
-              <FileText className="h-20 w-20 text-primary/60" />
+          <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="flex items-center justify-center aspect-square max-h-40 sm:max-h-none bg-gradient-to-br from-primary/10 via-accent/10 to-primary/5 rounded-lg">
+              <FileText className="h-14 w-14 sm:h-20 sm:w-20 text-primary/60" />
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
-                <h1 className="text-2xl font-bold text-foreground text-balance">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground text-balance">
                   {pdf.title}
                 </h1>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -189,14 +189,14 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 sm:gap-3 pt-2">
                 <Button 
-                  className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                  className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-sm sm:text-base"
                   onClick={handleDownload}
                   disabled={downloading}
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  {downloading ? "Downloading..." : "Download"}
+                  <Download className="h-4 w-4 mr-1 sm:mr-2" />
+                  {downloading ? "..." : "Download"}
                 </Button>
                 <FavoriteButton pdfId={pdf.id} size="md" />
                 <Button 

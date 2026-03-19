@@ -6,20 +6,20 @@ import { ThemeToggle } from "@/components/theme-toggle"
 export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
-            <FileText className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-balance">TechVyro</span>
+          <span className="text-lg sm:text-xl font-bold text-balance">TechVyro</span>
         </Link>
         
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-1 sm:gap-2">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="ghost" size="sm" asChild className="px-2 sm:px-3">
             <Link href="/admin">
-              <Settings className="h-4 w-4 mr-2" />
-              Admin
+              <Settings className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Admin</span>
             </Link>
           </Button>
         </nav>
