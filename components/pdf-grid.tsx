@@ -115,32 +115,41 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
     <div className="space-y-6 sm:space-y-8">
       {/* Categories Section - Clickable cards that link to category pages */}
       {categories.length > 0 && (
-        <section className="space-y-3 sm:space-y-4">
+        <section className="space-y-4 sm:space-y-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              <h2 className="text-base sm:text-lg font-semibold text-foreground">Categories</h2>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/10">
+                <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold text-foreground">Browse Categories</h2>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{categories.length} categories available</p>
+              </div>
             </div>
-            <span className="text-xs text-muted-foreground">{categories.length} categories</span>
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
             {/* All PDFs Card */}
             <Card 
-              className={`cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 group ${
-                selectedCategory === null && !showFavoritesOnly ? "ring-2 ring-primary bg-primary/5" : "hover:border-primary/50"
+              className={`cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group ${
+                selectedCategory === null && !showFavoritesOnly 
+                  ? "ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 shadow-md" 
+                  : "hover:border-primary/50 hover:shadow-primary/10"
               }`}
               onClick={() => {
                 setSelectedCategory(null)
                 setShowFavoritesOnly(false)
               }}
             >
-              <CardContent className="p-2.5 sm:p-3 text-center">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-1.5 sm:mb-2 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              <CardContent className="p-3 sm:p-4 text-center">
+                <div className="relative h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3">
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative h-full w-full rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+                  </div>
                 </div>
-                <p className="font-medium text-xs sm:text-sm truncate">All PDFs</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{pdfs.length} files</p>
+                <p className="font-semibold text-xs sm:text-sm truncate">All PDFs</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{pdfs.length} files</p>
               </CardContent>
             </Card>
 
@@ -148,22 +157,28 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             {categories.map((category) => (
               <Link key={category.id} href={`/category/${category.slug}`}>
                 <Card 
-                  className="cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 group h-full"
+                  className="cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group h-full hover:border-opacity-50"
                   style={{
                     borderColor: selectedCategory === category.id ? category.color : undefined,
                   }}
                 >
-                  <CardContent className="p-2.5 sm:p-3 text-center">
-                    <div 
-                      className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-1.5 sm:mb-2 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform"
-                      style={{ backgroundColor: `${category.color}15` }}
-                    >
-                      <FolderOpen className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: category.color }} />
+                  <CardContent className="p-3 sm:p-4 text-center">
+                    <div className="relative h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3">
+                      <div 
+                        className="absolute inset-0 rounded-xl blur-lg opacity-0 group-hover:opacity-60 transition-opacity"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <div 
+                        className="relative h-full w-full rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md"
+                        style={{ backgroundColor: category.color }}
+                      >
+                        <FolderOpen className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                      </div>
                     </div>
-                    <p className="font-medium text-xs sm:text-sm truncate">{category.name}</p>
-                    <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-muted-foreground">
+                    <p className="font-semibold text-xs sm:text-sm truncate">{category.name}</p>
+                    <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5">
                       <span>{categoryCounts[category.id] || 0} files</span>
-                      <ArrowRight className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: category.color }} />
+                      <ArrowRight className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style={{ color: category.color }} />
                     </div>
                   </CardContent>
                 </Card>
@@ -174,16 +189,22 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
       )}
 
       {/* Search and Filters */}
-      <section className="space-y-3">
-        <SearchBar value={search} onChange={setSearch} />
+      <section className="space-y-4">
+        <div className="relative">
+          <SearchBar value={search} onChange={setSearch} />
+        </div>
         
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Favorites Button */}
           {isLoaded && favorites.length > 0 && (
             <Button
               variant={showFavoritesOnly ? "default" : "outline"}
               size="sm"
-              className="gap-1.5 text-xs h-8"
+              className={`gap-1.5 text-xs h-9 px-3 transition-all duration-300 ${
+                showFavoritesOnly 
+                  ? "bg-gradient-to-r from-pink-500 to-rose-500 border-0 shadow-md shadow-pink-500/20" 
+                  : "hover:border-pink-500/50 hover:text-pink-500"
+              }`}
               onClick={() => {
                 setShowFavoritesOnly(!showFavoritesOnly)
                 if (!showFavoritesOnly) setSelectedCategory(null)
@@ -192,42 +213,50 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
               <Heart className={`h-3.5 w-3.5 ${showFavoritesOnly ? "fill-current" : ""}`} />
               <span className="hidden xs:inline">Favorites</span>
               <span className="xs:hidden">Fav</span>
-              ({favorites.length})
+              <span className="bg-background/20 px-1.5 py-0.5 rounded-md text-[10px] font-semibold">
+                {favorites.length}
+              </span>
             </Button>
           )}
 
           {/* Sort Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9 px-3 hover:border-primary/50">
                 <ArrowUpDown className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{sortLabels[sortBy]}</span>
                 <span className="sm:hidden">Sort</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => setSortBy("newest")} className="gap-2 text-sm">
-                <Clock className="h-4 w-4" /> Newest First
+            <DropdownMenuContent align="start" className="min-w-[160px]">
+              <DropdownMenuItem onClick={() => setSortBy("newest")} className="gap-2 text-sm cursor-pointer">
+                <Clock className="h-4 w-4 text-primary" /> Newest First
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy("oldest")} className="gap-2 text-sm">
-                <Clock className="h-4 w-4" /> Oldest First
+              <DropdownMenuItem onClick={() => setSortBy("oldest")} className="gap-2 text-sm cursor-pointer">
+                <Clock className="h-4 w-4 text-muted-foreground" /> Oldest First
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy("most-viewed")} className="gap-2 text-sm">
-                <Eye className="h-4 w-4" /> Most Viewed
+              <DropdownMenuItem onClick={() => setSortBy("most-viewed")} className="gap-2 text-sm cursor-pointer">
+                <Eye className="h-4 w-4 text-blue-500" /> Most Viewed
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy("most-downloaded")} className="gap-2 text-sm">
-                <Download className="h-4 w-4" /> Most Downloaded
+              <DropdownMenuItem onClick={() => setSortBy("most-downloaded")} className="gap-2 text-sm cursor-pointer">
+                <Download className="h-4 w-4 text-green-500" /> Most Downloaded
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy("alphabetical")} className="gap-2 text-sm">
-                <SortAsc className="h-4 w-4" /> A-Z
+              <DropdownMenuItem onClick={() => setSortBy("alphabetical")} className="gap-2 text-sm cursor-pointer">
+                <SortAsc className="h-4 w-4 text-accent" /> A-Z
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
           {/* Results count */}
-          <div className="text-xs text-muted-foreground ml-auto">
-            {filteredAndSortedPdfs.length} {filteredAndSortedPdfs.length === 1 ? "PDF" : "PDFs"}
-            {totalPages > 1 && ` | Page ${currentPage}/${totalPages}`}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto bg-muted/50 px-3 py-1.5 rounded-lg">
+            <span className="font-medium text-foreground">{filteredAndSortedPdfs.length}</span>
+            <span>{filteredAndSortedPdfs.length === 1 ? "PDF" : "PDFs"}</span>
+            {totalPages > 1 && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-border" />
+                <span>Page <span className="font-medium text-foreground">{currentPage}</span>/{totalPages}</span>
+              </>
+            )}
           </div>
         </div>
       </section>

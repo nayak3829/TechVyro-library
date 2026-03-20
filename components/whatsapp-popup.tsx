@@ -1,14 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Sparkles, Bell } from 'lucide-react';
+import { X, Sparkles, Bell, Users, Zap, Gift } from 'lucide-react';
 
 export function WhatsAppPopup() {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [hasShown, setHasShown] = useState(false);
 
   useEffect(() => {
+    // Check if already shown in this session
+    if (typeof window !== 'undefined' && sessionStorage.getItem('whatsapp_popup_shown')) {
+      return;
+    }
+    
     const timer = setTimeout(() => {
       // Check if video player is open (z-50 element with fixed positioning)
       const videoPlayer = document.querySelector('.fixed.inset-0.z-50.bg-black');
@@ -17,8 +23,12 @@ export function WhatsAppPopup() {
         return;
       }
       setIsOpen(true);
+      setHasShown(true);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('whatsapp_popup_shown', 'true');
+      }
       setTimeout(() => setIsAnimating(true), 50);
-    }, 500);
+    }, 1500);
     
     return () => clearTimeout(timer);
   }, []);
@@ -144,19 +154,29 @@ export function WhatsAppPopup() {
               Get exclusive access to secret websites, tools & tech updates directly on WhatsApp.
             </p>
 
-            {/* Features */}
+            {/* Features Grid */}
             <div 
-              className={`flex justify-center gap-4 mb-6 text-xs text-gray-500 transition-all duration-500 ${isAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+              className={`grid grid-cols-3 gap-2 mb-6 transition-all duration-500 ${isAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
               style={{ transitionDelay: '450ms' }}
             >
-              <span className="flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#25D366]" />
-                Free Updates
-              </span>
-              <span className="flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#25D366]" />
-                Exclusive Content
-              </span>
+              <div className="flex flex-col items-center gap-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
+                <div className="h-7 w-7 rounded-full bg-[#25D366]/20 flex items-center justify-center">
+                  <Zap className="w-3.5 h-3.5 text-[#25D366]" />
+                </div>
+                <span className="text-[10px] text-gray-400 text-center">Fast Updates</span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
+                <div className="h-7 w-7 rounded-full bg-[#25D366]/20 flex items-center justify-center">
+                  <Gift className="w-3.5 h-3.5 text-[#25D366]" />
+                </div>
+                <span className="text-[10px] text-gray-400 text-center">Free PDFs</span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
+                <div className="h-7 w-7 rounded-full bg-[#25D366]/20 flex items-center justify-center">
+                  <Users className="w-3.5 h-3.5 text-[#25D366]" />
+                </div>
+                <span className="text-[10px] text-gray-400 text-center">Community</span>
+              </div>
             </div>
 
             {/* Join Button */}

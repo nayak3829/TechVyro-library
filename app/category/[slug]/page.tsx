@@ -105,42 +105,55 @@ export default async function CategoryPage({ params }: PageProps) {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
         {/* Breadcrumb */}
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-5 sm:mb-8">
           <Link 
             href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+            </div>
+            <span>Back to Home</span>
           </Link>
         </div>
 
-        {/* Category Header */}
-        <section className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div 
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: `${category.color}20` }}
-            >
-              <FolderOpen className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: category.color }} />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-                {category.name}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {pdfs.length} {pdfs.length === 1 ? "PDF" : "PDFs"} available
-              </p>
+        {/* Category Header - Enhanced */}
+        <section className="mb-8 sm:mb-10">
+          <div className="relative p-6 sm:p-8 rounded-2xl overflow-hidden" style={{ backgroundColor: `${category.color}08` }}>
+            {/* Background decoration */}
+            <div className="absolute inset-0 opacity-30" style={{ background: `radial-gradient(ellipse at 100% 0%, ${category.color}20, transparent 50%)` }} />
+            
+            <div className="relative flex items-center gap-4 sm:gap-5">
+              <div className="relative">
+                <div className="absolute -inset-2 rounded-2xl blur-lg opacity-40" style={{ backgroundColor: category.color }} />
+                <div 
+                  className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-2xl flex items-center justify-center shadow-lg"
+                  style={{ backgroundColor: category.color }}
+                >
+                  <FolderOpen className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
+                </div>
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-1">
+                  {category.name}
+                </h1>
+                <p className="text-sm sm:text-base text-muted-foreground">
+                  <span className="font-semibold" style={{ color: category.color }}>{pdfs.length}</span> {pdfs.length === 1 ? "PDF" : "PDFs"} available in this category
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Other Categories Pills */}
+        {/* Other Categories Pills - Enhanced */}
         {allCategories.length > 1 && (
-          <section className="mb-6 sm:mb-8">
-            <p className="text-xs sm:text-sm text-muted-foreground mb-2">Other Categories:</p>
+          <section className="mb-8 sm:mb-10">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="h-1 w-1 rounded-full bg-primary" />
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Browse Other Categories</p>
+            </div>
             <div className="flex flex-wrap gap-2">
               {allCategories
                 .filter(c => c.id !== category.id)
@@ -148,14 +161,14 @@ export default async function CategoryPage({ params }: PageProps) {
                   <Link
                     key={cat.id}
                     href={`/category/${cat.slug}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors hover:opacity-80"
+                    className="group inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                     style={{ 
-                      backgroundColor: `${cat.color}15`,
+                      backgroundColor: `${cat.color}10`,
                       color: cat.color,
-                      border: `1px solid ${cat.color}30`
+                      border: `1px solid ${cat.color}25`
                     }}
                   >
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                    <div className="h-2.5 w-2.5 rounded-full group-hover:scale-110 transition-transform" style={{ backgroundColor: cat.color }} />
                     {cat.name}
                   </Link>
                 ))}
