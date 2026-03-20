@@ -101,13 +101,14 @@ export async function GET(request: Request, { params }: RouteProps) {
     const watermarkedPdfBytes = await pdfDoc.save()
 
     // Increment download count
-    await supabase.rpc("increment_download_count", { pdf_id: id }).catch(() => {
-      // Fallback if RPC doesn't exist
-      supabase
+    try {
+      await supabase
         .from("pdfs")
         .update({ download_count: (pdf.download_count || 0) + 1 })
         .eq("id", id)
-    })
+    } catch {
+      // Ignore download count errors
+    }
 
     // Create filename
     const safeFilename = pdf.title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_")
