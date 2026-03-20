@@ -31,7 +31,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { title, description, filePath, fileSize, categoryId } = body
+    const { 
+      title, 
+      description, 
+      filePath, 
+      fileSize, 
+      categoryId,
+      tags,
+      visibility,
+      scheduledAt,
+      allowDownload,
+      customSlug
+    } = body
 
     if (!title?.trim()) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 })
@@ -56,7 +67,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A PDF with this title already exists" }, { status: 400 })
     }
 
-    // Create database record
+    // Check for duplicate slug if provided
+    if (customSlug) {
+      const { data: existingSlug } = await supabase
+        .from("pdfs")
+        .select("id")
+        .eq("slug", customSlug)
+        .single()
+
+      if (existingSlug) {
+        await supabase.storage.from("pdfs").remove([filePath])
+        return NextResponse.json({ error: "A PDF with this URL slug already exists" }, { status: 400 })
+      }
+    }
+
+    // Create database record with all new fields
     const { data: pdf, error: dbError } = await supabase
       .from("pdfs")
       .insert({
@@ -66,6 +91,12 @@ export async function POST(request: Request) {
         file_size: fileSize || null,
         category_id: categoryId || null,
         view_count: 0,
+        // New advanced fields
+        tags: tags?.length > 0 ? tags : null,
+        visibility: visibility || "public",
+        scheduled_at: scheduledAt || null,
+        allow_download: allowDownload !== false, // Default to true
+        slug: customSlug || null,
       })
       .select()
       .single()
