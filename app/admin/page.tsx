@@ -1,21 +1,48 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, BarChart3 } from "lucide-react"
+import dynamic from "next/dynamic"
+import { ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, BarChart3, RefreshCw, Settings, Database, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PDFUploadForm } from "@/components/admin/pdf-upload-form"
-import { CategoryManager } from "@/components/admin/category-manager"
-import { PDFList } from "@/components/admin/pdf-list"
-import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
 import type { Category, PDF } from "@/lib/types"
+
+// Dynamic imports for heavy components
+const PDFUploadForm = dynamic(() => import("@/components/admin/pdf-upload-form").then(mod => ({ default: mod.PDFUploadForm })), {
+  loading: () => <ComponentLoader text="Loading uploader..." />,
+})
+
+const CategoryManager = dynamic(() => import("@/components/admin/category-manager").then(mod => ({ default: mod.CategoryManager })), {
+  loading: () => <ComponentLoader text="Loading categories..." />,
+})
+
+const PDFList = dynamic(() => import("@/components/admin/pdf-list").then(mod => ({ default: mod.PDFList })), {
+  loading: () => <ComponentLoader text="Loading PDFs..." />,
+})
+
+const AnalyticsDashboard = dynamic(() => import("@/components/admin/analytics-dashboard").then(mod => ({ default: mod.AnalyticsDashboard })), {
+  loading: () => <ComponentLoader text="Loading analytics..." />,
+})
+
+function ComponentLoader({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 gap-3">
+      <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+      <p className="text-sm text-muted-foreground">{text}</p>
+    </div>
+  )
+}
 
 export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [pdfs, setPdfs] = useState<PDF[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   async function fetchData() {
     try {
@@ -31,14 +58,22 @@ export default function AdminPage() {
       setPdfs(pdfsData.pdfs || [])
     } catch (error) {
       console.error("[v0] Error fetching data:", error)
+      toast.error("Failed to fetch data")
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => {
     fetchData()
   }, [])
+
+  function handleRefresh() {
+    setRefreshing(true)
+    fetchData()
+    toast.success("Data refreshed!")
+  }
 
   function handleLogout() {
     sessionStorage.removeItem("admin_token")
@@ -61,6 +96,19 @@ export default function AdminPage() {
     fetchData()
   }
 
+  // Quick stats
+  const totalViews = pdfs.reduce((sum, pdf) => sum + (pdf.view_count || 0), 0)
+  const totalDownloads = pdfs.reduce((sum, pdf) => sum + pdf.download_count, 0)
+  const totalStorage = pdfs.reduce((sum, pdf) => sum + (pdf.file_size || 0), 0)
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return "0 B"
+    const k = 1024
+    const sizes = ["B", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -78,53 +126,117 @@ export default function AdminPage() {
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
               <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-sm sm:text-base">Admin</span>
+            <span className="font-semibold text-sm sm:text-base">Admin Dashboard</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="px-2 sm:px-3">
-            <LogOut className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-2 sm:px-3"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="px-2 sm:px-3">
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        {/* Quick Stats Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <Card className="border-border/50">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total PDFs</p>
+                  <p className="text-xl sm:text-2xl font-bold">{pdfs.length}</p>
+                </div>
+                <FileText className="h-8 w-8 text-primary/30" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Categories</p>
+                  <p className="text-xl sm:text-2xl font-bold">{categories.length}</p>
+                </div>
+                <FolderPlus className="h-8 w-8 text-accent/30" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Views</p>
+                  <p className="text-xl sm:text-2xl font-bold">{totalViews.toLocaleString()}</p>
+                </div>
+                <BarChart3 className="h-8 w-8 text-green-500/30" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Storage Used</p>
+                  <p className="text-xl sm:text-2xl font-bold">{formatBytes(totalStorage)}</p>
+                </div>
+                <Database className="h-8 w-8 text-blue-500/30" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="mb-4 sm:mb-8">
-          <h1 className="text-xl sm:text-3xl font-bold text-foreground">Admin Dashboard</h1>
+          <h1 className="text-xl sm:text-3xl font-bold text-foreground">Manage Library</h1>
           <p className="mt-1 sm:mt-2 text-sm sm:text-base text-muted-foreground">
-            Manage your PDF library and categories
+            Upload PDFs, manage categories, and view analytics
           </p>
         </div>
 
-        <Tabs defaultValue="analytics" className="space-y-4 sm:space-y-6">
-          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-            <TabsTrigger value="analytics" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="upload" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+        <Tabs defaultValue="upload" className="space-y-4 sm:space-y-6">
+          <TabsList className="flex flex-wrap h-auto gap-1 p-1 bg-muted/50">
+            <TabsTrigger value="upload" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 data-[state=active]:bg-background">
               <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Upload</span>
+              <span>Upload</span>
             </TabsTrigger>
-            <TabsTrigger value="pdfs" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <TabsTrigger value="pdfs" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 data-[state=active]:bg-background">
               <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">PDFs</span> ({pdfs.length})
+              <span>PDFs</span>
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                {pdfs.length}
+              </Badge>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+            <TabsTrigger value="categories" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 data-[state=active]:bg-background">
               <FolderPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Categories</span> ({categories.length})
+              <span>Categories</span>
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                {categories.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 data-[state=active]:bg-background">
+              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Analytics</span>
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="analytics">
-            <AnalyticsDashboard pdfs={pdfs} categories={categories} />
-          </TabsContent>
 
           <TabsContent value="upload">
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>Upload New PDF</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5 text-primary" />
+                  Upload New PDFs
+                </CardTitle>
                 <CardDescription>
-                  Add a new PDF document to your library
+                  Add new PDF documents to your library. Supports parallel uploads up to 50MB each.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -139,9 +251,12 @@ export default function AdminPage() {
           <TabsContent value="pdfs">
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>All PDFs</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  All PDFs
+                </CardTitle>
                 <CardDescription>
-                  View and manage all uploaded PDFs
+                  View, edit, and manage all uploaded PDFs. Use search and filters to find specific files.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -159,9 +274,12 @@ export default function AdminPage() {
           <TabsContent value="categories">
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>Categories</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderPlus className="h-5 w-5 text-primary" />
+                  Categories
+                </CardTitle>
                 <CardDescription>
-                  Create and manage document categories
+                  Create and manage document categories. Categories help organize your PDF library.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -171,6 +289,10 @@ export default function AdminPage() {
                 />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <AnalyticsDashboard pdfs={pdfs} categories={categories} />
           </TabsContent>
         </Tabs>
       </main>

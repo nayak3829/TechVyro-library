@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
+import { WhatsAppPopup } from "@/components/whatsapp-popup"
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -63,6 +64,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster richColors position="top-right" />
+          <WhatsAppPopup />
         </ThemeProvider>
         <Analytics />
       </body>

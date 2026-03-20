@@ -1,6 +1,8 @@
+import { Suspense } from "react"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { Header } from "@/components/header"
 import { PDFGrid } from "@/components/pdf-grid"
+import { Skeleton } from "@/components/ui/skeleton"
 import type { PDF, Category } from "@/lib/types"
 
 export const revalidate = 60
@@ -82,7 +84,22 @@ export default async function HomePage() {
           </div>
         )}
 
-        <PDFGrid pdfs={pdfs} categories={categories} />
+        <Suspense fallback={
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-24 rounded-lg" />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {[...Array(10)].map((_, i) => (
+                <Skeleton key={i} className="aspect-[3/4] rounded-lg" />
+              ))}
+            </div>
+          </div>
+        }>
+          <PDFGrid pdfs={pdfs} categories={categories} />
+        </Suspense>
       </main>
       
       <footer className="border-t border-border/40 py-8 sm:py-12 mt-8 sm:mt-12">

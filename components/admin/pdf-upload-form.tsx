@@ -1,12 +1,16 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { Upload, FileText, X, CheckCircle, Loader2, AlertCircle } from "lucide-react"
+import { useState, useRef, useCallback } from "react"
+import { Upload, FileText, X, CheckCircle, Loader2, AlertCircle, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import type { Category } from "@/lib/types"
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB in bytes
+const MAX_PARALLEL_UPLOADS = 5 // Maximum concurrent uploads
 
 interface FileEntry {
   id: string
@@ -14,6 +18,7 @@ interface FileEntry {
   title: string
   categoryId: string
   status: "pending" | "uploading" | "done" | "error"
+  progress: number
   error?: string
 }
 
@@ -38,19 +43,41 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function addFiles(files: FileList | File[]) {
-    const pdfs = Array.from(files).filter((f) => f.type === "application/pdf")
+    const allFiles = Array.from(files)
+    const pdfs = allFiles.filter((f) => f.type === "application/pdf")
+    
     if (pdfs.length === 0) {
       toast.error("Only PDF files are allowed")
       return
     }
-    const newEntries: FileEntry[] = pdfs.map((file) => ({
+
+    // Check for oversized files
+    const oversizedFiles = pdfs.filter(f => f.size > MAX_FILE_SIZE)
+    const validFiles = pdfs.filter(f => f.size <= MAX_FILE_SIZE)
+
+    if (oversizedFiles.length > 0) {
+      const names = oversizedFiles.map(f => f.name).join(", ")
+      toast.error(`Files exceeding 50MB limit: ${names}`, {
+        description: "Please compress or split these files before uploading.",
+        duration: 5000,
+      })
+    }
+
+    if (validFiles.length === 0) return
+
+    const newEntries: FileEntry[] = validFiles.map((file) => ({
       id: generateId(),
       file,
       title: titleFromFilename(file.name),
       categoryId: globalCategory,
       status: "pending",
+      progress: 0,
     }))
     setEntries((prev) => [...prev, ...newEntries])
+
+    if (validFiles.length > 0 && oversizedFiles.length > 0) {
+      toast.info(`Added ${validFiles.length} file(s). ${oversizedFiles.length} file(s) skipped (over 50MB).`)
+    }
   }
 
   function handleDrag(e: React.DragEvent) {
@@ -90,13 +117,14 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
     )
   }
 
-  async function uploadEntry(entry: FileEntry): Promise<boolean> {
-    updateEntry(entry.id, { status: "uploading" })
+  const uploadEntry = useCallback(async (entry: FileEntry): Promise<boolean> => {
+    updateEntry(entry.id, { status: "uploading", progress: 0 })
     try {
       const token = sessionStorage.getItem("admin_token")
       const title = entry.title.trim() || titleFromFilename(entry.file.name)
 
       // Step 1: Get signed upload URL from our API
+      updateEntry(entry.id, { progress: 10 })
       const urlRes = await fetch("/api/pdfs/get-upload-url", {
         method: "POST",
         headers: { 
@@ -115,19 +143,42 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
       }
       
       const { signedUrl, filePath } = await urlRes.json()
+      updateEntry(entry.id, { progress: 20 })
 
-      // Step 2: Upload file directly to Supabase Storage (bypasses Vercel size limits)
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/pdf",
-        },
-        body: entry.file,
+      // Step 2: Upload file directly to Supabase Storage with XMLHttpRequest for progress tracking
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable) {
+            // Map upload progress from 20% to 80%
+            const uploadProgress = 20 + Math.round((event.loaded / event.total) * 60)
+            updateEntry(entry.id, { progress: uploadProgress })
+          }
+        })
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve()
+          } else {
+            reject(new Error("Failed to upload file to storage"))
+          }
+        })
+
+        xhr.addEventListener("error", () => {
+          reject(new Error("Network error during upload"))
+        })
+
+        xhr.addEventListener("abort", () => {
+          reject(new Error("Upload was cancelled"))
+        })
+
+        xhr.open("PUT", signedUrl)
+        xhr.setRequestHeader("Content-Type", "application/pdf")
+        xhr.send(entry.file)
       })
 
-      if (!uploadRes.ok) {
-        throw new Error("Failed to upload file to storage")
-      }
+      updateEntry(entry.id, { progress: 85 })
 
       // Step 3: Save metadata to database
       const metaRes = await fetch("/api/pdfs/save-metadata", {
@@ -149,7 +200,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         throw new Error(metaData.error || "Failed to save PDF metadata")
       }
 
-      updateEntry(entry.id, { status: "done" })
+      updateEntry(entry.id, { status: "done", progress: 100 })
       return true
     } catch (err) {
       let errorMsg = "Upload failed"
@@ -162,11 +213,12 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
       }
       updateEntry(entry.id, {
         status: "error",
+        progress: 0,
         error: errorMsg,
       })
       return false
     }
-  }
+  }, [])
 
   async function handleUploadAll() {
     const pending = entries.filter((e) => e.status === "pending")
@@ -175,24 +227,35 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
       return
     }
     setIsUploading(true)
+    
+    // Parallel upload with concurrency limit
     let successCount = 0
-    for (const entry of pending) {
-      const ok = await uploadEntry(entry)
-      if (ok) successCount++
+    const results: boolean[] = []
+    
+    // Process in batches for parallel upload
+    for (let i = 0; i < pending.length; i += MAX_PARALLEL_UPLOADS) {
+      const batch = pending.slice(i, i + MAX_PARALLEL_UPLOADS)
+      const batchResults = await Promise.all(batch.map(entry => uploadEntry(entry)))
+      results.push(...batchResults)
+      successCount += batchResults.filter(Boolean).length
     }
+    
     setIsUploading(false)
+    
     if (successCount > 0) {
       toast.success(`${successCount} PDF${successCount > 1 ? "s" : ""} uploaded successfully!`)
       onSuccess()
     }
-    const failed = entries.filter((e) => e.status === "error")
-    if (failed.length > 0) {
-      toast.error(`${failed.length} file${failed.length > 1 ? "s" : ""} failed to upload`)
+    
+    const failedCount = results.filter(r => !r).length
+    if (failedCount > 0) {
+      toast.error(`${failedCount} file${failedCount > 1 ? "s" : ""} failed to upload`)
     }
+    
     // Remove successfully uploaded files after a short delay
     setTimeout(() => {
       setEntries((prev) => prev.filter((e) => e.status !== "done"))
-    }, 1500)
+    }, 2000)
   }
 
   const pendingCount = entries.filter((e) => e.status === "pending").length
@@ -222,7 +285,11 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         />
         <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
         <p className="font-medium text-foreground">Drop PDFs here or click to select</p>
-        <p className="text-sm text-muted-foreground mt-1">Multiple files supported — titles are auto-filled from filenames</p>
+        <p className="text-sm text-muted-foreground mt-1">Multiple files supported (max 50MB each) - parallel upload</p>
+        <div className="flex items-center justify-center gap-2 mt-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+          <span className="text-xs text-amber-600">Files over 50MB will be rejected</span>
+        </div>
       </div>
 
       {/* Global Category */}
@@ -288,12 +355,22 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                   disabled={entry.status !== "pending"}
                   className="h-8 text-sm"
                 />
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {entry.file.name} &middot; {(entry.file.size / 1024 / 1024).toFixed(2)} MB
-                  {entry.status === "error" && (
-                    <span className="text-destructive ml-1">&mdash; {entry.error}</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-muted-foreground truncate flex-1">
+                    {entry.file.name} &middot; {(entry.file.size / 1024 / 1024).toFixed(2)} MB
+                    {entry.status === "error" && (
+                      <span className="text-destructive ml-1">&mdash; {entry.error}</span>
+                    )}
+                  </p>
+                  {entry.status === "uploading" && (
+                    <span className="text-xs font-medium text-primary shrink-0">
+                      {entry.progress}%
+                    </span>
                   )}
-                </p>
+                </div>
+                {entry.status === "uploading" && (
+                  <Progress value={entry.progress} className="h-1.5 mt-1.5" />
+                )}
               </div>
 
               {/* Per-file category */}

@@ -78,16 +78,36 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
   async function handleDownload() {
     setDownloading(true)
     try {
-      // Increment download count
-      await fetch(`/api/pdfs/${pdf.id}/download`, { method: "POST" })
+      // Download watermarked PDF
+      const response = await fetch(`/api/pdfs/${pdf.id}/download-watermarked`)
       
-      // Trigger download
+      if (!response.ok) {
+        throw new Error("Failed to download PDF")
+      }
+      
+      // Get the blob from response
+      const blob = await response.blob()
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
-      link.href = pdfUrl
-      link.download = pdf.title + ".pdf"
-      link.click()
+      link.href = url
       
-      toast.success("Download started!")
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get("Content-Disposition")
+      let filename = pdf.title + "_TechVyro.pdf"
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/)
+        if (match) filename = match[1]
+      }
+      
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast.success("Download started with TechVyro watermark!")
     } catch (error) {
       console.error("[v0] Download error:", error)
       toast.error("Failed to download PDF")
