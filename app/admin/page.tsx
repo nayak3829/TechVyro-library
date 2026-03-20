@@ -7,7 +7,7 @@ import {
   ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, 
   BarChart3, RefreshCw, Settings, Database, Loader2, MessageSquare,
   TrendingUp, Download, Eye, Star, Clock, Users, Zap, HardDrive,
-  Activity, AlertCircle
+  Activity, AlertCircle, Home, History
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -41,6 +41,14 @@ const ReviewsManager = dynamic(() => import("@/components/admin/reviews-manager"
 
 const SiteSettings = dynamic(() => import("@/components/admin/site-settings").then(mod => ({ default: mod.SiteSettings })), {
   loading: () => <ComponentLoader text="Loading settings..." />,
+})
+
+const ActivityLog = dynamic(() => import("@/components/admin/activity-log").then(mod => ({ default: mod.ActivityLog })), {
+  loading: () => <ComponentLoader text="Loading activity log..." />,
+})
+
+const HomepageManager = dynamic(() => import("@/components/admin/homepage-manager").then(mod => ({ default: mod.HomepageManager })), {
+  loading: () => <ComponentLoader text="Loading homepage manager..." />,
 })
 
 function ComponentLoader({ text }: { text: string }) {
@@ -234,6 +242,14 @@ export default function AdminPage() {
             <TabsTrigger value="analytics" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger value="homepage" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Homepage</span>
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Activity</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -559,6 +575,16 @@ export default function AdminPage() {
           {/* Analytics Tab */}
           <TabsContent value="analytics">
             <AnalyticsDashboard pdfs={pdfs} categories={categories} />
+          </TabsContent>
+
+          {/* Homepage Manager Tab */}
+          <TabsContent value="homepage">
+            <HomepageManager pdfs={pdfs} categories={categories} />
+          </TabsContent>
+
+          {/* Activity Log Tab */}
+          <TabsContent value="activity">
+            <ActivityLog pdfs={pdfs} categories={categories} />
           </TabsContent>
 
           {/* Settings Tab */}

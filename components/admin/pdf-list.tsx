@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Trash2, ExternalLink, FileText, Pencil, Check, X, Eye, Loader2, Search, Filter, Download } from "lucide-react"
+import { Trash2, ExternalLink, FileText, Pencil, Check, X, Eye, Loader2, Search, Filter, Download, FolderInput, FileDown, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empty } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import type { PDF, Category } from "@/lib/types"
@@ -46,6 +47,7 @@ export function PDFList({ pdfs, categories, loading, onDelete, onUpdate }: PDFLi
   const [saving, setSaving] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkMoving, setBulkMoving] = useState(false)
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("")
@@ -147,6 +149,88 @@ export function PDFList({ pdfs, categories, loading, onDelete, onUpdate }: PDFLi
     } finally {
       setBulkDeleting(false)
     }
+  }
+
+  async function handleBulkMove(categoryId: string | null) {
+    if (selectedIds.size === 0) return
+
+    setBulkMoving(true)
+    try {
+      const token = sessionStorage.getItem("admin_token")
+      const response = await fetch("/api/pdfs/bulk-move", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ids: Array.from(selectedIds), category_id: categoryId }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to move PDFs")
+      }
+
+      const data = await response.json()
+      const categoryName = categoryId ? categories.find(c => c.id === categoryId)?.name : "Uncategorized"
+      toast.success(`${data.updated} PDF${data.updated > 1 ? "s" : ""} moved to ${categoryName}!`)
+      setSelectedIds(new Set())
+      onUpdate()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to move PDFs")
+    } finally {
+      setBulkMoving(false)
+    }
+  }
+
+  function handleExportCSV() {
+    const csvData = filteredPdfs.map(pdf => ({
+      Title: pdf.title,
+      Category: categories.find(c => c.id === pdf.category_id)?.name || "Uncategorized",
+      Views: pdf.view_count || 0,
+      Downloads: pdf.download_count,
+      "File Size": formatFileSize(pdf.file_size),
+      "Created At": formatDate(pdf.created_at),
+      Rating: pdf.average_rating?.toFixed(1) || "N/A",
+      Reviews: pdf.review_count || 0,
+    }))
+
+    const headers = Object.keys(csvData[0] || {}).join(",")
+    const rows = csvData.map(row => Object.values(row).map(v => `"${v}"`).join(",")).join("\n")
+    const csv = `${headers}\n${rows}`
+
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `techvyro-pdfs-export-${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("PDF data exported to CSV!")
+  }
+
+  function handleExportJSON() {
+    const jsonData = filteredPdfs.map(pdf => ({
+      id: pdf.id,
+      title: pdf.title,
+      description: pdf.description,
+      category: categories.find(c => c.id === pdf.category_id)?.name || null,
+      views: pdf.view_count || 0,
+      downloads: pdf.download_count,
+      file_size: pdf.file_size,
+      average_rating: pdf.average_rating,
+      review_count: pdf.review_count,
+      created_at: pdf.created_at,
+    }))
+
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `techvyro-pdfs-export-${new Date().toISOString().split("T")[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("PDF data exported to JSON!")
   }
 
   function startEdit(pdf: PDF) {
@@ -310,7 +394,7 @@ export function PDFList({ pdfs, categories, loading, onDelete, onUpdate }: PDFLi
       {/* Bulk Actions Bar - Enhanced */}
       <div className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
         selectedIds.size > 0 
-          ? "bg-destructive/5 border-destructive/30" 
+          ? "bg-primary/5 border-primary/30" 
           : "bg-muted/30 border-border/50"
       }`}>
         <div className="flex items-center gap-4">
@@ -327,30 +411,82 @@ export function PDFList({ pdfs, categories, loading, onDelete, onUpdate }: PDFLi
                 : `${filteredPdfs.length} PDFs total`}
             </span>
             {selectedIds.size > 0 && (
-              <p className="text-xs text-muted-foreground">Click delete to remove selected</p>
+              <p className="text-xs text-muted-foreground">Use actions below to manage selected PDFs</p>
             )}
           </div>
         </div>
-        {selectedIds.size > 0 && (
-          <Button
-            variant="destructive"
-            onClick={handleBulkDelete}
-            disabled={bulkDeleting}
-            className="gap-2 shadow-lg shadow-destructive/20"
-          >
-            {bulkDeleting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Deleting {selectedIds.size}...
-              </>
-            ) : (
-              <>
-                <Trash2 className="h-4 w-4" />
-                Delete {selectedIds.size} PDF{selectedIds.size > 1 ? "s" : ""}
-              </>
-            )}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Export dropdown - always visible */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                <span className="hidden sm:inline">Export</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportJSON}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Export as JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {selectedIds.size > 0 && (
+            <>
+              {/* Move to category dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2" disabled={bulkMoving}>
+                    {bulkMoving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FolderInput className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">Move to</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleBulkMove(null)}>
+                    <span className="text-muted-foreground">Uncategorized</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {categories.map((cat) => (
+                    <DropdownMenuItem key={cat.id} onClick={() => handleBulkMove(cat.id)}>
+                      <span className="h-2.5 w-2.5 rounded-full mr-2" style={{ backgroundColor: cat.color }} />
+                      {cat.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Delete button */}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="gap-2"
+              >
+                {bulkDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="hidden sm:inline">Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Delete ({selectedIds.size})</span>
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* PDF List - Enhanced */}
