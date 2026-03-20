@@ -1,23 +1,39 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useCallback } from "react"
 import Link from "next/link"
 import { PDFCard } from "@/components/pdf-card"
 import { SearchBar } from "@/components/search-bar"
 import { Empty } from "@/components/ui/empty"
-import { FileText, ArrowUpDown, Clock, Eye, Download, SortAsc, Heart, ChevronLeft, ChevronRight, FolderOpen, ArrowRight, Grid3X3 } from "lucide-react"
+import { 
+  FileText, ArrowUpDown, Clock, Eye, Download, SortAsc, Heart, 
+  ChevronLeft, ChevronRight, FolderOpen, ArrowRight, Grid3X3,
+  LayoutGrid, List, Filter, X, Sparkles
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { useFavorites } from "@/hooks/use-favorites"
 import type { PDF, Category } from "@/lib/types"
 
-type SortOption = "newest" | "oldest" | "most-viewed" | "most-downloaded" | "alphabetical"
+type SortOption = "newest" | "oldest" | "most-viewed" | "most-downloaded" | "alphabetical" | "rating"
+type ViewMode = "grid" | "compact"
 
 const ITEMS_PER_PAGE = 20
 
@@ -32,14 +48,17 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
   const [sortBy, setSortBy] = useState<SortOption>("newest")
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const { favorites, isLoaded } = useFavorites()
 
-  const sortLabels: Record<SortOption, string> = {
-    "newest": "Newest",
-    "oldest": "Oldest",
-    "most-viewed": "Most Viewed",
-    "most-downloaded": "Downloads",
-    "alphabetical": "A-Z",
+  const sortLabels: Record<SortOption, { label: string; icon: typeof Clock }> = {
+    "newest": { label: "Newest", icon: Clock },
+    "oldest": { label: "Oldest", icon: Clock },
+    "most-viewed": { label: "Most Viewed", icon: Eye },
+    "most-downloaded": { label: "Downloads", icon: Download },
+    "alphabetical": { label: "A-Z", icon: SortAsc },
+    "rating": { label: "Top Rated", icon: Sparkles },
   }
 
   // Calculate category counts
@@ -78,6 +97,9 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
       case "alphabetical":
         result = [...result].sort((a, b) => a.title.localeCompare(b.title))
         break
+      case "rating":
+        result = [...result].sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0))
+        break
     }
 
     return result
@@ -111,9 +133,79 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
     return pages
   }
 
+  const clearAllFilters = useCallback(() => {
+    setSearch("")
+    setSelectedCategory(null)
+    setShowFavoritesOnly(false)
+    setSortBy("newest")
+  }, [])
+
+  const activeFiltersCount = [
+    search,
+    selectedCategory,
+    showFavoritesOnly,
+    sortBy !== "newest"
+  ].filter(Boolean).length
+
+  // Category selection card
+  const CategoryCard = ({ category, isSelected, count, onClick }: { 
+    category?: Category
+    isSelected: boolean
+    count: number
+    onClick: () => void
+  }) => (
+    <Card 
+      className={`cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group ${
+        isSelected 
+          ? "ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 shadow-md" 
+          : "hover:border-primary/50 hover:shadow-primary/10"
+      }`}
+      onClick={onClick}
+    >
+      <CardContent className="p-3 sm:p-4 text-center">
+        <div className="relative h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3">
+          <div 
+            className="absolute inset-0 rounded-xl blur-lg opacity-0 group-hover:opacity-60 transition-opacity"
+            style={{ backgroundColor: category?.color || "hsl(var(--primary))" }}
+          />
+          <div 
+            className="relative h-full w-full rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md"
+            style={{ backgroundColor: category?.color || "hsl(var(--primary))" }}
+          >
+            {category ? (
+              <FolderOpen className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            ) : (
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+            )}
+          </div>
+        </div>
+        <p className="font-semibold text-xs sm:text-sm truncate">{category?.name || "All PDFs"}</p>
+        <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+          <span>{count} files</span>
+          {category && (
+            <ArrowRight className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style={{ color: category.color }} />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Categories Section - Clickable cards that link to category pages */}
+      {/* Section Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20">
+            <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">PDF Library</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">{pdfs.length} documents available</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Categories Section */}
       {categories.length > 0 && (
         <section className="space-y-4 sm:space-y-5">
           <div className="flex items-center justify-between">
@@ -122,7 +214,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
                 <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-semibold text-foreground">Browse Categories</h2>
+                <h3 className="text-base sm:text-lg font-semibold text-foreground">Browse Categories</h3>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">{categories.length} categories available</p>
               </div>
             </div>
@@ -130,58 +222,24 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
           
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
             {/* All PDFs Card */}
-            <Card 
-              className={`cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group ${
-                selectedCategory === null && !showFavoritesOnly 
-                  ? "ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 shadow-md" 
-                  : "hover:border-primary/50 hover:shadow-primary/10"
-              }`}
+            <CategoryCard
+              isSelected={selectedCategory === null && !showFavoritesOnly}
+              count={pdfs.length}
               onClick={() => {
                 setSelectedCategory(null)
                 setShowFavoritesOnly(false)
               }}
-            >
-              <CardContent className="p-3 sm:p-4 text-center">
-                <div className="relative h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3">
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="relative h-full w-full rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
-                  </div>
-                </div>
-                <p className="font-semibold text-xs sm:text-sm truncate">All PDFs</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{pdfs.length} files</p>
-              </CardContent>
-            </Card>
+            />
 
-            {/* Category Cards - Now link to dedicated pages */}
+            {/* Category Cards */}
             {categories.map((category) => (
               <Link key={category.id} href={`/category/${category.slug}`}>
-                <Card 
-                  className="cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group h-full hover:border-opacity-50"
-                  style={{
-                    borderColor: selectedCategory === category.id ? category.color : undefined,
-                  }}
-                >
-                  <CardContent className="p-3 sm:p-4 text-center">
-                    <div className="relative h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3">
-                      <div 
-                        className="absolute inset-0 rounded-xl blur-lg opacity-0 group-hover:opacity-60 transition-opacity"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <div 
-                        className="relative h-full w-full rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md"
-                        style={{ backgroundColor: category.color }}
-                      >
-                        <FolderOpen className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                      </div>
-                    </div>
-                    <p className="font-semibold text-xs sm:text-sm truncate">{category.name}</p>
-                    <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      <span>{categoryCounts[category.id] || 0} files</span>
-                      <ArrowRight className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style={{ color: category.color }} />
-                    </div>
-                  </CardContent>
-                </Card>
+                <CategoryCard
+                  category={category}
+                  isSelected={selectedCategory === category.id}
+                  count={categoryCounts[category.id] || 0}
+                  onClick={() => {}}
+                />
               </Link>
             ))}
           </div>
@@ -190,11 +248,92 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
 
       {/* Search and Filters */}
       <section className="space-y-4">
-        <div className="relative">
-          <SearchBar value={search} onChange={setSearch} />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+          
+          {/* Mobile Filter Button */}
+          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="sm:hidden gap-2 h-11">
+                <Filter className="h-4 w-4" />
+                Filters
+                {activeFiltersCount > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-primary/10 text-primary">
+                    {activeFiltersCount}
+                  </Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[70vh]">
+              <SheetHeader>
+                <SheetTitle>Filter & Sort</SheetTitle>
+                <SheetDescription>Customize how PDFs are displayed</SheetDescription>
+              </SheetHeader>
+              <div className="mt-6 space-y-6">
+                {/* Sort Options */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Sort By</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(sortLabels).map(([key, { label, icon: Icon }]) => (
+                      <Button
+                        key={key}
+                        variant={sortBy === key ? "default" : "outline"}
+                        size="sm"
+                        className="justify-start gap-2"
+                        onClick={() => {
+                          setSortBy(key as SortOption)
+                        }}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Favorites Toggle */}
+                {isLoaded && favorites.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm">Quick Filters</h4>
+                    <Button
+                      variant={showFavoritesOnly ? "default" : "outline"}
+                      className={`w-full justify-start gap-2 ${
+                        showFavoritesOnly ? "bg-gradient-to-r from-pink-500 to-rose-500 border-0" : ""
+                      }`}
+                      onClick={() => {
+                        setShowFavoritesOnly(!showFavoritesOnly)
+                        if (!showFavoritesOnly) setSelectedCategory(null)
+                      }}
+                    >
+                      <Heart className={`h-4 w-4 ${showFavoritesOnly ? "fill-current" : ""}`} />
+                      Favorites Only ({favorites.length})
+                    </Button>
+                  </div>
+                )}
+
+                {/* Clear All */}
+                {activeFiltersCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      clearAllFilters()
+                      setMobileFiltersOpen(false)
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear All Filters
+                  </Button>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Desktop Filter Bar */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Favorites Button */}
           {isLoaded && favorites.length > 0 && (
             <Button
@@ -211,8 +350,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
               }}
             >
               <Heart className={`h-3.5 w-3.5 ${showFavoritesOnly ? "fill-current" : ""}`} />
-              <span className="hidden xs:inline">Favorites</span>
-              <span className="xs:hidden">Fav</span>
+              Favorites
               <span className="bg-background/20 px-1.5 py-0.5 rounded-md text-[10px] font-semibold">
                 {favorites.length}
               </span>
@@ -224,28 +362,67 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9 px-3 hover:border-primary/50">
                 <ArrowUpDown className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{sortLabels[sortBy]}</span>
-                <span className="sm:hidden">Sort</span>
+                {sortLabels[sortBy].label}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[160px]">
+            <DropdownMenuContent align="start" className="min-w-[180px]">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Sort by</DropdownMenuLabel>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSortBy("newest")} className="gap-2 text-sm cursor-pointer">
                 <Clock className="h-4 w-4 text-primary" /> Newest First
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSortBy("oldest")} className="gap-2 text-sm cursor-pointer">
                 <Clock className="h-4 w-4 text-muted-foreground" /> Oldest First
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSortBy("most-viewed")} className="gap-2 text-sm cursor-pointer">
                 <Eye className="h-4 w-4 text-blue-500" /> Most Viewed
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSortBy("most-downloaded")} className="gap-2 text-sm cursor-pointer">
                 <Download className="h-4 w-4 text-green-500" /> Most Downloaded
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortBy("rating")} className="gap-2 text-sm cursor-pointer">
+                <Sparkles className="h-4 w-4 text-amber-500" /> Top Rated
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSortBy("alphabetical")} className="gap-2 text-sm cursor-pointer">
                 <SortAsc className="h-4 w-4 text-accent" /> A-Z
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 border border-border/50 rounded-lg p-0.5">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "compact" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewMode("compact")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Clear Filters */}
+          {activeFiltersCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs h-9 px-3 text-muted-foreground hover:text-destructive"
+              onClick={clearAllFilters}
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </Button>
+          )}
 
           {/* Results count */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto bg-muted/50 px-3 py-1.5 rounded-lg">
@@ -259,6 +436,52 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             )}
           </div>
         </div>
+
+        {/* Active Filters Display */}
+        {(search || selectedCategory || showFavoritesOnly) && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Active filters:</span>
+            {search && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Search: {search.slice(0, 15)}{search.length > 15 ? "..." : ""}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-4 w-4 p-0 hover:bg-transparent"
+                  onClick={() => setSearch("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+            {selectedCategory && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                {categories.find(c => c.id === selectedCategory)?.name}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-4 w-4 p-0 hover:bg-transparent"
+                  onClick={() => setSelectedCategory(null)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+            {showFavoritesOnly && (
+              <Badge variant="secondary" className="gap-1 pr-1 bg-pink-500/10 text-pink-600">
+                Favorites
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-4 w-4 p-0 hover:bg-transparent"
+                  onClick={() => setShowFavoritesOnly(false)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+          </div>
+        )}
       </section>
 
       {/* PDF Grid */}
@@ -271,9 +494,13 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             : "No PDFs have been uploaded yet"}
         />
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className={
+          viewMode === "grid" 
+            ? "grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+            : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+        }>
           {paginatedPdfs.map((pdf) => (
-            <PDFCard key={pdf.id} pdf={pdf} />
+            <PDFCard key={pdf.id} pdf={pdf} compact={viewMode === "compact"} />
           ))}
         </div>
       )}
@@ -286,7 +513,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             size="sm"
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="h-8 w-8 p-0"
+            className="h-9 w-9 p-0"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -299,12 +526,12 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
                   variant={currentPage === page ? "default" : "outline"}
                   size="sm"
                   onClick={() => setCurrentPage(page)}
-                  className="h-8 w-8 p-0 text-xs"
+                  className={`h-9 w-9 p-0 text-xs ${currentPage === page ? "bg-primary shadow-md shadow-primary/20" : ""}`}
                 >
                   {page}
                 </Button>
               ) : (
-                <span key={idx} className="px-0.5 text-muted-foreground text-xs">...</span>
+                <span key={idx} className="px-1 text-muted-foreground text-xs">...</span>
               )
             ))}
           </div>
@@ -314,7 +541,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             size="sm"
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="h-8 w-8 p-0"
+            className="h-9 w-9 p-0"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

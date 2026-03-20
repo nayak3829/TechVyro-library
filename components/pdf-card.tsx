@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { FileText, Download, Eye, Star, Sparkles } from "lucide-react"
+import { FileText, Download, Eye, Star, Sparkles, Calendar } from "lucide-react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { FavoriteButton } from "@/components/favorite-button"
@@ -7,6 +7,7 @@ import type { PDF } from "@/lib/types"
 
 interface PDFCardProps {
   pdf: PDF
+  compact?: boolean
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -23,9 +24,90 @@ function isNewPDF(dateString: string): boolean {
   return diffDays <= 7
 }
 
-export function PDFCard({ pdf }: PDFCardProps) {
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })
+}
+
+export function PDFCard({ pdf, compact = false }: PDFCardProps) {
   const isNew = isNewPDF(pdf.created_at)
   
+  if (compact) {
+    return (
+      <Link href={`/pdf/${pdf.id}`}>
+        <Card className="group h-full overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5 border-border/50 bg-card hover:border-primary/30">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-start gap-3">
+              {/* PDF Icon */}
+              <div className="relative shrink-0">
+                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 group-hover:from-primary/20 group-hover:to-accent/15 transition-colors">
+                  <FileText className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+                </div>
+                {isNew && (
+                  <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-amber-500 to-orange-500 shadow-md">
+                    <Sparkles className="h-3 w-3 text-white" />
+                  </div>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                    {pdf.title}
+                  </h3>
+                  <FavoriteButton pdfId={pdf.id} size="sm" variant="ghost" />
+                </div>
+
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {pdf.category && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] px-1.5 py-0"
+                      style={{
+                        backgroundColor: pdf.category.color + "20",
+                        color: pdf.category.color,
+                      }}
+                    >
+                      {pdf.category.name}
+                    </Badge>
+                  )}
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(pdf.created_at)}
+                  </span>
+                </div>
+
+                {/* Stats Row */}
+                <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    {(pdf.view_count || 0).toLocaleString()}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Download className="h-3 w-3" />
+                    {pdf.download_count.toLocaleString()}
+                  </span>
+                  {pdf.average_rating && (
+                    <span className="flex items-center gap-0.5 text-amber-500">
+                      <Star className="h-3 w-3 fill-current" />
+                      {pdf.average_rating.toFixed(1)}
+                    </span>
+                  )}
+                  <span className="ml-auto text-muted-foreground/60">
+                    {formatFileSize(pdf.file_size)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+    )
+  }
+
   return (
     <Link href={`/pdf/${pdf.id}`}>
       <Card className="group h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-primary/15 hover:-translate-y-1.5 border-border/50 bg-card hover:border-primary/30">
@@ -48,7 +130,7 @@ export function PDFCard({ pdf }: PDFCardProps) {
           {/* Category Badge */}
           {pdf.category && (
             <Badge
-              className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 font-medium shadow-md"
+              className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 font-medium shadow-md border-0"
               style={{
                 backgroundColor: pdf.category.color,
                 color: "#fff",
@@ -98,13 +180,13 @@ export function PDFCard({ pdf }: PDFCardProps) {
             ) : (
               <span className="flex items-center gap-0.5 sm:gap-1">
                 <Eye className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" />
-                <span>{pdf.view_count || 0}</span>
+                <span>{(pdf.view_count || 0).toLocaleString()}</span>
               </span>
             )}
           </div>
           <span className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-md">
             <Download className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" />
-            <span className="font-medium">{pdf.download_count}</span>
+            <span className="font-medium">{pdf.download_count.toLocaleString()}</span>
           </span>
         </CardFooter>
       </Card>

@@ -3,12 +3,18 @@
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
-import { ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, BarChart3, RefreshCw, Settings, Database, Loader2, MessageSquare } from "lucide-react"
+import { 
+  ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, 
+  BarChart3, RefreshCw, Settings, Database, Loader2, MessageSquare,
+  TrendingUp, Download, Eye, Star, Clock, Users, Zap, HardDrive,
+  Activity, AlertCircle
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import type { Category, PDF } from "@/lib/types"
 
@@ -33,6 +39,10 @@ const ReviewsManager = dynamic(() => import("@/components/admin/reviews-manager"
   loading: () => <ComponentLoader text="Loading reviews..." />,
 })
 
+const SiteSettings = dynamic(() => import("@/components/admin/site-settings").then(mod => ({ default: mod.SiteSettings })), {
+  loading: () => <ComponentLoader text="Loading settings..." />,
+})
+
 function ComponentLoader({ text }: { text: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -47,6 +57,7 @@ export default function AdminPage() {
   const [pdfs, setPdfs] = useState<PDF[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [activeTab, setActiveTab] = useState("overview")
 
   async function fetchData() {
     try {
@@ -100,10 +111,23 @@ export default function AdminPage() {
     fetchData()
   }
 
-  // Quick stats
+  // Calculated stats
   const totalViews = pdfs.reduce((sum, pdf) => sum + (pdf.view_count || 0), 0)
   const totalDownloads = pdfs.reduce((sum, pdf) => sum + pdf.download_count, 0)
   const totalStorage = pdfs.reduce((sum, pdf) => sum + (pdf.file_size || 0), 0)
+  const totalReviews = pdfs.reduce((sum, pdf) => sum + (pdf.review_count || 0), 0)
+  const avgRating = pdfs.filter(p => p.average_rating).length > 0
+    ? pdfs.filter(p => p.average_rating).reduce((sum, pdf) => sum + (pdf.average_rating || 0), 0) / pdfs.filter(p => p.average_rating).length
+    : 0
+  const engagementRate = totalViews > 0 ? ((totalDownloads / totalViews) * 100) : 0
+
+  // Recent activity (last 7 days)
+  const recentPdfs = pdfs.filter(pdf => {
+    const uploadDate = new Date(pdf.created_at)
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    return uploadDate >= weekAgo
+  })
 
   function formatBytes(bytes: number) {
     if (bytes === 0) return "0 B"
@@ -115,8 +139,8 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
-        {/* Gradient line at top */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
         
         <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
@@ -125,12 +149,13 @@ export default function AdminPage() {
               href="/" 
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
                 <ArrowLeft className="h-4 w-4" />
               </div>
-              <span className="hidden sm:inline">Back to Library</span>
+              <span className="hidden sm:inline font-medium">Back to Library</span>
             </Link>
           </div>
+
           <div className="flex items-center gap-2.5">
             <div className="relative">
               <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur opacity-50" />
@@ -144,6 +169,7 @@ export default function AdminPage() {
             </div>
             <span className="sm:hidden font-semibold text-sm">Admin</span>
           </div>
+
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Button 
               variant="outline" 
@@ -169,71 +195,20 @@ export default function AdminPage() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
-        {/* Quick Stats Bar - Enhanced */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
-          <Card className="group border-border/50 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Total PDFs</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-foreground">{pdfs.length}</p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 group-hover:scale-110 transition-transform duration-300">
-                  <FileText className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="group border-border/50 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/10 transition-all duration-300">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Categories</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-foreground">{categories.length}</p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent/20 to-accent/10 group-hover:scale-110 transition-transform duration-300">
-                  <FolderPlus className="h-6 w-6 text-accent" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="group border-border/50 hover:border-green-500/40 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Total Views</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-foreground">{totalViews.toLocaleString()}</p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
-                  <BarChart3 className="h-6 w-6 text-green-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="group border-border/50 hover:border-blue-500/40 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Storage Used</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-foreground">{formatBytes(totalStorage)}</p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 group-hover:scale-110 transition-transform duration-300">
-                  <Database className="h-6 w-6 text-blue-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="mb-6 sm:mb-10">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Manage Library</h1>
-          <p className="mt-1.5 sm:mt-2 text-sm sm:text-base text-muted-foreground">
-            Upload PDFs, manage categories, view analytics, and moderate reviews
+        {/* Page Title */}
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard Overview</h1>
+          <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+            Manage your PDF library, analytics, and settings
           </p>
         </div>
 
-        <Tabs defaultValue="upload" className="space-y-5 sm:space-y-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 sm:space-y-8">
           <TabsList className="flex flex-wrap h-auto gap-1.5 p-1.5 bg-muted/50 rounded-xl">
+            <TabsTrigger value="overview" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Overview</span>
+            </TabsTrigger>
             <TabsTrigger value="upload" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Upload</span>
@@ -260,8 +235,244 @@ export default function AdminPage() {
               <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Analytics</span>
             </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Settings</span>
+            </TabsTrigger>
           </TabsList>
 
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+              <StatCard 
+                label="Total PDFs" 
+                value={pdfs.length} 
+                icon={FileText}
+                color="primary"
+              />
+              <StatCard 
+                label="Categories" 
+                value={categories.length} 
+                icon={FolderPlus}
+                color="accent"
+              />
+              <StatCard 
+                label="Total Views" 
+                value={totalViews} 
+                icon={Eye}
+                color="green"
+              />
+              <StatCard 
+                label="Downloads" 
+                value={totalDownloads} 
+                icon={Download}
+                color="blue"
+              />
+              <StatCard 
+                label="Reviews" 
+                value={totalReviews} 
+                icon={MessageSquare}
+                color="purple"
+              />
+              <StatCard 
+                label="Storage" 
+                value={formatBytes(totalStorage)} 
+                icon={HardDrive}
+                color="orange"
+                isString
+              />
+            </div>
+
+            {/* Quick Actions & Insights */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Quick Actions */}
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Zap className="h-5 w-5 text-amber-500" />
+                    Quick Actions
+                  </CardTitle>
+                  <CardDescription>Frequently used actions</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button 
+                    className="w-full justify-start gap-3" 
+                    variant="outline"
+                    onClick={() => setActiveTab("upload")}
+                  >
+                    <Upload className="h-4 w-4 text-primary" />
+                    Upload New PDF
+                  </Button>
+                  <Button 
+                    className="w-full justify-start gap-3" 
+                    variant="outline"
+                    onClick={() => setActiveTab("categories")}
+                  >
+                    <FolderPlus className="h-4 w-4 text-accent" />
+                    Add Category
+                  </Button>
+                  <Button 
+                    className="w-full justify-start gap-3" 
+                    variant="outline"
+                    onClick={() => setActiveTab("analytics")}
+                  >
+                    <BarChart3 className="h-4 w-4 text-blue-500" />
+                    View Analytics
+                  </Button>
+                  <Button 
+                    className="w-full justify-start gap-3" 
+                    variant="outline"
+                    onClick={() => setActiveTab("reviews")}
+                  >
+                    <MessageSquare className="h-4 w-4 text-green-500" />
+                    Moderate Reviews
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Performance Metrics */}
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                    Performance
+                  </CardTitle>
+                  <CardDescription>Key performance indicators</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Engagement Rate</span>
+                      <span className="font-medium">{engagementRate.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={Math.min(engagementRate, 100)} className="h-2" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Average Rating</span>
+                      <span className="font-medium flex items-center gap-1">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        {avgRating > 0 ? avgRating.toFixed(1) : "N/A"}
+                      </span>
+                    </div>
+                    <Progress value={avgRating * 20} className="h-2" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Category Coverage</span>
+                      <span className="font-medium">{categories.length > 0 ? Math.round((pdfs.filter(p => p.category_id).length / pdfs.length) * 100) : 0}%</span>
+                    </div>
+                    <Progress value={categories.length > 0 && pdfs.length > 0 ? (pdfs.filter(p => p.category_id).length / pdfs.length) * 100 : 0} className="h-2" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Activity */}
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Clock className="h-5 w-5 text-blue-500" />
+                    Recent Uploads
+                  </CardTitle>
+                  <CardDescription>PDFs added in the last 7 days</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {recentPdfs.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No recent uploads</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recentPdfs.slice(0, 4).map((pdf) => (
+                        <div key={pdf.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                            <FileText className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{pdf.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(pdf.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {recentPdfs.length > 4 && (
+                        <Button 
+                          variant="ghost" 
+                          className="w-full text-xs h-8"
+                          onClick={() => setActiveTab("pdfs")}
+                        >
+                          View all {recentPdfs.length} recent uploads
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Top Performing PDFs */}
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Top Performing PDFs
+                </CardTitle>
+                <CardDescription>Most downloaded and viewed documents</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[...pdfs]
+                    .sort((a, b) => b.download_count - a.download_count)
+                    .slice(0, 6)
+                    .map((pdf, index) => {
+                      const category = categories.find(c => c.id === pdf.category_id)
+                      return (
+                        <div 
+                          key={pdf.id}
+                          className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50"
+                        >
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-sm ${
+                            index === 0 ? "bg-amber-500/20 text-amber-600" :
+                            index === 1 ? "bg-slate-400/20 text-slate-500" :
+                            index === 2 ? "bg-orange-600/20 text-orange-600" :
+                            "bg-muted text-muted-foreground"
+                          }`}>
+                            #{index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{pdf.title}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Download className="h-3 w-3" />
+                                {pdf.download_count}
+                              </span>
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Eye className="h-3 w-3" />
+                                {pdf.view_count || 0}
+                              </span>
+                            </div>
+                          </div>
+                          {category && (
+                            <Badge 
+                              variant="outline" 
+                              className="text-[10px] h-5 shrink-0"
+                              style={{ backgroundColor: category.color + "20", color: category.color, borderColor: category.color + "40" }}
+                            >
+                              {category.name}
+                            </Badge>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Upload Tab */}
           <TabsContent value="upload">
             <Card className="border-border/50">
               <CardHeader>
@@ -282,6 +493,7 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* PDFs Tab */}
           <TabsContent value="pdfs">
             <Card className="border-border/50">
               <CardHeader>
@@ -305,6 +517,7 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* Categories Tab */}
           <TabsContent value="categories">
             <Card className="border-border/50">
               <CardHeader>
@@ -325,6 +538,7 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* Reviews Tab */}
           <TabsContent value="reviews">
             <Card className="border-border/50">
               <CardHeader>
@@ -342,11 +556,59 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* Analytics Tab */}
           <TabsContent value="analytics">
             <AnalyticsDashboard pdfs={pdfs} categories={categories} />
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings">
+            <SiteSettings />
           </TabsContent>
         </Tabs>
       </main>
     </div>
+  )
+}
+
+// Stat Card Component
+function StatCard({ 
+  label, 
+  value, 
+  icon: Icon, 
+  color,
+  isString = false
+}: { 
+  label: string
+  value: number | string
+  icon: typeof FileText
+  color: "primary" | "accent" | "green" | "blue" | "purple" | "orange"
+  isString?: boolean
+}) {
+  const colorClasses = {
+    primary: "border-primary/40 hover:shadow-primary/10 from-primary/20 to-primary/10 text-primary",
+    accent: "border-accent/40 hover:shadow-accent/10 from-accent/20 to-accent/10 text-accent",
+    green: "border-green-500/40 hover:shadow-green-500/10 from-green-500/20 to-green-500/10 text-green-500",
+    blue: "border-blue-500/40 hover:shadow-blue-500/10 from-blue-500/20 to-blue-500/10 text-blue-500",
+    purple: "border-purple-500/40 hover:shadow-purple-500/10 from-purple-500/20 to-purple-500/10 text-purple-500",
+    orange: "border-orange-500/40 hover:shadow-orange-500/10 from-orange-500/20 to-orange-500/10 text-orange-500",
+  }
+
+  return (
+    <Card className={`group border-border/50 hover:${colorClasses[color].split(' ')[0]} hover:shadow-lg ${colorClasses[color].split(' ')[1]} transition-all duration-300`}>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">{label}</p>
+            <p className="text-xl sm:text-2xl font-bold text-foreground mt-1">
+              {isString ? value : (typeof value === 'number' ? value.toLocaleString() : value)}
+            </p>
+          </div>
+          <div className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gradient-to-br ${colorClasses[color].split(' ').slice(2, 4).join(' ')} group-hover:scale-110 transition-transform duration-300`}>
+            <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${colorClasses[color].split(' ')[4]}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
