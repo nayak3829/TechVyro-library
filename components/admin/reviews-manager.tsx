@@ -32,43 +32,34 @@ export function ReviewsManager({ pdfs, categories }: ReviewsManagerProps) {
   const [filterPdf, setFilterPdf] = useState<string>("all")
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "rating_high" | "rating_low">("newest")
 
-  // Fetch all reviews
+  // Fetch all reviews using dedicated endpoint
   useEffect(() => {
     async function fetchAllReviews() {
       setLoading(true)
       try {
-        const allReviews: ReviewWithPDF[] = []
+        const token = sessionStorage.getItem("admin_token")
+        const res = await fetch("/api/reviews", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         
-        for (const pdf of pdfs) {
-          try {
-            const res = await fetch(`/api/pdfs/${pdf.id}/reviews`)
-            if (res.ok) {
-              const pdfReviews = await res.json()
-              allReviews.push(...pdfReviews.map((r: Review) => ({
-                ...r,
-                pdf_title: pdf.title
-              })))
-            }
-          } catch (err) {
-            console.error(`Failed to fetch reviews for PDF ${pdf.id}:`, err)
-          }
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || "Failed to fetch reviews")
         }
         
-        setReviews(allReviews)
+        const data = await res.json()
+        console.log("[v0] Fetched reviews:", data.reviews?.length || 0)
+        setReviews(data.reviews || [])
       } catch (error) {
-        console.error("Failed to fetch reviews:", error)
+        console.error("[v0] Failed to fetch reviews:", error)
         toast.error("Failed to load reviews")
       } finally {
         setLoading(false)
       }
     }
 
-    if (pdfs.length > 0) {
-      fetchAllReviews()
-    } else {
-      setLoading(false)
-    }
-  }, [pdfs])
+    fetchAllReviews()
+  }, [])
 
   // Filter and sort reviews
   const filteredReviews = useMemo(() => {
