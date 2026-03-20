@@ -72,3 +72,42 @@ export async function POST(
     return NextResponse.json({ error: "Failed to add review" }, { status: 500 })
   }
 }
+
+// Delete a review (Admin only)
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verify admin token
+    const authHeader = request.headers.get("Authorization")
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!isAdminConfigured()) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 503 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const reviewId = searchParams.get("reviewId")
+
+    if (!reviewId) {
+      return NextResponse.json({ error: "Review ID is required" }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+
+    const { error } = await supabase
+      .from("reviews")
+      .delete()
+      .eq("id", reviewId)
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("[v0] Error deleting review:", error)
+    return NextResponse.json({ error: "Failed to delete review" }, { status: 500 })
+  }
+}
