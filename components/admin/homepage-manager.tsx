@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { 
   Home, Star, Megaphone, Eye, EyeOff, Save, Plus, Trash2, 
   GripVertical, ArrowUp, ArrowDown, AlertCircle, CheckCircle, Info,
-  FileText, X, Loader2, Image as ImageIcon, Link as LinkIcon
+  FileText, X, Loader2, Image as ImageIcon, Link as LinkIcon, Users,
+  Quote, BadgeCheck, Edit2
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-import type { PDF, Category } from "@/lib/types"
+import type { PDF, Category, Testimonial } from "@/lib/types"
 
 interface HomepageManagerProps {
   pdfs: PDF[]
@@ -39,13 +40,94 @@ interface FeaturedPDF {
   order: number
 }
 
+const defaultTestimonials: Testimonial[] = [
+  {
+    id: "1",
+    name: "Rahul Sharma",
+    course: "NDA Aspirant",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+    rating: 5,
+    comment: "TechVyro ne meri NDA preparation ko next level pe le gaya. Notes itne clear hain ki ek baar padhke yaad ho jaata hai!",
+    verified: true,
+    enabled: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "2",
+    name: "Priya Patel",
+    course: "B.Tech Student",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",
+    rating: 5,
+    comment: "Engineering ke saare subjects ke notes mil gaye ek jagah. Exam se pehle revision ke liye perfect resource hai!",
+    verified: true,
+    enabled: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "3",
+    name: "Amit Kumar",
+    course: "SSC Aspirant",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
+    rating: 5,
+    comment: "Previous year papers aur solutions sab free mein! Maine 3 competitive exams clear kiye TechVyro ke resources se.",
+    verified: true,
+    enabled: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "4",
+    name: "Sneha Reddy",
+    course: "NEET Aspirant",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",
+    rating: 5,
+    comment: "Biology aur Chemistry ke notes bahut detailed hain. Diagrams itne clear hain ki concepts turant samajh aate hain!",
+    verified: true,
+    enabled: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "5",
+    name: "Vikram Singh",
+    course: "UPSC Aspirant",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+    rating: 5,
+    comment: "Current affairs aur static GK ke PDFs regularly update hote hain. Prelims preparation ke liye best resource!",
+    verified: true,
+    enabled: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "6",
+    name: "Ananya Gupta",
+    course: "Class 12 Student",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+    rating: 5,
+    comment: "Board exams ke liye NCERT solutions aur sample papers mil gaye. 95% score kiya thanks to TechVyro!",
+    verified: true,
+    enabled: true,
+    createdAt: new Date().toISOString()
+  }
+]
+
 export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
-  const [activeSection, setActiveSection] = useState<"featured" | "announcements" | "hero">("featured")
+  const [activeSection, setActiveSection] = useState<"featured" | "announcements" | "hero" | "testimonials">("featured")
   const [saving, setSaving] = useState(false)
 
   // Featured PDFs state
   const [featuredPdfs, setFeaturedPdfs] = useState<FeaturedPDF[]>([])
   const [selectedPdfToAdd, setSelectedPdfToAdd] = useState<string>("")
+
+  // Testimonials state
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(defaultTestimonials)
+  const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null)
+  const [newTestimonial, setNewTestimonial] = useState<Partial<Testimonial>>({
+    name: "",
+    course: "",
+    avatar: "",
+    rating: 5,
+    comment: "",
+    verified: true,
+  })
 
   // Announcements state
   const [announcements, setAnnouncements] = useState<Announcement[]>([
@@ -75,7 +157,7 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
     backgroundStyle: "gradient" as "gradient" | "solid" | "pattern",
   })
 
-  // Load featured PDFs from localStorage
+  // Load settings from localStorage
   useEffect(() => {
     const stored = localStorage.getItem("techvyro_featured_pdfs")
     if (stored) {
@@ -105,6 +187,15 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
         setHeroSettings(JSON.parse(storedHero))
       } catch {
         // Invalid data, ignore
+      }
+    }
+
+    const storedTestimonials = localStorage.getItem("techvyro_testimonials")
+    if (storedTestimonials) {
+      try {
+        setTestimonials(JSON.parse(storedTestimonials))
+      } catch {
+        // Invalid data, use defaults
       }
     }
   }, [])
@@ -145,6 +236,51 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
     
     ;[newFeatured[index], newFeatured[newIndex]] = [newFeatured[newIndex], newFeatured[index]]
     setFeaturedPdfs(newFeatured)
+  }
+
+  // Testimonial functions
+  function addTestimonial() {
+    if (!newTestimonial.name || !newTestimonial.comment) {
+      toast.error("Name and comment are required")
+      return
+    }
+
+    const testimonial: Testimonial = {
+      id: Date.now().toString(),
+      name: newTestimonial.name!,
+      course: newTestimonial.course || "Student",
+      avatar: newTestimonial.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${newTestimonial.name}`,
+      rating: newTestimonial.rating || 5,
+      comment: newTestimonial.comment!,
+      verified: newTestimonial.verified ?? true,
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    }
+
+    setTestimonials([testimonial, ...testimonials])
+    setNewTestimonial({ name: "", course: "", avatar: "", rating: 5, comment: "", verified: true })
+    toast.success("Testimonial added!")
+  }
+
+  function updateTestimonial() {
+    if (!editingTestimonial) return
+    
+    setTestimonials(testimonials.map(t => 
+      t.id === editingTestimonial.id ? editingTestimonial : t
+    ))
+    setEditingTestimonial(null)
+    toast.success("Testimonial updated!")
+  }
+
+  function deleteTestimonial(id: string) {
+    setTestimonials(testimonials.filter(t => t.id !== id))
+    toast.success("Testimonial deleted")
+  }
+
+  function toggleTestimonial(id: string) {
+    setTestimonials(testimonials.map(t => 
+      t.id === id ? { ...t, enabled: !t.enabled } : t
+    ))
   }
 
   // Add announcement
@@ -190,9 +326,10 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
       localStorage.setItem("techvyro_featured_pdfs", JSON.stringify(featuredPdfs))
       localStorage.setItem("techvyro_announcements", JSON.stringify(announcements))
       localStorage.setItem("techvyro_hero_settings", JSON.stringify(heroSettings))
+      localStorage.setItem("techvyro_testimonials", JSON.stringify(testimonials))
       
       await new Promise(resolve => setTimeout(resolve, 500))
-      toast.success("Homepage settings saved!")
+      toast.success("All settings saved!")
     } catch (error) {
       toast.error("Failed to save settings")
     } finally {
@@ -216,10 +353,23 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
 
   return (
     <div className="space-y-6">
+      {/* Save Button - Fixed at top */}
+      <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/20">
+        <div>
+          <h3 className="font-semibold text-foreground">Homepage Settings</h3>
+          <p className="text-sm text-muted-foreground">Manage featured PDFs, testimonials, announcements & more</p>
+        </div>
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save All Changes
+        </Button>
+      </div>
+
       {/* Section Navigation */}
       <div className="flex flex-wrap gap-2">
         {[
           { id: "featured", label: "Featured PDFs", icon: Star },
+          { id: "testimonials", label: "Testimonials", icon: Quote },
           { id: "announcements", label: "Announcements", icon: Megaphone },
           { id: "hero", label: "Hero Section", icon: Home },
         ].map((section) => {
@@ -238,6 +388,11 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
             >
               <Icon className="h-4 w-4" />
               {section.label}
+              {section.id === "testimonials" && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                  {testimonials.filter(t => t.enabled).length}
+                </Badge>
+              )}
             </button>
           )
         })}
@@ -355,6 +510,221 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Testimonials Section */}
+      {activeSection === "testimonials" && (
+        <div className="space-y-6">
+          {/* Add/Edit Testimonial */}
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5 text-primary" />
+                {editingTestimonial ? "Edit Testimonial" : "Add Testimonial"}
+              </CardTitle>
+              <CardDescription>
+                {editingTestimonial ? "Update the testimonial details" : "Add a new student testimonial to display on homepage"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Student Name *</Label>
+                  <Input
+                    value={editingTestimonial?.name ?? newTestimonial.name}
+                    onChange={(e) => editingTestimonial 
+                      ? setEditingTestimonial({...editingTestimonial, name: e.target.value})
+                      : setNewTestimonial({ ...newTestimonial, name: e.target.value })
+                    }
+                    placeholder="e.g., Rahul Sharma"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Course / Role</Label>
+                  <Input
+                    value={editingTestimonial?.course ?? newTestimonial.course}
+                    onChange={(e) => editingTestimonial
+                      ? setEditingTestimonial({...editingTestimonial, course: e.target.value})
+                      : setNewTestimonial({ ...newTestimonial, course: e.target.value })
+                    }
+                    placeholder="e.g., NDA Aspirant, B.Tech Student"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Avatar URL (Optional)</Label>
+                  <Input
+                    value={editingTestimonial?.avatar ?? newTestimonial.avatar}
+                    onChange={(e) => editingTestimonial
+                      ? setEditingTestimonial({...editingTestimonial, avatar: e.target.value})
+                      : setNewTestimonial({ ...newTestimonial, avatar: e.target.value })
+                    }
+                    placeholder="https://... (leave empty for auto-generated)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Rating</Label>
+                  <Select
+                    value={String(editingTestimonial?.rating ?? newTestimonial.rating ?? 5)}
+                    onValueChange={(v) => editingTestimonial
+                      ? setEditingTestimonial({...editingTestimonial, rating: parseInt(v)})
+                      : setNewTestimonial({ ...newTestimonial, rating: parseInt(v) })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 Stars</SelectItem>
+                      <SelectItem value="4">4 Stars</SelectItem>
+                      <SelectItem value="3">3 Stars</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Comment *</Label>
+                <Textarea
+                  value={editingTestimonial?.comment ?? newTestimonial.comment}
+                  onChange={(e) => editingTestimonial
+                    ? setEditingTestimonial({...editingTestimonial, comment: e.target.value})
+                    : setNewTestimonial({ ...newTestimonial, comment: e.target.value })
+                  }
+                  placeholder="Write the student's testimonial..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={editingTestimonial?.verified ?? newTestimonial.verified ?? true}
+                  onCheckedChange={(v) => editingTestimonial
+                    ? setEditingTestimonial({...editingTestimonial, verified: v})
+                    : setNewTestimonial({ ...newTestimonial, verified: v })
+                  }
+                />
+                <Label className="flex items-center gap-2">
+                  <BadgeCheck className="h-4 w-4 text-blue-500" />
+                  Verified Student Badge
+                </Label>
+              </div>
+
+              <div className="flex gap-2">
+                {editingTestimonial ? (
+                  <>
+                    <Button onClick={updateTestimonial}>
+                      <Save className="h-4 w-4 mr-2" />
+                      Update Testimonial
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditingTestimonial(null)}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={addTestimonial}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Testimonial
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Existing Testimonials */}
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-accent" />
+                Student Testimonials
+              </CardTitle>
+              <CardDescription>
+                {testimonials.filter(t => t.enabled).length} active testimonials showing on homepage
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {testimonials.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Quote className="h-12 w-12 mx-auto opacity-30 mb-3" />
+                  <p>No testimonials yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {testimonials.map((testimonial) => (
+                    <div
+                      key={testimonial.id}
+                      className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
+                        testimonial.enabled 
+                          ? "bg-card border-border/50" 
+                          : "bg-muted/30 border-border/30 opacity-60"
+                      }`}
+                    >
+                      <img
+                        src={testimonial.avatar}
+                        alt={testimonial.name}
+                        className="h-12 w-12 rounded-full object-cover border-2 border-primary/20"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${testimonial.name}`
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium">{testimonial.name}</p>
+                          <Badge variant="outline" className="text-[10px]">
+                            {testimonial.course}
+                          </Badge>
+                          {testimonial.verified && (
+                            <BadgeCheck className="h-4 w-4 text-blue-500" />
+                          )}
+                          {!testimonial.enabled && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Disabled
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-3 w-3 ${i < testimonial.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
+                            />
+                          ))}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                          "{testimonial.comment}"
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={testimonial.enabled}
+                          onCheckedChange={() => toggleTestimonial(testimonial.id)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="hover:bg-primary/10 hover:text-primary"
+                          onClick={() => setEditingTestimonial(testimonial)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:bg-destructive/10"
+                          onClick={() => deleteTestimonial(testimonial.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Announcements Section */}
@@ -524,97 +894,75 @@ export function HomepageManager({ pdfs, categories }: HomepageManagerProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Main Title</Label>
-              <Input
-                value={heroSettings.title}
-                onChange={(e) => setHeroSettings({ ...heroSettings, title: e.target.value })}
-                placeholder="TechVyro PDF Library"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Subtitle</Label>
-              <Textarea
-                value={heroSettings.subtitle}
-                onChange={(e) => setHeroSettings({ ...heroSettings, subtitle: e.target.value })}
-                placeholder="Your one-stop destination for free PDF resources..."
-                rows={2}
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Hero Title</Label>
+                <Input
+                  value={heroSettings.title}
+                  onChange={(e) => setHeroSettings({ ...heroSettings, title: e.target.value })}
+                  placeholder="Main title..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Hero Subtitle</Label>
+                <Textarea
+                  value={heroSettings.subtitle}
+                  onChange={(e) => setHeroSettings({ ...heroSettings, subtitle: e.target.value })}
+                  placeholder="Subtitle text..."
+                  rows={2}
+                />
+              </div>
             </div>
 
             <Separator />
 
             <div className="space-y-4">
-              <h4 className="text-sm font-medium">Display Options</h4>
-              
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
-                <div>
-                  <p className="font-medium">Show Statistics</p>
-                  <p className="text-sm text-muted-foreground">Display total PDFs, downloads, etc.</p>
+              <h4 className="font-medium">Display Options</h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    Show Statistics
+                  </Label>
+                  <Switch
+                    checked={heroSettings.showStats}
+                    onCheckedChange={(v) => setHeroSettings({ ...heroSettings, showStats: v })}
+                  />
                 </div>
-                <Switch
-                  checked={heroSettings.showStats}
-                  onCheckedChange={(checked) => setHeroSettings({ ...heroSettings, showStats: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
-                <div>
-                  <p className="font-medium">Show Search Bar</p>
-                  <p className="text-sm text-muted-foreground">Enable quick search in hero section</p>
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    Show Search Bar
+                  </Label>
+                  <Switch
+                    checked={heroSettings.showSearch}
+                    onCheckedChange={(v) => setHeroSettings({ ...heroSettings, showSearch: v })}
+                  />
                 </div>
-                <Switch
-                  checked={heroSettings.showSearch}
-                  onCheckedChange={(checked) => setHeroSettings({ ...heroSettings, showSearch: checked })}
-                />
               </div>
             </div>
 
             <Separator />
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Label>Background Style</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "gradient", label: "Gradient" },
-                  { id: "solid", label: "Solid" },
-                  { id: "pattern", label: "Pattern" },
-                ].map((style) => (
-                  <button
-                    key={style.id}
-                    onClick={() => setHeroSettings({ ...heroSettings, backgroundStyle: style.id as typeof heroSettings.backgroundStyle })}
-                    className={`p-3 rounded-lg border text-sm font-medium transition-all ${
-                      heroSettings.backgroundStyle === style.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border/50 hover:border-primary/50"
-                    }`}
-                  >
-                    {style.label}
-                  </button>
-                ))}
-              </div>
+              <Select
+                value={heroSettings.backgroundStyle}
+                onValueChange={(v) => setHeroSettings({ ...heroSettings, backgroundStyle: v as typeof heroSettings.backgroundStyle })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gradient">Gradient</SelectItem>
+                  <SelectItem value="solid">Solid Color</SelectItem>
+                  <SelectItem value="pattern">Pattern</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving} className="gap-2 px-6">
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              Save Changes
-            </>
-          )}
-        </Button>
-      </div>
     </div>
   )
 }

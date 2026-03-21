@@ -31,3 +31,15 @@ export interface PDF {
   category?: Category | null
   reviews?: Review[]
 }
+
+export interface Testimonial {
+  id: string
+  name: string
+  course: string
+  avatar: string
+  rating: number
+  comment: string
+  verified: boolean
+  enabled: boolean
+  createdAt: string
+}

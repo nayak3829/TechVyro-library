@@ -80,7 +80,6 @@ export default function AdminPage() {
       setCategories(catsData.categories || [])
       setPdfs(pdfsData.pdfs || [])
     } catch (error) {
-      console.error("[v0] Error fetching data:", error)
       toast.error("Failed to fetch data")
     } finally {
       setLoading(false)

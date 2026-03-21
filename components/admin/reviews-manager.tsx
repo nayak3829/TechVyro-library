@@ -48,10 +48,8 @@ export function ReviewsManager({ pdfs, categories }: ReviewsManagerProps) {
         }
         
         const data = await res.json()
-        console.log("[v0] Fetched reviews:", data.reviews?.length || 0)
         setReviews(data.reviews || [])
       } catch (error) {
-        console.error("[v0] Failed to fetch reviews:", error)
         toast.error("Failed to load reviews")
       } finally {
         setLoading(false)
