@@ -720,21 +720,21 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
       )}
 
       {/* Header */}
-      <div className={`sticky top-0 z-40 p-3 border-b ${darkMode ? "bg-gray-800 border-gray-700" : "bg-background/95 backdrop-blur border-border"}`}>
-        <div className="container mx-auto flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2 font-bold">
+      <div className={`sticky top-0 z-40 p-2 sm:p-3 border-b ${darkMode ? "bg-gray-800 border-gray-700" : "bg-background/95 backdrop-blur border-border"}`}>
+        <div className="container mx-auto flex items-center justify-between gap-2">
+          <Link href="/" className="flex items-center gap-1 font-bold text-sm sm:text-base">
             <span className="text-red-500">Tech</span>
             <span>Vyro</span>
           </Link>
           
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={toggleTheme}
-              className="px-2 sm:px-3"
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
             >
-              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {darkMode ? <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
             </Button>
             
             {!reviewMode && (
@@ -742,9 +742,9 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
                 variant="default" 
                 size="sm"
                 onClick={handleSubmit}
-                className="bg-green-500 hover:bg-green-600"
+                className="bg-green-500 hover:bg-green-600 h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
               >
-                <Send className="h-4 w-4 sm:mr-1.5" />
+                <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1.5" />
                 <span className="hidden sm:inline">Submit</span>
               </Button>
             )}
@@ -754,41 +754,42 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
                 variant="outline" 
                 size="sm"
                 onClick={handleRestart}
+                className="h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
               >
-                <RotateCcw className="h-4 w-4 sm:mr-1.5" />
+                <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1.5" />
                 <span className="hidden sm:inline">Restart</span>
               </Button>
             )}
             
-            <div className={`px-3 sm:px-4 py-2 rounded-full font-bold text-white text-sm ${
+            <div className={`px-2 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-white text-xs sm:text-sm ${
               timeRemaining <= 300 
                 ? "bg-gradient-to-r from-red-500 to-orange-500 animate-pulse" 
                 : "bg-gradient-to-r from-primary to-accent"
             }`}>
-              <Clock className="inline h-4 w-4 mr-1" />
+              <Clock className="inline h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
               {formatTime(timeRemaining)}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto p-4">
-        <div className="flex flex-col lg:flex-row gap-4">
+      <div className="container mx-auto p-2 sm:p-4">
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
           {/* Question Panel */}
           <div className="flex-1 order-2 lg:order-1">
-            <Card className={`p-4 sm:p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+            <Card className={`p-3 sm:p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
               {/* Question Header */}
-              <div className="flex items-center justify-between border-b pb-4 mb-4 border-primary">
-                <span className="text-lg font-bold text-primary">
+              <div className="flex items-center justify-between border-b pb-2 sm:pb-4 mb-3 sm:mb-4 border-primary">
+                <span className="text-sm sm:text-lg font-bold text-primary">
                   Q {currentIndex + 1} / {questions.length}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   {reviewMode && (
-                    <Badge className="text-xs">
+                    <Badge className="text-[10px] sm:text-xs px-1.5 sm:px-2">
                       Time: {formatTime(questionTimes[currentIndex] || 0)}
                     </Badge>
                   )}
-                  <Badge className="bg-green-500 text-white">
+                  <Badge className="bg-green-500 text-white text-[10px] sm:text-xs px-1.5 sm:px-2">
                     {currentQuestion.marks} mark{currentQuestion.marks > 1 ? "s" : ""}
                   </Badge>
                 </div>
@@ -796,12 +797,12 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
 
               {/* Question Text */}
               <div 
-                className={`p-4 rounded-lg mb-6 border-l-4 border-primary text-sm sm:text-base ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}
+                className={`p-3 sm:p-4 rounded-lg mb-4 sm:mb-6 border-l-4 border-primary text-xs sm:text-base leading-relaxed ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}
                 dangerouslySetInnerHTML={{ __html: currentQuestion.question }}
               />
 
               {/* Options */}
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {currentQuestion.options.map((option, idx) => {
                   const optionNum = idx + 1
                   const isSelected = answers[currentIndex] === optionNum
@@ -813,7 +814,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
                     <div
                       key={idx}
                       onClick={() => !reviewMode && handleAnswer(optionNum)}
-                      className={`p-3 sm:p-4 rounded-lg border-2 cursor-pointer flex items-center gap-3 transition-all text-sm sm:text-base ${
+                      className={`p-2.5 sm:p-4 rounded-lg border-2 cursor-pointer flex items-center gap-2 sm:gap-3 transition-all text-xs sm:text-base ${
                         reviewMode
                           ? showAsCorrect
                             ? "bg-green-100 border-green-500 dark:bg-green-900/30"
@@ -827,7 +828,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
                               : "bg-muted/30 border-border hover:bg-primary/5 hover:border-primary"
                       }`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${
+                      <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 font-bold text-xs sm:text-sm ${
                         reviewMode
                           ? showAsCorrect
                             ? "bg-green-500 text-white"
@@ -841,14 +842,14 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
                         {String.fromCharCode(65 + idx)}
                       </div>
                       <span 
-                        className="flex-1"
+                        className="flex-1 leading-relaxed"
                         dangerouslySetInnerHTML={{ __html: option }}
                       />
                       {reviewMode && showAsCorrect && (
-                        <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 shrink-0" />
                       )}
                       {reviewMode && userAnsweredWrong && (
-                        <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                        <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 shrink-0" />
                       )}
                     </div>
                   )
@@ -857,46 +858,48 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
 
               {/* Solution in review mode */}
               {reviewMode && currentQuestion.explanation && (
-                <details className={`mt-6 p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"}`}>
-                  <summary className="cursor-pointer font-bold text-primary">View Solution</summary>
+                <details className={`mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"}`}>
+                  <summary className="cursor-pointer font-bold text-primary text-xs sm:text-sm">View Solution</summary>
                   <div 
-                    className="mt-3 pt-3 border-t border-border text-sm"
+                    className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-border text-xs sm:text-sm"
                     dangerouslySetInnerHTML={{ __html: currentQuestion.explanation }}
                   />
                 </details>
               )}
 
               {/* Navigation Buttons */}
-              <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
+              <div className="flex items-center justify-between mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-border">
                 <Button 
                   variant="outline" 
                   onClick={handlePrev}
                   disabled={currentIndex === 0}
                   size="sm"
+                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Prev
+                  <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline ml-0.5">Prev</span>
                 </Button>
                 
                 {!reviewMode && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <Button 
                       variant="ghost" 
                       size="sm"
                       onClick={handleClearResponse}
                       disabled={!answers[currentIndex]}
+                      className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Clear</span>
+                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline ml-1">Clear</span>
                     </Button>
                     <Button 
                       variant={marked[currentIndex] ? "default" : "outline"}
                       size="sm"
                       onClick={handleMark}
-                      className={marked[currentIndex] ? "bg-purple-500 hover:bg-purple-600" : ""}
+                      className={`h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm ${marked[currentIndex] ? "bg-purple-500 hover:bg-purple-600" : ""}`}
                     >
-                      <Star className={`h-4 w-4 mr-1 ${marked[currentIndex] ? "fill-white" : ""}`} />
-                      <span className="hidden sm:inline">Mark</span>
+                      <Star className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${marked[currentIndex] ? "fill-white" : ""}`} />
+                      <span className="hidden sm:inline ml-1">Mark</span>
                     </Button>
                   </div>
                 )}
@@ -906,9 +909,10 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
                   onClick={handleNext}
                   disabled={currentIndex === questions.length - 1}
                   size="sm"
+                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  <span className="hidden xs:inline mr-0.5">Next</span>
+                  <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             </Card>
@@ -916,31 +920,31 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
 
           {/* Palette Panel */}
           <div className="lg:w-72 order-1 lg:order-2">
-            <Card className={`p-4 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+            <Card className={`p-2 sm:p-4 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
               {/* Status Legend */}
               {!reviewMode && (
-                <div className={`grid grid-cols-2 gap-2 p-3 rounded-lg mb-4 text-xs ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-green-500"></div>
-                    <span>Answered ({answeredCount})</span>
+                <div className={`grid grid-cols-2 gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg mb-3 sm:mb-4 text-[10px] sm:text-xs ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-green-500 shrink-0"></div>
+                    <span className="truncate">Answered ({answeredCount})</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-red-500"></div>
-                    <span>Not Answered ({notAnsweredCount})</span>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-red-500 shrink-0"></div>
+                    <span className="truncate">Not Ans ({notAnsweredCount})</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-gray-400"></div>
-                    <span>Not Visited ({notVisitedCount})</span>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-gray-400 shrink-0"></div>
+                    <span className="truncate">Not Visit ({notVisitedCount})</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-purple-500"></div>
-                    <span>Marked ({markedCount})</span>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-purple-500 shrink-0"></div>
+                    <span className="truncate">Marked ({markedCount})</span>
                   </div>
                 </div>
               )}
 
               {/* Question Grid */}
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-6 sm:grid-cols-5 gap-1.5 sm:gap-2">
                 {questions.map((_, idx) => {
                   const isAnswered = answers[idx] !== undefined
                   const isMarked = marked[idx]
@@ -964,8 +968,8 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
                     <button
                       key={idx}
                       onClick={() => goToQuestion(idx)}
-                      className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm font-bold transition-all ${bgColor} ${
-                        isCurrent ? "ring-2 ring-primary ring-offset-2" : ""
+                      className={`w-full aspect-square rounded sm:rounded-lg flex items-center justify-center text-[10px] sm:text-sm font-bold transition-all ${bgColor} ${
+                        isCurrent ? "ring-2 ring-primary ring-offset-1 sm:ring-offset-2" : ""
                       } ${!reviewMode && (isAnswered || isMarked) ? "text-white" : ""} ${
                         reviewMode ? "text-white" : ""
                       }`}
@@ -977,12 +981,12 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
               </div>
 
               {/* Progress */}
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="flex justify-between text-sm mb-2">
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
+                <div className="flex justify-between text-[10px] sm:text-sm mb-1.5 sm:mb-2">
                   <span>Progress</span>
                   <span>{answeredCount}/{questions.length}</span>
                 </div>
-                <Progress value={(answeredCount / questions.length) * 100} className="h-2" />
+                <Progress value={(answeredCount / questions.length) * 100} className="h-1.5 sm:h-2" />
               </div>
             </Card>
           </div>

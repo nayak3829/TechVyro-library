@@ -7,7 +7,7 @@ import {
   ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, 
   BarChart3, RefreshCw, Settings, Database, Loader2, MessageSquare,
   TrendingUp, Download, Eye, Star, Clock, Users, Zap, HardDrive,
-  Activity, AlertCircle, Home, History, Code
+  Activity, AlertCircle, Home, History
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -57,14 +57,6 @@ const FolderManager = dynamic(() => import("@/components/admin/folder-manager").
 
 const QuizManager = dynamic(() => import("@/components/admin/quiz-manager").then(mod => ({ default: mod.QuizManager })), {
   loading: () => <ComponentLoader text="Loading quiz manager..." />,
-})
-
-const HTMLUploadForm = dynamic(() => import("@/components/admin/html-upload-form").then(mod => ({ default: mod.HTMLUploadForm })), {
-  loading: () => <ComponentLoader text="Loading HTML uploader..." />,
-})
-
-const HTMLFilesManager = dynamic(() => import("@/components/admin/html-files-manager").then(mod => ({ default: mod.HTMLFilesManager })), {
-  loading: () => <ComponentLoader text="Loading HTML files..." />,
 })
 
 function ComponentLoader({ text }: { text: string }) {
@@ -226,63 +218,62 @@ export default function AdminPage() {
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 sm:space-y-8">
-          <TabsList className="flex flex-wrap h-auto gap-1.5 p-1.5 bg-muted/50 rounded-xl">
-            <TabsTrigger value="overview" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Overview</span>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-8">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
+            <TabsList className="flex h-auto gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-muted/50 rounded-xl min-w-max sm:min-w-0 sm:flex-wrap">
+            <TabsTrigger value="overview" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="upload" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Upload</span>
+            <TabsTrigger value="upload" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Upload className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Upload</span>
             </TabsTrigger>
-            <TabsTrigger value="pdfs" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>PDFs</span>
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-primary/10 text-primary">
+            <TabsTrigger value="pdfs" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">PDFs</span>
+              <Badge variant="secondary" className="ml-0.5 sm:ml-1 h-4 sm:h-5 px-1 sm:px-1.5 text-[9px] sm:text-xs bg-primary/10 text-primary">
                 {pdfs.length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="structure" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <FolderPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Structure</span>
+            <TabsTrigger value="structure" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <FolderPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Structure</span>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Database className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Categories</span>
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-accent/10 text-accent">
+            <TabsTrigger value="categories" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Database className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Categories</span>
+              <Badge variant="secondary" className="ml-0.5 sm:ml-1 h-4 sm:h-5 px-1 sm:px-1.5 text-[9px] sm:text-xs bg-accent/10 text-accent">
                 {categories.length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="quizzes" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Quizzes</span>
+            <TabsTrigger value="quizzes" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Quizzes</span>
             </TabsTrigger>
-            <TabsTrigger value="html" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Code className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>HTML</span>
+
+            <TabsTrigger value="reviews" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Reviews</span>
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Reviews</span>
+            <TabsTrigger value="analytics" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Analytics</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Analytics</span>
+            <TabsTrigger value="homepage" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Home className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Home</span>
             </TabsTrigger>
-            <TabsTrigger value="homepage" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Homepage</span>
+            <TabsTrigger value="activity" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <History className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Activity</span>
             </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Activity</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Settings</span>
+            <TabsTrigger value="settings" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline sm:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
@@ -617,43 +608,6 @@ export default function AdminPage() {
                 <QuizManager />
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* HTML Tab */}
-          <TabsContent value="html" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-2">
-              {/* Upload */}
-              <Card className="border-border/50 lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Code className="h-5 w-5 text-primary" />
-                    Upload HTML Files
-                  </CardTitle>
-                  <CardDescription>
-                    Upload custom HTML files. Admin can manage visibility, tags, and organize content.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <HTMLUploadForm onSuccess={() => setActiveTab("html")} />
-                </CardContent>
-              </Card>
-
-              {/* Manage Files */}
-              <Card className="border-border/50 lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-accent" />
-                    Manage HTML Files
-                  </CardTitle>
-                  <CardDescription>
-                    View, edit, delete, and control visibility of uploaded HTML files.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <HTMLFilesManager />
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
 
           {/* Reviews Tab */}

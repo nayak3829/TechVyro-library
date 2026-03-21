@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { toast } from "sonner"
 import type { Category } from "@/lib/types"
+import { InlineStructureEditor } from "./inline-structure-editor"
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB in bytes
 const MAX_PARALLEL_UPLOADS = 8
@@ -340,7 +341,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
     <div className="space-y-5">
       {/* Drop Zone */}
       <div
-        className={`relative border-2 border-dashed rounded-2xl p-8 sm:p-10 text-center transition-all duration-300 cursor-pointer group ${
+        className={`relative border-2 border-dashed rounded-xl sm:rounded-2xl p-4 sm:p-10 text-center transition-all duration-300 cursor-pointer group ${
           dragActive
             ? "border-primary bg-primary/10 scale-[1.02]"
             : "border-border hover:border-primary/50 hover:bg-muted/30"
@@ -351,7 +352,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,80,200,0.05),transparent_70%)] rounded-2xl pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,80,200,0.05),transparent_70%)] rounded-xl sm:rounded-2xl pointer-events-none" />
         
         <input
           ref={fileInputRef}
@@ -363,27 +364,27 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         />
         
         <div className="relative">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-            <Upload className="h-8 w-8 text-primary" />
+          <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+            <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
           </div>
-          <p className="font-semibold text-lg text-foreground">Drop PDFs here or click to select</p>
-          <p className="text-sm text-muted-foreground mt-2">Multiple files supported (max 50MB each)</p>
+          <p className="font-semibold text-sm sm:text-lg text-foreground">Drop PDFs here or click to select</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">Multiple files supported (max 50MB each)</p>
           
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
-            <span className="inline-flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-              <Zap className="h-3 w-3" />
-              Fast Upload
+          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-4">
+            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-primary bg-primary/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
+              <Zap className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              Fast
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-green-600 bg-green-500/10 px-2.5 py-1 rounded-full">
-              <Files className="h-3 w-3" />
-              Batch Support
+            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-green-600 bg-green-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
+              <Files className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              Batch
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-blue-600 bg-blue-500/10 px-2.5 py-1 rounded-full">
-              <Tag className="h-3 w-3" />
-              Tags & SEO
+            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-blue-600 bg-blue-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
+              <Tag className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              Tags
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full">
-              <Calendar className="h-3 w-3" />
+            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-amber-600 bg-amber-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
+              <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               Schedule
             </span>
           </div>
@@ -397,15 +398,15 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
             <CollapsibleTrigger asChild>
               <Button 
                 variant="ghost" 
-                className="w-full flex items-center justify-between p-4 h-auto hover:bg-muted/50"
+                className="w-full flex items-center justify-between p-3 sm:p-4 h-auto hover:bg-muted/50"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                    <Settings2 className="h-4.5 w-4.5 text-primary" />
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-primary/10">
+                    <Settings2 className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 text-primary" />
                   </div>
                   <div className="text-left">
-                    <p className="font-medium text-foreground">Global Upload Settings</p>
-                    <p className="text-xs text-muted-foreground">Apply settings to all pending files at once</p>
+                    <p className="font-medium text-foreground text-xs sm:text-sm">Global Upload Settings</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Apply to all pending files</p>
                   </div>
                 </div>
                 {showGlobalSettings ? (
@@ -509,6 +510,36 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                   <Sparkles className="h-4 w-4" />
                   Apply to All Pending Files
                 </Button>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      )}
+
+      {/* Content Structure Editor */}
+      {entries.length > 0 && (
+        <Collapsible>
+          <div className="rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 overflow-hidden">
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="w-full flex items-center justify-between p-3 sm:p-4 h-auto hover:bg-muted/50"
+              >
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-accent/10">
+                    <FolderPlus className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 text-accent" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-foreground text-xs sm:text-sm">Edit Content Structure</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Create folders, categories, sections</p>
+                  </div>
+                </div>
+                <ChevronDown className="h-4 w-4 transition-transform ui-expanded:rotate-180" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="p-3 sm:p-4 border-t border-border/50">
+                <InlineStructureEditor compact />
               </div>
             </CollapsibleContent>
           </div>
