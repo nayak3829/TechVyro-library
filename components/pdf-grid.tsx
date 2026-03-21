@@ -492,68 +492,68 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
         )}
 
         {/* PDF Grid */}
-      {paginatedPdfs.length === 0 ? (
-        <Empty
-          icon={FileText}
-          title="No PDFs found"
-          description={search || selectedCategory || showFavoritesOnly 
-            ? "Try adjusting your search or filters" 
-            : "No PDFs have been uploaded yet"}
-        />
-      ) : (
-        <div className={
-          viewMode === "grid" 
-            ? "grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
-            : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-        }>
-          {paginatedPdfs.map((pdf) => (
-            <PDFCard key={pdf.id} pdf={pdf} compact={viewMode === "compact"} />
-          ))}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-1 pt-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="h-9 w-9 p-0"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="flex items-center gap-0.5 sm:gap-1">
-            {getPageNumbers().map((page, idx) => (
-              typeof page === "number" ? (
-                <Button
-                  key={idx}
-                  variant={currentPage === page ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(page)}
-                  className={`h-9 w-9 p-0 text-xs ${currentPage === page ? "bg-primary shadow-md shadow-primary/20" : ""}`}
-                >
-                  {page}
-                </Button>
-              ) : (
-                <span key={idx} className="px-1 text-muted-foreground text-xs">...</span>
-              )
+        {paginatedPdfs.length === 0 ? (
+          <Empty
+            icon={FileText}
+            title="No PDFs found"
+            description={search || selectedCategory || showFavoritesOnly 
+              ? "Try adjusting your search or filters" 
+              : "No PDFs have been uploaded yet"}
+          />
+        ) : (
+          <div className={
+            viewMode === "grid" 
+              ? "grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+              : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+          }>
+            {paginatedPdfs.map((pdf) => (
+              <PDFCard key={pdf.id} pdf={pdf} compact={viewMode === "compact"} />
             ))}
           </div>
+        )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="h-9 w-9 p-0"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-1 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="h-9 w-9 p-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <div className="flex items-center gap-0.5 sm:gap-1">
+              {getPageNumbers().map((page, idx) => (
+                typeof page === "number" ? (
+                  <Button
+                    key={idx}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={`h-9 w-9 p-0 text-xs ${currentPage === page ? "bg-primary shadow-md shadow-primary/20" : ""}`}
+                  >
+                    {page}
+                  </Button>
+                ) : (
+                  <span key={idx} className="px-1 text-muted-foreground text-xs">...</span>
+                )
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="h-9 w-9 p-0"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </section>
     </div>
   )
