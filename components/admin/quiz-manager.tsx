@@ -226,85 +226,113 @@ export function QuizManager() {
   // Parse HTML to extract quiz data
   const parseQuizHtml = (html: string): Quiz | null => {
     try {
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(html, "text/html")
-      
-      // Extract title from multiple possible locations
+      // Extract title from multiple possible patterns
       let title = ""
-      const titleEl = doc.querySelector(".start-title")
-      if (titleEl) {
-        title = titleEl.textContent?.trim() || ""
+      
+      // Try .start-title class
+      const startTitleMatch = html.match(/<[^>]*class="[^"]*start-title[^"]*"[^>]*>([^<]*)</)
+      if (startTitleMatch) {
+        title = startTitleMatch[1].trim()
       }
+      
+      // Try h1 tag
       if (!title) {
-        const h1 = doc.querySelector("h1")
-        title = h1?.textContent?.trim() || ""
+        const h1Match = html.match(/<h1[^>]*>([^<]*)<\/h1>/i)
+        if (h1Match) {
+          title = h1Match[1].trim()
+        }
       }
+      
+      // Try title tag
       if (!title) {
-        const titleTag = doc.querySelector("title")
-        title = titleTag?.textContent?.trim() || ""
+        const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+        if (titleMatch) {
+          title = titleMatch[1].trim()
+        }
       }
       
       // Clean title - remove other branding
       title = title
         .replace(/Boss_Quiz_Robot/gi, "TechVyro")
         .replace(/LearnWithSumit/gi, "TechVyro")
+        .replace(/Sumit\s*Raftaar/gi, "TechVyro")
         .replace(/Sumit/gi, "TechVyro")
+        .replace(/\s+/g, " ")
         .trim() || "Imported Quiz"
 
       // Try to extract questions from script
-      const scripts = doc.querySelectorAll("script")
       let questionsData: any[] = []
       let timeLimit = 1200
 
-      scripts.forEach(script => {
-        const content = script.textContent || ""
+      // Find TIME constant
+      const timeMatch = html.match(/const\s+TIME\s*=\s*(\d+)/i)
+      if (timeMatch) {
+        timeLimit = parseInt(timeMatch[1])
+      }
+
+      // Method 1: Try to find Q array with template literals
+      const qArrayMatch = html.match(/const\s+Q\s*=\s*\[([\s\S]*?)\];/m)
+      if (qArrayMatch) {
+        const arrayContent = qArrayMatch[1]
         
-        // Find Q array
-        const qMatch = content.match(/const\s+Q\s*=\s*(\[[\s\S]*?\]);/m)
-        if (qMatch) {
-          try {
-            // Clean up the JSON - handle single quotes, trailing commas
-            let jsonStr = qMatch[1]
-              .replace(/'/g, '"')
-              .replace(/,(\s*[\]}])/g, '$1')
-              .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
-            questionsData = JSON.parse(jsonStr)
-          } catch (e) {
-            // Try another approach - eval-like parsing
-            try {
-              const evalMatch = content.match(/const\s+Q\s*=\s*(\[[\s\S]*?\]);/m)
-              if (evalMatch) {
-                // Manual parsing for common patterns
-                const arrayContent = evalMatch[1]
-                const questionMatches = arrayContent.matchAll(/\{\s*question\s*:\s*["'`]([\s\S]*?)["'`]\s*,\s*options\s*:\s*\[([\s\S]*?)\]\s*,\s*correct\s*:\s*(\d+)/g)
-                
-                for (const match of questionMatches) {
-                  const options = match[2]
-                    .split(',')
-                    .map(o => o.trim().replace(/^["'`]|["'`]$/g, '').trim())
-                    .filter(o => o.length > 0)
-                  
-                  questionsData.push({
-                    question: match[1],
-                    options: options,
-                    correct: parseInt(match[3]),
-                    marks: 1,
-                    explanation: ""
-                  })
-                }
-              }
-            } catch (e2) {
-              // Silent fail
+        // Parse each question object using regex
+        const questionRegex = /\{\s*question\s*:\s*[`'"]([\s\S]*?)[`'"]\s*,\s*options\s*:\s*\[([\s\S]*?)\]\s*,\s*correct\s*:\s*(\d+)/g
+        let match
+        
+        while ((match = questionRegex.exec(arrayContent)) !== null) {
+          const questionText = match[1].trim()
+          const optionsStr = match[2]
+          const correct = parseInt(match[3])
+          
+          // Parse options - handle backticks, single quotes, double quotes
+          const optionMatches = optionsStr.match(/[`'"]([^`'"]*)[`'"]/g)
+          const options = optionMatches 
+            ? optionMatches.map(o => o.slice(1, -1).trim())
+            : []
+          
+          if (options.length >= 2) {
+            questionsData.push({
+              question: questionText,
+              options: options,
+              correct: correct,
+              marks: 1,
+              explanation: ""
+            })
+          }
+        }
+      }
+
+      // Method 2: If method 1 failed, try alternative parsing
+      if (questionsData.length === 0) {
+        // Try to find questions in different format
+        const altQuestionRegex = /question\s*:\s*[`'"](.*?)[`'"]/gi
+        const altOptionRegex = /options\s*:\s*\[(.*?)\]/gi
+        const altCorrectRegex = /correct\s*:\s*(\d+)/gi
+        
+        const questions = [...html.matchAll(/question\s*:\s*[`'"]([\s\S]*?)[`'"]/gi)]
+        const optionSets = [...html.matchAll(/options\s*:\s*\[([\s\S]*?)\]/gi)]
+        const corrects = [...html.matchAll(/correct\s*:\s*(\d+)/gi)]
+        
+        for (let i = 0; i < questions.length; i++) {
+          if (optionSets[i] && corrects[i]) {
+            const optionsStr = optionSets[i][1]
+            const optionMatches = optionsStr.match(/[`'"]([^`'"]+)[`'"]/g)
+            const options = optionMatches 
+              ? optionMatches.map(o => o.slice(1, -1).trim())
+              : []
+            
+            if (options.length >= 2) {
+              questionsData.push({
+                question: questions[i][1].trim(),
+                options: options,
+                correct: parseInt(corrects[i][1]),
+                marks: 1,
+                explanation: ""
+              })
             }
           }
         }
-
-        // Find TIME
-        const timeMatch = content.match(/const\s+TIME\s*=\s*(\d+)/)
-        if (timeMatch) {
-          timeLimit = parseInt(timeMatch[1])
-        }
-      })
+      }
 
       if (questionsData.length === 0) {
         return null
@@ -313,7 +341,10 @@ export function QuizManager() {
       // Convert to our format
       const questions: Question[] = questionsData.map((q: any) => ({
         id: generateId(),
-        question: String(q.question || "").replace(/Boss_Quiz_Robot/gi, "TechVyro").replace(/LearnWithSumit/gi, "TechVyro"),
+        question: String(q.question || "")
+          .replace(/Boss_Quiz_Robot/gi, "TechVyro")
+          .replace(/LearnWithSumit/gi, "TechVyro")
+          .replace(/Sumit/gi, "TechVyro"),
         options: Array.isArray(q.options) ? q.options.map((o: any) => String(o)) : ["", "", "", ""],
         correct: typeof q.correct === "number" ? q.correct : 1,
         marks: typeof q.marks === "number" ? q.marks : 1,
@@ -323,7 +354,7 @@ export function QuizManager() {
       // Detect category from title
       let category = "General"
       const lowerTitle = title.toLowerCase()
-      if (lowerTitle.includes("math") || lowerTitle.includes("algebra") || lowerTitle.includes("geometry")) {
+      if (lowerTitle.includes("math") || lowerTitle.includes("algebra") || lowerTitle.includes("geometry") || lowerTitle.includes("inverse")) {
         category = "Mathematics"
       } else if (lowerTitle.includes("physics")) {
         category = "Physics"

@@ -115,10 +115,6 @@ export default function QuizPage() {
       title={quiz.title}
       questions={transformedQuestions}
       timeLimit={quiz.timeLimit}
-      onComplete={(result) => {
-        // Could save results to localStorage or send to API
-        console.log("Quiz completed:", result)
-      }}
     />
   )
 }

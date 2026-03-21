@@ -46,7 +46,7 @@ export default function QuizzesPage() {
         setQuizzes(allQuizzes.filter(q => q.enabled && q.questions.length > 0))
       }
     } catch (e) {
-      console.error("Failed to load quizzes")
+      // Failed to load quizzes
     }
     setLoading(false)
   }, [])

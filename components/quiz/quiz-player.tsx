@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { 
   Clock, ChevronLeft, ChevronRight, Star, Trash2, Send, 
-  Moon, Sun, CheckCircle, XCircle, Eye, FileText, RotateCcw
+  Moon, Sun, CheckCircle, XCircle, Eye, FileText, RotateCcw,
+  AlertTriangle, Home
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -23,7 +24,7 @@ interface Question {
 interface QuizPlayerProps {
   title: string
   questions: Question[]
-  timeLimit: number // in seconds
+  timeLimit: number
   onComplete?: (result: QuizResult) => void
 }
 
@@ -41,60 +42,67 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
   const [started, setStarted] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
-  const [marked, setMarked] = useState<boolean[]>(new Array(questions.length).fill(false))
-  const [visited, setVisited] = useState<boolean[]>(new Array(questions.length).fill(false))
-  const [questionTimes, setQuestionTimes] = useState<number[]>(new Array(questions.length).fill(0))
-  const [questionStart, setQuestionStart] = useState<number | null>(null)
+  const [marked, setMarked] = useState<boolean[]>([])
+  const [visited, setVisited] = useState<boolean[]>([])
+  const [questionTimes, setQuestionTimes] = useState<number[]>([])
   const [timeRemaining, setTimeRemaining] = useState(timeLimit)
   const [submitted, setSubmitted] = useState(false)
   const [reviewMode, setReviewMode] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false)
+  
+  const questionStartRef = useRef<number>(Date.now())
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Initialize arrays when questions change
+  useEffect(() => {
+    if (questions.length > 0) {
+      setMarked(new Array(questions.length).fill(false))
+      setVisited(new Array(questions.length).fill(false))
+      setQuestionTimes(new Array(questions.length).fill(0))
+    }
+  }, [questions.length])
 
   // Timer
   useEffect(() => {
     if (!started || submitted) return
     
-    const timer = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
-          handleSubmit(true)
+          handleAutoSubmit()
           return 0
         }
         return prev - 1
       })
     }, 1000)
 
-    return () => clearInterval(timer)
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
   }, [started, submitted])
 
-  // Question timer
+  // Theme persistence
   useEffect(() => {
-    if (!started || submitted || reviewMode) return
-    setQuestionStart(Date.now())
-    
-    return () => {
-      if (questionStart) {
-        const elapsed = Math.floor((Date.now() - questionStart) / 1000)
-        setQuestionTimes(prev => {
-          const updated = [...prev]
-          updated[currentIndex] += elapsed
-          return updated
-        })
-      }
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("quiz-theme")
+      if (savedTheme === "dark") setDarkMode(true)
     }
-  }, [currentIndex, started, submitted, reviewMode])
+  }, [])
 
   // Keyboard navigation
   useEffect(() => {
-    if (!started) return
+    if (!started || submitted) return
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
       if (e.key === "ArrowLeft") handlePrev()
       else if (e.key === "ArrowRight") handleNext()
       else if (e.key === "m" || e.key === "M") handleMark()
       else if (e.key >= "1" && e.key <= "5") {
         const optIndex = parseInt(e.key)
-        if (optIndex <= questions[currentIndex].options.length) {
+        if (questions[currentIndex] && optIndex <= questions[currentIndex].options.length) {
           handleAnswer(optIndex)
         }
       }
@@ -102,17 +110,13 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [started, currentIndex])
-
-  // Theme persistence
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("quiz-theme")
-    if (savedTheme === "dark") setDarkMode(true)
-  }, [])
+  }, [started, submitted, currentIndex, questions])
 
   const toggleTheme = () => {
     setDarkMode(prev => {
-      localStorage.setItem("quiz-theme", !prev ? "dark" : "light")
+      if (typeof window !== "undefined") {
+        localStorage.setItem("quiz-theme", !prev ? "dark" : "light")
+      }
       return !prev
     })
   }
@@ -125,6 +129,7 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
 
   const handleStart = () => {
     setStarted(true)
+    questionStartRef.current = Date.now()
     setVisited(prev => {
       const updated = [...prev]
       updated[0] = true
@@ -133,12 +138,12 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
   }
 
   const handleAnswer = (optionIndex: number) => {
-    if (submitted) return
+    if (submitted || reviewMode) return
     setAnswers(prev => ({ ...prev, [currentIndex]: optionIndex }))
   }
 
   const handleClearResponse = () => {
-    if (submitted) return
+    if (submitted || reviewMode) return
     setAnswers(prev => {
       const updated = { ...prev }
       delete updated[currentIndex]
@@ -147,10 +152,19 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
   }
 
   const handleMark = () => {
-    if (submitted) return
+    if (submitted || reviewMode) return
     setMarked(prev => {
       const updated = [...prev]
       updated[currentIndex] = !updated[currentIndex]
+      return updated
+    })
+  }
+
+  const saveCurrentQuestionTime = () => {
+    const elapsed = Math.floor((Date.now() - questionStartRef.current) / 1000)
+    setQuestionTimes(prev => {
+      const updated = [...prev]
+      updated[currentIndex] = (updated[currentIndex] || 0) + elapsed
       return updated
     })
   }
@@ -168,53 +182,41 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
   }
 
   const goToQuestion = (index: number) => {
-    // Save current question time
-    if (questionStart && !reviewMode) {
-      const elapsed = Math.floor((Date.now() - questionStart) / 1000)
-      setQuestionTimes(prev => {
-        const updated = [...prev]
-        updated[currentIndex] += elapsed
-        return updated
-      })
+    if (!reviewMode) {
+      saveCurrentQuestionTime()
     }
     
     setCurrentIndex(index)
-    setVisited(prev => {
-      const updated = [...prev]
-      updated[index] = true
-      return updated
-    })
-  }
-
-  const handleSubmit = useCallback((auto = false) => {
-    if (submitted) return
+    questionStartRef.current = Date.now()
     
-    const unanswered = questions.length - Object.keys(answers).length
-    if (!auto && unanswered > 0 && timeRemaining > 0) {
-      if (!confirm(`${unanswered} questions unanswered. Submit anyway?`)) return
-    }
-
-    // Save final question time
-    if (questionStart) {
-      const elapsed = Math.floor((Date.now() - questionStart) / 1000)
-      setQuestionTimes(prev => {
+    if (!reviewMode) {
+      setVisited(prev => {
         const updated = [...prev]
-        updated[currentIndex] += elapsed
+        updated[index] = true
         return updated
       })
     }
+  }
 
-    setSubmitted(true)
-
-    // Calculate results
+  const calculateResults = useCallback(() => {
     let correct = 0, wrong = 0, skipped = 0
     questions.forEach((q, i) => {
-      if (!answers[i]) skipped++
+      if (answers[i] === undefined) skipped++
       else if (answers[i] === q.correct) correct++
       else wrong++
     })
 
-    const score = correct - (wrong * 0.25) // Negative marking
+    const score = correct - (wrong * 0.25)
+    return { score, correct, wrong, skipped }
+  }, [questions, answers])
+
+  const handleAutoSubmit = useCallback(() => {
+    if (submitted) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    saveCurrentQuestionTime()
+    setSubmitted(true)
+    
+    const { score, correct, wrong, skipped } = calculateResults()
     const result: QuizResult = {
       score,
       correct,
@@ -224,9 +226,36 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
       answers,
       questionTimes
     }
-
     onComplete?.(result)
-  }, [submitted, questions, answers, timeRemaining, questionStart, currentIndex, timeLimit, questionTimes, onComplete])
+  }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete])
+
+  const handleSubmit = () => {
+    const unanswered = questions.length - Object.keys(answers).length
+    if (unanswered > 0) {
+      setShowConfirmSubmit(true)
+      return
+    }
+    confirmSubmit()
+  }
+
+  const confirmSubmit = () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    saveCurrentQuestionTime()
+    setSubmitted(true)
+    setShowConfirmSubmit(false)
+    
+    const { score, correct, wrong, skipped } = calculateResults()
+    const result: QuizResult = {
+      score,
+      correct,
+      wrong,
+      skipped,
+      totalTime: timeLimit - timeRemaining,
+      answers,
+      questionTimes
+    }
+    onComplete?.(result)
+  }
 
   const handleReview = () => {
     setReviewMode(true)
@@ -243,7 +272,7 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
     setVisited(new Array(questions.length).fill(false))
     setQuestionTimes(new Array(questions.length).fill(0))
     setTimeRemaining(timeLimit)
-    setQuestionStart(null)
+    setShowConfirmSubmit(false)
   }
 
   // Stats
@@ -254,11 +283,26 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
 
   const currentQuestion = questions[currentIndex]
 
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-8 text-center">
+          <AlertTriangle className="h-16 w-16 mx-auto text-amber-500 mb-4" />
+          <h2 className="text-xl font-bold mb-2">Quiz Error</h2>
+          <p className="text-muted-foreground mb-4">No questions found in this quiz.</p>
+          <Button asChild>
+            <Link href="/quiz">Back to Quizzes</Link>
+          </Button>
+        </Card>
+      </div>
+    )
+  }
+
   // Start Screen
   if (!started) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5"}`}>
-        <Card className={`max-w-xl w-full p-8 text-center ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+        <Card className={`max-w-xl w-full p-6 sm:p-8 text-center ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
           <div className="mb-6">
             <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold">
               <span className="text-red-500">Tech</span>
@@ -267,42 +311,50 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
             <p className="text-sm text-muted-foreground mt-1">Quiz Platform</p>
           </div>
           
-          <h1 className={`text-2xl font-bold mb-6 ${darkMode ? "text-white" : "text-foreground"}`}>
+          <h1 className={`text-xl sm:text-2xl font-bold mb-6 ${darkMode ? "text-white" : "text-foreground"}`}>
             {title}
           </h1>
           
-          <div className={`p-6 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
+          <div className={`p-4 sm:p-6 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
             <h2 className="text-lg font-semibold text-primary mb-4">Test Instructions</h2>
-            <div className="space-y-3 text-left">
+            <div className="space-y-3 text-left text-sm sm:text-base">
               <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-primary" />
+                <FileText className="h-5 w-5 text-primary shrink-0" />
                 <span>Total Questions: {questions.length}</span>
               </div>
               <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-primary" />
+                <Clock className="h-5 w-5 text-primary shrink-0" />
                 <span>Time Limit: {Math.floor(timeLimit / 60)} minutes</span>
               </div>
               <div className="flex items-center gap-3">
-                <CheckCircle className="h-5 w-5 text-green-500" />
+                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                 <span>+1 for correct answer</span>
               </div>
               <div className="flex items-center gap-3">
-                <XCircle className="h-5 w-5 text-red-500" />
-                <span>-0.25 for wrong answer</span>
+                <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                <span>-0.25 for wrong answer (negative marking)</span>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-border text-sm text-muted-foreground">
-              <p>Keyboard: Arrow keys to navigate, 1-5 to select, M to mark</p>
+            <div className="mt-4 pt-4 border-t border-border text-xs sm:text-sm text-muted-foreground">
+              <p>Keyboard: Arrow keys to navigate, 1-5 to select, M to mark for review</p>
             </div>
           </div>
 
-          <Button 
-            size="lg" 
-            className="w-full text-lg py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-            onClick={handleStart}
-          >
-            Start Test
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button 
+              size="lg" 
+              className="flex-1 text-lg py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+              onClick={handleStart}
+            >
+              Start Test
+            </Button>
+            <Button variant="outline" size="lg" asChild className="py-6">
+              <Link href="/quiz">
+                <Home className="h-4 w-4 mr-2" />
+                All Quizzes
+              </Link>
+            </Button>
+          </div>
         </Card>
       </div>
     )
@@ -310,40 +362,51 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
 
   // Result Screen
   if (submitted && !reviewMode) {
-    const correct = questions.filter((q, i) => answers[i] === q.correct).length
-    const wrong = questions.filter((q, i) => answers[i] && answers[i] !== q.correct).length
-    const skipped = questions.length - Object.keys(answers).length
-    const score = correct - (wrong * 0.25)
+    const { score, correct, wrong, skipped } = calculateResults()
     const accuracy = answeredCount > 0 ? ((correct / answeredCount) * 100).toFixed(1) : "0"
     const totalTime = timeLimit - timeRemaining
+    const percentage = ((correct / questions.length) * 100).toFixed(0)
 
     return (
       <div className={`min-h-screen p-4 ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-primary/10 to-accent/10"}`}>
-        <Card className={`max-w-2xl mx-auto p-8 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+        <Card className={`max-w-2xl mx-auto p-6 sm:p-8 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold mb-4">
               <span className="text-red-500">Tech</span>
               <span className={darkMode ? "text-white" : "text-foreground"}>Vyro</span>
             </Link>
             <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : ""}`}>Performance Summary</h2>
+            
+            {/* Score Circle */}
+            <div className="my-6">
+              <div className={`inline-flex items-center justify-center w-32 h-32 rounded-full border-4 ${
+                parseFloat(percentage) >= 70 ? "border-green-500" : 
+                parseFloat(percentage) >= 40 ? "border-amber-500" : "border-red-500"
+              }`}>
+                <div className="text-center">
+                  <div className="text-3xl font-bold">{percentage}%</div>
+                  <div className="text-xs text-muted-foreground">Score</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
             <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-primary/10"}`}>
-              <div className="text-3xl font-bold text-primary">{score.toFixed(1)}</div>
-              <div className="text-sm text-muted-foreground">Score</div>
+              <div className="text-2xl sm:text-3xl font-bold text-primary">{score.toFixed(1)}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Total Score</div>
             </div>
             <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-green-500/10"}`}>
-              <div className="text-3xl font-bold text-green-500">{correct}</div>
-              <div className="text-sm text-muted-foreground">Correct</div>
+              <div className="text-2xl sm:text-3xl font-bold text-green-500">{correct}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Correct</div>
             </div>
             <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-red-500/10"}`}>
-              <div className="text-3xl font-bold text-red-500">{wrong}</div>
-              <div className="text-sm text-muted-foreground">Wrong</div>
+              <div className="text-2xl sm:text-3xl font-bold text-red-500">{wrong}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Wrong</div>
             </div>
             <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-amber-500/10"}`}>
-              <div className="text-3xl font-bold text-amber-500">{skipped}</div>
-              <div className="text-sm text-muted-foreground">Skipped</div>
+              <div className="text-2xl sm:text-3xl font-bold text-amber-500">{skipped}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Skipped</div>
             </div>
           </div>
 
@@ -358,7 +421,7 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Button 
               variant="outline" 
               className="flex-1"
@@ -375,6 +438,12 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
               Restart Quiz
             </Button>
           </div>
+          
+          <div className="mt-4 text-center">
+            <Link href="/quiz" className="text-sm text-primary hover:underline">
+              Browse more quizzes
+            </Link>
+          </div>
         </Card>
       </div>
     )
@@ -383,8 +452,39 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
   // Quiz Screen
   return (
     <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-background"}`}>
+      {/* Confirm Submit Modal */}
+      {showConfirmSubmit && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className={`max-w-md w-full p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+            <div className="text-center">
+              <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+              <h3 className="text-lg font-bold mb-2">Confirm Submission</h3>
+              <p className="text-muted-foreground mb-4">
+                You have {questions.length - Object.keys(answers).length} unanswered questions.
+                Are you sure you want to submit?
+              </p>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setShowConfirmSubmit(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-1 bg-green-500 hover:bg-green-600"
+                  onClick={confirmSubmit}
+                >
+                  Submit Anyway
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Header */}
-      <div className={`sticky top-0 z-50 p-3 border-b ${darkMode ? "bg-gray-800 border-gray-700" : "bg-background/95 backdrop-blur border-border"}`}>
+      <div className={`sticky top-0 z-40 p-3 border-b ${darkMode ? "bg-gray-800 border-gray-700" : "bg-background/95 backdrop-blur border-border"}`}>
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2 font-bold">
             <span className="text-red-500">Tech</span>
@@ -396,7 +496,7 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
               variant="ghost" 
               size="sm" 
               onClick={toggleTheme}
-              className="px-3"
+              className="px-2 sm:px-3"
             >
               {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -405,20 +505,31 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
               <Button 
                 variant="default" 
                 size="sm"
-                onClick={() => handleSubmit(false)}
+                onClick={handleSubmit}
                 className="bg-green-500 hover:bg-green-600"
               >
-                <Send className="h-4 w-4 mr-1.5" />
+                <Send className="h-4 w-4 sm:mr-1.5" />
                 <span className="hidden sm:inline">Submit</span>
               </Button>
             )}
             
-            <div className={`px-4 py-2 rounded-full font-bold text-white ${
+            {reviewMode && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleRestart}
+              >
+                <RotateCcw className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Restart</span>
+              </Button>
+            )}
+            
+            <div className={`px-3 sm:px-4 py-2 rounded-full font-bold text-white text-sm ${
               timeRemaining <= 300 
                 ? "bg-gradient-to-r from-red-500 to-orange-500 animate-pulse" 
                 : "bg-gradient-to-r from-primary to-accent"
             }`}>
-              <Clock className="inline h-4 w-4 mr-1.5" />
+              <Clock className="inline h-4 w-4 mr-1" />
               {formatTime(timeRemaining)}
             </div>
           </div>
@@ -428,28 +539,28 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
       <div className="container mx-auto p-4">
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Question Panel */}
-          <div className="flex-1">
-            <Card className={`p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+          <div className="flex-1 order-2 lg:order-1">
+            <Card className={`p-4 sm:p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
               {/* Question Header */}
               <div className="flex items-center justify-between border-b pb-4 mb-4 border-primary">
                 <span className="text-lg font-bold text-primary">
-                  Question {currentIndex + 1} of {questions.length}
+                  Q {currentIndex + 1} / {questions.length}
                 </span>
-                <Badge className="bg-green-500 text-white">
-                  {currentQuestion.marks} marks
-                </Badge>
-              </div>
-
-              {/* Time spent on question */}
-              {reviewMode && (
-                <div className={`text-right mb-3 text-sm p-2 rounded ${darkMode ? "bg-gray-700" : "bg-primary/10"}`}>
-                  Time: {formatTime(questionTimes[currentIndex])}
+                <div className="flex items-center gap-2">
+                  {reviewMode && (
+                    <Badge className="text-xs">
+                      Time: {formatTime(questionTimes[currentIndex] || 0)}
+                    </Badge>
+                  )}
+                  <Badge className="bg-green-500 text-white">
+                    {currentQuestion.marks} mark{currentQuestion.marks > 1 ? "s" : ""}
+                  </Badge>
                 </div>
-              )}
+              </div>
 
               {/* Question Text */}
               <div 
-                className={`p-4 rounded-lg mb-6 border-l-4 border-primary ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}
+                className={`p-4 rounded-lg mb-6 border-l-4 border-primary text-sm sm:text-base ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}
                 dangerouslySetInnerHTML={{ __html: currentQuestion.question }}
               />
 
@@ -466,7 +577,7 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
                     <div
                       key={idx}
                       onClick={() => !reviewMode && handleAnswer(optionNum)}
-                      className={`p-4 rounded-lg border-2 cursor-pointer flex items-center gap-3 transition-all ${
+                      className={`p-3 sm:p-4 rounded-lg border-2 cursor-pointer flex items-center gap-3 transition-all text-sm sm:text-base ${
                         reviewMode
                           ? showAsCorrect
                             ? "bg-green-100 border-green-500 dark:bg-green-900/30"
@@ -480,25 +591,29 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
                               : "bg-muted/30 border-border hover:bg-primary/5 hover:border-primary"
                       }`}
                     >
-                      {!reviewMode && (
-                        <input
-                          type="radio"
-                          name="answer"
-                          checked={isSelected}
-                          onChange={() => handleAnswer(optionNum)}
-                          className="w-5 h-5"
-                        />
-                      )}
-                      {reviewMode && (
-                        <span className="w-6 h-6 flex items-center justify-center">
-                          {showAsCorrect && <CheckCircle className="h-5 w-5 text-green-500" />}
-                          {userAnsweredWrong && <XCircle className="h-5 w-5 text-red-500" />}
-                        </span>
-                      )}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${
+                        reviewMode
+                          ? showAsCorrect
+                            ? "bg-green-500 text-white"
+                            : userAnsweredWrong
+                              ? "bg-red-500 text-white"
+                              : "bg-muted text-muted-foreground"
+                          : isSelected
+                            ? "bg-primary text-white"
+                            : "bg-muted text-muted-foreground"
+                      }`}>
+                        {String.fromCharCode(65 + idx)}
+                      </div>
                       <span 
                         className="flex-1"
-                        dangerouslySetInnerHTML={{ __html: `${String.fromCharCode(65 + idx)}. ${option}` }}
+                        dangerouslySetInnerHTML={{ __html: option }}
                       />
+                      {reviewMode && showAsCorrect && (
+                        <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                      )}
+                      {reviewMode && userAnsweredWrong && (
+                        <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                      )}
                     </div>
                   )
                 })}
@@ -506,66 +621,117 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
 
               {/* Solution in review mode */}
               {reviewMode && currentQuestion.explanation && (
-                <details className={`mt-6 p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-muted/30 border-border"}`}>
+                <details className={`mt-6 p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"}`}>
                   <summary className="cursor-pointer font-bold text-primary">View Solution</summary>
                   <div 
-                    className="mt-3 pt-3 border-t border-border"
+                    className="mt-3 pt-3 border-t border-border text-sm"
                     dangerouslySetInnerHTML={{ __html: currentQuestion.explanation }}
                   />
                 </details>
               )}
+
+              {/* Navigation Buttons */}
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  onClick={handlePrev}
+                  disabled={currentIndex === 0}
+                  size="sm"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Prev
+                </Button>
+                
+                {!reviewMode && (
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={handleClearResponse}
+                      disabled={!answers[currentIndex]}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Clear</span>
+                    </Button>
+                    <Button 
+                      variant={marked[currentIndex] ? "default" : "outline"}
+                      size="sm"
+                      onClick={handleMark}
+                      className={marked[currentIndex] ? "bg-purple-500 hover:bg-purple-600" : ""}
+                    >
+                      <Star className={`h-4 w-4 mr-1 ${marked[currentIndex] ? "fill-white" : ""}`} />
+                      <span className="hidden sm:inline">Mark</span>
+                    </Button>
+                  </div>
+                )}
+                
+                <Button 
+                  variant="outline" 
+                  onClick={handleNext}
+                  disabled={currentIndex === questions.length - 1}
+                  size="sm"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </Card>
           </div>
 
           {/* Palette Panel */}
-          <div className="lg:w-72">
+          <div className="lg:w-72 order-1 lg:order-2">
             <Card className={`p-4 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
               {/* Status Legend */}
-              <div className={`grid grid-cols-2 gap-3 p-3 rounded-lg mb-4 ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-green-500">{answeredCount}</div>
-                  <div className="text-xs text-muted-foreground">Answered</div>
+              {!reviewMode && (
+                <div className={`grid grid-cols-2 gap-2 p-3 rounded-lg mb-4 text-xs ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-green-500"></div>
+                    <span>Answered ({answeredCount})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-red-500"></div>
+                    <span>Not Answered ({notAnsweredCount})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-gray-400"></div>
+                    <span>Not Visited ({notVisitedCount})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-purple-500"></div>
+                    <span>Marked ({markedCount})</span>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-blue-500">{notAnsweredCount}</div>
-                  <div className="text-xs text-muted-foreground">Not Answered</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-gray-500">{notVisitedCount}</div>
-                  <div className="text-xs text-muted-foreground">Not Visited</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-amber-500">{markedCount}</div>
-                  <div className="text-xs text-muted-foreground">Marked</div>
-                </div>
-              </div>
+              )}
 
-              <h3 className="font-bold text-center text-primary mb-3">Questions</h3>
-              
               {/* Question Grid */}
               <div className="grid grid-cols-5 gap-2">
                 {questions.map((_, idx) => {
                   const isAnswered = answers[idx] !== undefined
-                  const isVisited = visited[idx]
                   const isMarked = marked[idx]
+                  const isVisited = visited[idx]
                   const isCurrent = idx === currentIndex
+                  const isCorrect = reviewMode && answers[idx] === questions[idx].correct
+                  const isWrong = reviewMode && answers[idx] !== undefined && answers[idx] !== questions[idx].correct
+
+                  let bgColor = "bg-gray-300 dark:bg-gray-600"
+                  if (reviewMode) {
+                    if (isCorrect) bgColor = "bg-green-500"
+                    else if (isWrong) bgColor = "bg-red-500"
+                    else bgColor = "bg-amber-500"
+                  } else {
+                    if (isMarked) bgColor = "bg-purple-500"
+                    else if (isAnswered) bgColor = "bg-green-500"
+                    else if (isVisited) bgColor = "bg-red-500"
+                  }
 
                   return (
                     <button
                       key={idx}
                       onClick={() => goToQuestion(idx)}
-                      className={`aspect-square rounded-full font-bold text-sm flex items-center justify-center transition-all ${
-                        isCurrent ? "ring-2 ring-primary ring-offset-2 scale-110" : ""
-                      } ${
-                        isMarked
-                          ? "bg-amber-500 text-gray-900"
-                          : isAnswered
-                            ? "bg-green-500 text-gray-900"
-                            : isVisited
-                              ? "bg-blue-500 text-white"
-                              : darkMode
-                                ? "bg-gray-600 text-gray-300"
-                                : "bg-gray-200 text-gray-700"
+                      className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm font-bold transition-all ${bgColor} ${
+                        isCurrent ? "ring-2 ring-primary ring-offset-2" : ""
+                      } ${!reviewMode && (isAnswered || isMarked) ? "text-white" : ""} ${
+                        reviewMode ? "text-white" : ""
                       }`}
                     >
                       {idx + 1}
@@ -573,60 +739,19 @@ export function QuizPlayer({ title, questions, timeLimit, onComplete }: QuizPlay
                   )
                 })}
               </div>
+
+              {/* Progress */}
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex justify-between text-sm mb-2">
+                  <span>Progress</span>
+                  <span>{answeredCount}/{questions.length}</span>
+                </div>
+                <Progress value={(answeredCount / questions.length) * 100} className="h-2" />
+              </div>
             </Card>
           </div>
         </div>
       </div>
-
-      {/* Bottom Navigation */}
-      <div className={`fixed bottom-0 left-0 right-0 p-3 border-t ${darkMode ? "bg-gray-800 border-gray-700" : "bg-background/95 backdrop-blur border-border"}`}>
-        <div className="container mx-auto flex flex-wrap justify-center gap-2 max-w-2xl">
-          <Button
-            variant="outline"
-            onClick={handlePrev}
-            disabled={currentIndex === 0}
-            className="flex-1 sm:flex-none"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Prev
-          </Button>
-          
-          {!reviewMode && (
-            <>
-              <Button
-                variant="outline"
-                onClick={handleClearResponse}
-                className="flex-1 sm:flex-none border-red-500 text-red-500 hover:bg-red-500/10"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={handleMark}
-                className={`flex-1 sm:flex-none ${marked[currentIndex] ? "bg-amber-500 text-white border-amber-500" : ""}`}
-              >
-                <Star className="h-4 w-4 mr-1" />
-                Mark
-              </Button>
-            </>
-          )}
-          
-          <Button
-            variant="outline"
-            onClick={handleNext}
-            disabled={currentIndex === questions.length - 1}
-            className="flex-1 sm:flex-none"
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      </div>
-      
-      {/* Bottom padding for fixed nav */}
-      <div className="h-20" />
     </div>
   )
 }
