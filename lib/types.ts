@@ -51,6 +51,7 @@ export interface ContentSection {
   description: string
   icon: string
   pdfCount: number
+  quizCount: number
   order: number
   enabled: boolean
 }
