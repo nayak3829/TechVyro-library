@@ -67,8 +67,8 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
   const [reviewMode, setReviewMode] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false)
-  const [showNameInput, setShowNameInput] = useState(false)
   const [playerName, setPlayerName] = useState("")
+  const [nameEntered, setNameEntered] = useState(false)
   const [savedToLeaderboard, setSavedToLeaderboard] = useState(false)
   const [topLeaderboard, setTopLeaderboard] = useState<LeaderboardEntry[]>([])
   
@@ -163,7 +163,13 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
   }
 
+  const handleNameSubmit = () => {
+    if (!playerName.trim()) return
+    setNameEntered(true)
+  }
+
   const handleStart = () => {
+    if (!nameEntered || !playerName.trim()) return
     setStarted(true)
     questionStartRef.current = Date.now()
     setVisited(prev => {
@@ -263,7 +269,44 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
       questionTimes
     }
     onComplete?.(result)
-  }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete])
+    
+    // Auto save to leaderboard
+    if (playerName.trim()) {
+      const percentage = Math.round((correct / questions.length) * 100)
+      const totalTime = timeLimit - timeRemaining
+      
+      const entry: LeaderboardEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: playerName.trim(),
+        score,
+        percentage,
+        correct,
+        wrong,
+        skipped,
+        totalTime,
+        quizId: quizId || "unknown",
+        quizTitle: title,
+        timestamp: new Date().toISOString()
+      }
+      
+      try {
+        const existing = localStorage.getItem(LEADERBOARD_KEY)
+        const entries: LeaderboardEntry[] = existing ? JSON.parse(existing) : []
+        entries.unshift(entry)
+        const trimmed = entries.slice(0, 100)
+        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(trimmed))
+        setSavedToLeaderboard(true)
+        
+        const forThisQuiz = trimmed
+          .filter(e => !quizId || e.quizId === quizId)
+          .sort((a, b) => b.percentage - a.percentage)
+          .slice(0, 5)
+        setTopLeaderboard(forThisQuiz)
+      } catch (e) {
+        // Silent fail
+      }
+    }
+  }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete, playerName, questions.length, quizId, title])
 
   const handleSubmit = () => {
     const unanswered = questions.length - Object.keys(answers).length
@@ -291,53 +334,49 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
       questionTimes
     }
     onComplete?.(result)
+    
+    // Auto save to leaderboard since we already have the name
+    if (playerName.trim()) {
+      const percentage = Math.round((correct / questions.length) * 100)
+      const totalTime = timeLimit - timeRemaining
+      
+      const entry: LeaderboardEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: playerName.trim(),
+        score,
+        percentage,
+        correct,
+        wrong,
+        skipped,
+        totalTime,
+        quizId: quizId || "unknown",
+        quizTitle: title,
+        timestamp: new Date().toISOString()
+      }
+      
+      try {
+        const existing = localStorage.getItem(LEADERBOARD_KEY)
+        const entries: LeaderboardEntry[] = existing ? JSON.parse(existing) : []
+        entries.unshift(entry)
+        const trimmed = entries.slice(0, 100)
+        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(trimmed))
+        setSavedToLeaderboard(true)
+        
+        // Refresh top leaderboard
+        const forThisQuiz = trimmed
+          .filter(e => !quizId || e.quizId === quizId)
+          .sort((a, b) => b.percentage - a.percentage)
+          .slice(0, 5)
+        setTopLeaderboard(forThisQuiz)
+      } catch (e) {
+        // Silent fail
+      }
+    }
   }
 
   const handleReview = () => {
     setReviewMode(true)
     setCurrentIndex(0)
-  }
-
-  const saveToLeaderboard = () => {
-    if (!playerName.trim() || savedToLeaderboard) return
-    
-    const { score, correct, wrong, skipped } = calculateResults()
-    const percentage = Math.round((correct / questions.length) * 100)
-    const totalTime = timeLimit - timeRemaining
-    
-    const entry: LeaderboardEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: playerName.trim(),
-      score,
-      percentage,
-      correct,
-      wrong,
-      skipped,
-      totalTime,
-      quizId: quizId || "unknown",
-      quizTitle: title,
-      timestamp: new Date().toISOString()
-    }
-    
-    try {
-      const existing = localStorage.getItem(LEADERBOARD_KEY)
-      const entries: LeaderboardEntry[] = existing ? JSON.parse(existing) : []
-      entries.unshift(entry)
-      // Keep only last 100 entries
-      const trimmed = entries.slice(0, 100)
-      localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(trimmed))
-      setSavedToLeaderboard(true)
-      setShowNameInput(false)
-      
-      // Refresh top leaderboard
-      const forThisQuiz = trimmed
-        .filter(e => !quizId || e.quizId === quizId)
-        .sort((a, b) => b.percentage - a.percentage)
-        .slice(0, 5)
-      setTopLeaderboard(forThisQuiz)
-    } catch (e) {
-      // Silent fail
-    }
   }
 
   const handleRestart = () => {
@@ -351,6 +390,8 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
     setQuestionTimes(new Array(questions.length).fill(0))
     setTimeRemaining(timeLimit)
     setShowConfirmSubmit(false)
+    setSavedToLeaderboard(false)
+    // Keep the name for next attempt
   }
 
   // Stats
@@ -393,46 +434,112 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
             {title}
           </h1>
           
-          <div className={`p-4 sm:p-6 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
-            <h2 className="text-lg font-semibold text-primary mb-4">Test Instructions</h2>
-            <div className="space-y-3 text-left text-sm sm:text-base">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-primary shrink-0" />
-                <span>Total Questions: {questions.length}</span>
+          {/* Name Input Section - Show first */}
+          {!nameEntered ? (
+            <div className={`p-4 sm:p-6 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-primary/5 border border-primary/20"}`}>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Trophy className="h-6 w-6 text-primary" />
+                <h2 className="text-lg font-semibold">Enter Your Name</h2>
               </div>
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-primary shrink-0" />
-                <span>Time Limit: {Math.floor(timeLimit / 60)} minutes</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                <span>+1 for correct answer</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <XCircle className="h-5 w-5 text-red-500 shrink-0" />
-                <span>-0.25 for wrong answer (negative marking)</span>
+              <p className={`text-sm mb-4 ${darkMode ? "text-gray-300" : "text-muted-foreground"}`}>
+                Your name will appear on the leaderboard after completing the quiz
+              </p>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className={`w-full px-4 py-3 rounded-xl border text-center text-lg font-medium ${
+                    darkMode 
+                      ? "bg-gray-600 border-gray-500 text-white placeholder:text-gray-400" 
+                      : "bg-background border-border focus:border-primary"
+                  } focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all`}
+                  onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
+                  autoFocus
+                />
+                <Button 
+                  size="lg" 
+                  className="w-full text-lg py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                  onClick={handleNameSubmit}
+                  disabled={!playerName.trim()}
+                >
+                  Continue
+                </Button>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-border text-xs sm:text-sm text-muted-foreground">
-              <p>Keyboard: Arrow keys to navigate, 1-5 to select, M to mark for review</p>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Show entered name */}
+              <div className={`flex items-center justify-center gap-2 mb-4 p-3 rounded-lg ${darkMode ? "bg-green-900/30" : "bg-green-50 border border-green-200"}`}>
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span className={`font-medium ${darkMode ? "text-green-400" : "text-green-700"}`}>
+                  Welcome, {playerName}!
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setNameEntered(false)}
+                >
+                  Edit
+                </Button>
+              </div>
+              
+              {/* Test Instructions */}
+              <div className={`p-4 sm:p-6 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
+                <h2 className="text-lg font-semibold text-primary mb-4">Test Instructions</h2>
+                <div className="space-y-3 text-left text-sm sm:text-base">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-primary shrink-0" />
+                    <span>Total Questions: {questions.length}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-primary shrink-0" />
+                    <span>Time Limit: {Math.floor(timeLimit / 60)} minutes</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                    <span>+1 for correct answer</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                    <span>-0.25 for wrong answer (negative marking)</span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-border text-xs sm:text-sm text-muted-foreground">
+                  <p>Keyboard: Arrow keys to navigate, 1-5 to select, M to mark for review</p>
+                </div>
+              </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button 
-              size="lg" 
-              className="flex-1 text-lg py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-              onClick={handleStart}
-            >
-              Start Test
-            </Button>
-            <Button variant="outline" size="lg" asChild className="py-6">
-              <Link href="/quiz">
-                <Home className="h-4 w-4 mr-2" />
-                All Quizzes
-              </Link>
-            </Button>
-          </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  size="lg" 
+                  className="flex-1 text-lg py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                  onClick={handleStart}
+                >
+                  Start Test
+                </Button>
+                <Button variant="outline" size="lg" asChild className="py-6">
+                  <Link href="/quiz">
+                    <Home className="h-4 w-4 mr-2" />
+                    All Quizzes
+                  </Link>
+                </Button>
+              </div>
+            </>
+          )}
+          
+          {!nameEntered && (
+            <div className="mt-4">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/quiz">
+                  <Home className="h-4 w-4 mr-2" />
+                  Back to All Quizzes
+                </Link>
+              </Button>
+            </div>
+          )}
         </Card>
       </div>
     )
@@ -499,53 +606,13 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
             </div>
           </div>
 
-          {/* Save to Leaderboard */}
-          {!savedToLeaderboard && (
-            <div className={`p-4 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-primary/5 border border-primary/20"}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <Trophy className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">Save to Leaderboard</h3>
-              </div>
-              {showNameInput ? (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    placeholder="Enter your name"
-                    className={`flex-1 px-4 py-2 rounded-lg border text-sm ${
-                      darkMode 
-                        ? "bg-gray-600 border-gray-500 text-white placeholder:text-gray-400" 
-                        : "bg-background border-border"
-                    }`}
-                    onKeyDown={(e) => e.key === "Enter" && saveToLeaderboard()}
-                    autoFocus
-                  />
-                  <Button onClick={saveToLeaderboard} disabled={!playerName.trim()}>
-                    Save
-                  </Button>
-                </div>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => setShowNameInput(true)}
-                >
-                  <Trophy className="h-4 w-4 mr-2" />
-                  Add My Score to Leaderboard
-                </Button>
-              )}
+          {/* Leaderboard Status */}
+          <div className={`p-4 rounded-xl mb-6 ${darkMode ? "bg-green-900/30" : "bg-green-50 border border-green-200"}`}>
+            <div className="flex items-center gap-2 text-green-600">
+              <Trophy className="h-5 w-5" />
+              <span className="font-medium">Score saved for: {playerName}</span>
             </div>
-          )}
-          
-          {savedToLeaderboard && (
-            <div className={`p-4 rounded-xl mb-6 ${darkMode ? "bg-green-900/30" : "bg-green-50 border border-green-200"}`}>
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle className="h-5 w-5" />
-                <span className="font-medium">Score saved to leaderboard!</span>
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Mini Leaderboard */}
           {topLeaderboard.length > 0 && (
