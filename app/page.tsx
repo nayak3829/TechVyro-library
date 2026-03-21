@@ -90,27 +90,41 @@ export default async function HomePage() {
       <Header />
       
       <main>
-        {/* Hero Section */}
+        {/* Hero Section - Clean background */}
         <HeroSection />
         
-        {/* Stats Section */}
+        {/* Section Divider */}
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+        
+        {/* Stats Section - Subtle muted background */}
         {configured && pdfs.length > 0 && (
           <StatsSection stats={stats} />
         )}
 
-        {/* Featured Section */}
+        {/* Section Divider */}
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+        {/* Featured Section - Clean background */}
         {configured && pdfs.length > 0 && (
-          <FeaturedSection featured={featured} />
+          <section className="py-12 sm:py-16 bg-background">
+            <FeaturedSection featured={featured} />
+          </section>
         )}
 
-        {/* Testimonials Section */}
+        {/* Section Divider */}
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+        {/* Testimonials Section - Muted background for contrast */}
         <TestimonialsSection />
+
+        {/* Section Divider */}
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
         {/* Setup Notice */}
         {!configured && (
-          <section className="container mx-auto px-4 py-12">
-            <div className="max-w-xl mx-auto p-6 rounded-2xl border border-amber-500/50 bg-amber-500/10">
-              <h2 className="text-lg font-semibold text-amber-600 mb-2">Setup Required</h2>
+          <section className="container mx-auto px-4 py-16">
+            <div className="max-w-xl mx-auto p-8 rounded-2xl border border-amber-500/50 bg-amber-500/10">
+              <h2 className="text-lg font-semibold text-amber-600 mb-3">Setup Required</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Add these environment variables to your Vercel project:
               </p>
@@ -123,24 +137,54 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* Main Content - PDF Grid */}
-        <section id="content" className="container mx-auto px-4 py-8 sm:py-12">
-          <Suspense fallback={
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {[...Array(6)].map((_, i) => (
-                  <Skeleton key={i} className="h-24 rounded-lg" />
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {[...Array(10)].map((_, i) => (
-                  <Skeleton key={i} className="aspect-[3/4] rounded-lg" />
-                ))}
-              </div>
+        {/* Main Content - PDF Grid - Clean white/dark background */}
+        <section id="content" className="py-12 sm:py-16 lg:py-20 bg-background">
+          <div className="container mx-auto px-4">
+            {/* Section Header */}
+            <div className="text-center mb-10 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
+                Browse All PDFs
+              </h2>
+              <p className="text-muted-foreground text-sm sm:text-base max-w-xl mx-auto">
+                Find the perfect study materials for your needs. Filter by category, popularity, or search for specific topics.
+              </p>
             </div>
-          }>
-            <PDFGrid pdfs={pdfs} categories={categories} />
-          </Suspense>
+            
+            <Suspense fallback={
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="h-24 rounded-lg" />
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:gap-5 md:gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {[...Array(10)].map((_, i) => (
+                    <Skeleton key={i} className="aspect-[3/4] rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            }>
+              <PDFGrid pdfs={pdfs} categories={categories} />
+            </Suspense>
+          </div>
+        </section>
+        
+        {/* Bottom CTA Section */}
+        <section className="py-12 sm:py-16 bg-gradient-to-b from-muted/50 to-background">
+          <div className="container mx-auto px-4 text-center">
+            <h3 className="text-xl sm:text-2xl font-bold text-foreground mb-3">
+              Ready to Ace Your Exams?
+            </h3>
+            <p className="text-muted-foreground text-sm sm:text-base max-w-lg mx-auto mb-6">
+              Join 10,000+ students who trust TechVyro for their study materials. All PDFs are free and updated daily.
+            </p>
+            <a 
+              href="#content"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+            >
+              Start Exploring
+            </a>
+          </div>
         </section>
       </main>
       

@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { WhatsAppPopup } from "@/components/whatsapp-popup"
+import { MobileNav } from "@/components/mobile-nav"
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -99,7 +100,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <div className="pb-16 md:pb-0">
+            {children}
+          </div>
+          <MobileNav />
           <Toaster richColors position="top-right" />
           <WhatsAppPopup />
         </ThemeProvider>

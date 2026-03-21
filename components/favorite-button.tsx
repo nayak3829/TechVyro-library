@@ -1,6 +1,6 @@
 "use client"
 
-import { Heart } from "lucide-react"
+import { Heart, Bookmark, BookmarkCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useFavorites } from "@/hooks/use-favorites"
@@ -9,31 +9,49 @@ import { toast } from "sonner"
 interface FavoriteButtonProps {
   pdfId: string
   size?: "sm" | "md" | "lg"
-  variant?: "default" | "overlay"
+  variant?: "default" | "overlay" | "ghost" | "bookmark"
   className?: string
+  showLabel?: boolean
 }
 
-export function FavoriteButton({ pdfId, size = "md", variant = "default", className }: FavoriteButtonProps) {
+export function FavoriteButton({ 
+  pdfId, 
+  size = "md", 
+  variant = "default", 
+  className,
+  showLabel = false 
+}: FavoriteButtonProps) {
   const { isFavorite, toggleFavorite, isLoaded } = useFavorites()
   const isFav = isFavorite(pdfId)
 
   const sizeClasses = {
-    sm: "h-7 w-7",
-    md: "h-9 w-9",
-    lg: "h-11 w-11",
+    sm: "h-8 w-8",
+    md: "h-10 w-10",
+    lg: "h-12 w-12",
   }
 
   const iconSizes = {
-    sm: "h-3.5 w-3.5",
-    md: "h-4 w-4",
-    lg: "h-5 w-5",
+    sm: "h-4 w-4",
+    md: "h-5 w-5",
+    lg: "h-6 w-6",
   }
 
   function handleClick(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
     toggleFavorite(pdfId)
-    toast.success(isFav ? "Removed from favorites" : "Added to favorites")
+    
+    if (isFav) {
+      toast.success("Removed from saved PDFs", {
+        description: "You can find your saved PDFs anytime",
+        icon: <Bookmark className="h-4 w-4" />,
+      })
+    } else {
+      toast.success("PDF saved for later!", {
+        description: "Quick access from your bookmarks",
+        icon: <BookmarkCheck className="h-4 w-4 text-primary" />,
+      })
+    }
   }
 
   if (!isLoaded) {
@@ -44,7 +62,38 @@ export function FavoriteButton({ pdfId, size = "md", variant = "default", classN
         className={cn(sizeClasses[size], "opacity-50", className)}
         disabled
       >
-        <Heart className={iconSizes[size]} />
+        <Bookmark className={iconSizes[size]} />
+      </Button>
+    )
+  }
+
+  // Bookmark variant for more prominent save action
+  if (variant === "bookmark") {
+    return (
+      <Button
+        variant="outline"
+        size={size === "sm" ? "sm" : "default"}
+        className={cn(
+          "gap-2 border-border/50 transition-all duration-300",
+          isFav 
+            ? "bg-primary/10 border-primary/50 text-primary hover:bg-primary/20" 
+            : "hover:border-primary/50 hover:bg-primary/5",
+          className
+        )}
+        onClick={handleClick}
+      >
+        <Bookmark
+          className={cn(
+            iconSizes[size],
+            "transition-all",
+            isFav && "fill-primary text-primary"
+          )}
+        />
+        {showLabel && (
+          <span className="text-sm font-medium">
+            {isFav ? "Saved" : "Save"}
+          </span>
+        )}
       </Button>
     )
   }
@@ -55,7 +104,9 @@ export function FavoriteButton({ pdfId, size = "md", variant = "default", classN
       size="icon"
       className={cn(
         sizeClasses[size],
-        variant === "overlay" && "bg-background/80 backdrop-blur-sm hover:bg-background/90",
+        variant === "overlay" && "bg-background/90 backdrop-blur-sm hover:bg-background shadow-md",
+        "transition-all duration-300 hover:scale-110",
+        isFav && "text-red-500",
         className
       )}
       onClick={handleClick}
@@ -63,8 +114,8 @@ export function FavoriteButton({ pdfId, size = "md", variant = "default", classN
       <Heart
         className={cn(
           iconSizes[size],
-          "transition-all",
-          isFav && "fill-red-500 text-red-500"
+          "transition-all duration-300",
+          isFav && "fill-red-500 text-red-500 scale-110"
         )}
       />
       <span className="sr-only">{isFav ? "Remove from favorites" : "Add to favorites"}</span>
