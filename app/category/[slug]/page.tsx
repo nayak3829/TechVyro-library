@@ -25,7 +25,6 @@ async function getCategoryBySlug(slug: string): Promise<Category | null> {
     .single()
 
   if (error) {
-    console.error("[v0] Error fetching category:", error)
     return null
   }
 
@@ -48,7 +47,6 @@ async function getCategoryPDFs(categoryId: string): Promise<PDF[]> {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("[v0] Error fetching PDFs:", error)
     return []
   }
 
@@ -67,7 +65,6 @@ async function getAllCategories(): Promise<Category[]> {
     .order("name")
 
   if (error) {
-    console.error("[v0] Error fetching categories:", error)
     return []
   }
 

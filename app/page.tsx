@@ -4,6 +4,7 @@ import { Header } from "@/components/header"
 import { HeroSection } from "@/components/home/hero-section"
 import { StatsSection } from "@/components/home/stats-section"
 import { FeaturedSection } from "@/components/home/featured-section"
+import { CategoriesSection } from "@/components/home/categories-section"
 import { TestimonialsSection } from "@/components/home/testimonials-section"
 import { PDFGrid } from "@/components/pdf-grid"
 import { Footer } from "@/components/footer"
@@ -68,6 +69,18 @@ function getFeaturedPDFs(pdfs: PDF[]) {
   return { popular, trending, recent, topRated }
 }
 
+function groupPdfsByCategory(pdfs: PDF[]): Record<string, PDF[]> {
+  return pdfs.reduce((acc, pdf) => {
+    if (pdf.category_id) {
+      if (!acc[pdf.category_id]) {
+        acc[pdf.category_id] = []
+      }
+      acc[pdf.category_id].push(pdf)
+    }
+    return acc
+  }, {} as Record<string, PDF[]>)
+}
+
 export default async function HomePage() {
   const configured = isSupabaseConfigured()
   const [pdfs, categories] = configured 
@@ -76,43 +89,74 @@ export default async function HomePage() {
   
   const stats = getStats(pdfs, categories)
   const featured = getFeaturedPDFs(pdfs)
+  const pdfsByCategory = groupPdfsByCategory(pdfs)
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ========== HEADER ========== */}
+      {/* ================================================ */}
+      {/* HEADER - Navigation & Search */}
+      {/* ================================================ */}
       <Header />
       
       <main>
-        {/* ========== SECTION 1: HERO ========== */}
-        {/* Full width hero with trust badges and CTA */}
+        {/* ================================================ */}
+        {/* SECTION 1: HERO */}
+        {/* Trust badges, headline, CTAs */}
+        {/* Background: Gradient with floating elements */}
+        {/* ================================================ */}
         <HeroSection />
         
-        {/* ========== SECTION 2: STATS ========== */}
-        {/* Numbers + emotional impact - muted background */}
+        {/* ================================================ */}
+        {/* SECTION 2: STATS */}
+        {/* Numbers + emotional features */}
+        {/* Background: Muted gradient */}
+        {/* ================================================ */}
         {configured && pdfs.length > 0 && (
           <StatsSection stats={stats} />
         )}
 
-        {/* ========== SECTION 3: FEATURED PDFS ========== */}
-        {/* Popular/Trending/Recent tabs - clean background */}
+        {/* ================================================ */}
+        {/* SECTION 3: FEATURED PDFs */}
+        {/* Popular/Trending/Recent/Top Rated tabs */}
+        {/* Background: Clean white/dark */}
+        {/* ================================================ */}
         {configured && pdfs.length > 0 && (
           <FeaturedSection featured={featured} />
         )}
 
-        {/* ========== SECTION 4: MAIN PDF GRID ========== */}
-        {/* All PDFs with filters - muted background */}
-        <section id="content" className="py-16 sm:py-20 lg:py-24 bg-gradient-to-b from-muted/30 to-background">
+        {/* ================================================ */}
+        {/* SECTION 4: CATEGORIES */}
+        {/* Browse by subject cards */}
+        {/* Background: Muted gradient */}
+        {/* ================================================ */}
+        {configured && categories.length > 0 && (
+          <CategoriesSection categories={categories} pdfsByCategory={pdfsByCategory} />
+        )}
+
+        {/* ================================================ */}
+        {/* SECTION 5: TESTIMONIALS */}
+        {/* Marquee animation reviews */}
+        {/* Background: Gradient muted */}
+        {/* ================================================ */}
+        <TestimonialsSection />
+
+        {/* ================================================ */}
+        {/* SECTION 6: ALL PDFs GRID */}
+        {/* Full library with filters */}
+        {/* Background: Clean with subtle gradient */}
+        {/* ================================================ */}
+        <section id="content" className="py-16 sm:py-20 lg:py-24 bg-background">
           <div className="container mx-auto px-4">
             {/* Section Header */}
             <div className="text-center mb-10 sm:mb-14">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-                Browse Collection
+                Full Library
               </div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 text-balance">
                 Explore All PDFs
               </h2>
               <p className="text-muted-foreground text-sm sm:text-base max-w-xl mx-auto">
-                Find the perfect study materials. Filter by category or search for specific topics.
+                Filter by category or search for specific study materials
               </p>
             </div>
             
@@ -150,16 +194,15 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* ========== SECTION 5: TESTIMONIALS ========== */}
-        {/* Social proof - gradient background */}
-        <TestimonialsSection />
-
-        {/* ========== SECTION 6: BOTTOM CTA ========== */}
+        {/* ================================================ */}
+        {/* SECTION 7: BOTTOM CTA */}
         {/* Final conversion push */}
-        <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-muted/50">
+        {/* Background: Gradient to muted */}
+        {/* ================================================ */}
+        <section className="py-16 sm:py-20 bg-gradient-to-b from-muted/30 to-muted/50">
           <div className="container mx-auto px-4">
             <div className="max-w-2xl mx-auto text-center">
-              <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
+              <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-4 text-balance">
                 Ready to Start Learning?
               </h3>
               <p className="text-muted-foreground text-sm sm:text-base mb-8 max-w-lg mx-auto">
@@ -189,7 +232,9 @@ export default async function HomePage() {
         </section>
       </main>
       
-      {/* ========== FOOTER ========== */}
+      {/* ================================================ */}
+      {/* FOOTER */}
+      {/* ================================================ */}
       <Footer />
     </div>
   )
