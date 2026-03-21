@@ -138,50 +138,50 @@ export function QuizSection() {
           {/* Quizzes Grid */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
+              <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
                 <Target className="h-5 w-5 text-primary" />
                 Available Quizzes
               </h3>
               <Link 
                 href="/quiz" 
-                className="text-sm text-primary hover:underline flex items-center gap-1"
+                className="text-xs sm:text-sm text-primary hover:underline flex items-center gap-1"
               >
                 View All <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {quizzes.map(quiz => (
                 <Card 
                   key={quiz.id}
-                  className="group overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/50 hover:border-primary/40"
+                  className="group overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/50 hover:border-primary/40 flex flex-col"
                 >
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <h4 className="font-semibold text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                  <div className="p-3 sm:p-4 flex flex-col flex-1">
+                    <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
+                      <h4 className="font-semibold text-xs sm:text-sm line-clamp-2 group-hover:text-primary transition-colors">
                         {quiz.title}
                       </h4>
                       <Badge 
-                        className={`shrink-0 text-[10px] text-white ${categoryColors[quiz.category] || "bg-gray-500"}`}
+                        className={`shrink-0 text-[9px] sm:text-[10px] text-white py-0.5 px-1.5 ${categoryColors[quiz.category] || "bg-gray-500"}`}
                       >
                         {quiz.category}
                       </Badge>
                     </div>
                     
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mb-4">
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-muted-foreground mb-3 sm:mb-4">
                       <div className="flex items-center gap-1">
-                        <FileText className="h-3.5 w-3.5" />
-                        {quiz.questions.length} Qs
+                        <FileText className="h-3 w-3" />
+                        <span>{quiz.questions.length} Qs</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {Math.floor(quiz.timeLimit / 60)} min
+                        <Clock className="h-3 w-3" />
+                        <span>{Math.floor(quiz.timeLimit / 60)} min</span>
                       </div>
                     </div>
                     
-                    <Button asChild size="sm" className="w-full h-9 text-xs">
+                    <Button asChild size="sm" className="w-full h-8 sm:h-9 text-[11px] sm:text-xs mt-auto">
                       <Link href={`/quiz/${quiz.id}`}>
-                        <Play className="h-3.5 w-3.5 mr-1.5" />
+                        <Play className="h-3 w-3 mr-1" />
                         Start Quiz
                       </Link>
                     </Button>
@@ -192,10 +192,10 @@ export function QuizSection() {
 
             {quizzes.length >= 4 && (
               <div className="text-center pt-2">
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="outline" size="sm" className="text-xs sm:text-sm">
                   <Link href="/quiz">
                     Browse All Quizzes
-                    <ArrowRight className="h-4 w-4 ml-2" />
+                    <ArrowRight className="h-3 w-3 ml-1.5" />
                   </Link>
                 </Button>
               </div>
@@ -204,41 +204,41 @@ export function QuizSection() {
 
           {/* Leaderboard */}
           <div className="lg:col-span-1">
-            <Card className="overflow-hidden border-border/50">
-              <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 p-4 border-b border-border/50">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-primary" />
-                  Leaderboard
+            <Card className="overflow-hidden border-border/50 flex flex-col h-full">
+              <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 p-3 sm:p-4 border-b border-border/50">
+                <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
+                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                  <span className="truncate">Leaderboard</span>
                 </h3>
-                <p className="text-xs text-muted-foreground mt-1">Top performers this week</p>
+                <p className="text-[11px] sm:text-xs text-muted-foreground mt-1">Top performers</p>
               </div>
 
-              <div className="p-4">
+              <div className="p-3 sm:p-4 flex-1 overflow-y-auto">
                 {leaderboard.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                    <p className="text-sm text-muted-foreground">No scores yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">Be the first to take a quiz!</p>
+                  <div className="text-center py-6 sm:py-8">
+                    <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-muted-foreground/50 mb-2 sm:mb-3" />
+                    <p className="text-xs sm:text-sm text-muted-foreground">No scores yet</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Be the first to take a quiz!</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {leaderboard.map((entry, index) => (
                       <div 
                         key={entry.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all hover:scale-[1.02] ${getRankBg(index)}`}
+                        className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border transition-all hover:scale-[1.02] ${getRankBg(index)}`}
                       >
-                        <div className="shrink-0">
+                        <div className="shrink-0 w-5 sm:w-6">
                           {getRankIcon(index)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{entry.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{entry.quizTitle}</p>
+                          <p className="font-medium text-[11px] sm:text-sm truncate">{entry.name}</p>
+                          <p className="text-[9px] sm:text-xs text-muted-foreground truncate">{entry.quizTitle}</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-bold text-sm text-primary">{entry.percentage}%</p>
+                          <p className="font-bold text-[11px] sm:text-sm text-primary">{entry.percentage}%</p>
                           <div className="flex items-center gap-0.5 justify-end">
-                            <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                            <span className="text-xs text-muted-foreground">{entry.score.toFixed(1)}</span>
+                            <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500 fill-amber-500" />
+                            <span className="text-[9px] sm:text-xs text-muted-foreground">{entry.score.toFixed(1)}</span>
                           </div>
                         </div>
                       </div>
@@ -246,12 +246,12 @@ export function QuizSection() {
                   </div>
                 )}
 
-                <div className="mt-4 pt-4 border-t border-border/50">
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/50">
                   <Link 
                     href="/quiz/leaderboard"
-                    className="text-sm text-primary hover:underline flex items-center justify-center gap-1"
+                    className="text-[11px] sm:text-sm text-primary hover:underline flex items-center justify-center gap-1"
                   >
-                    View Full Leaderboard <ArrowRight className="h-4 w-4" />
+                    View Full Leaderboard <ArrowRight className="h-3 w-3" />
                   </Link>
                 </div>
               </div>
