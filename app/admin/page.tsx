@@ -7,7 +7,7 @@ import {
   ArrowLeft, Plus, Upload, FolderPlus, Trash2, FileText, LogOut, 
   BarChart3, RefreshCw, Settings, Database, Loader2, MessageSquare,
   TrendingUp, Download, Eye, Star, Clock, Users, Zap, HardDrive,
-  Activity, AlertCircle, Home, History, Code
+  Activity, AlertCircle, Home, History
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -57,14 +57,6 @@ const FolderManager = dynamic(() => import("@/components/admin/folder-manager").
 
 const QuizManager = dynamic(() => import("@/components/admin/quiz-manager").then(mod => ({ default: mod.QuizManager })), {
   loading: () => <ComponentLoader text="Loading quiz manager..." />,
-})
-
-const HTMLUploadForm = dynamic(() => import("@/components/admin/html-upload-form").then(mod => ({ default: mod.HTMLUploadForm })), {
-  loading: () => <ComponentLoader text="Loading HTML uploader..." />,
-})
-
-const HTMLFilesManager = dynamic(() => import("@/components/admin/html-files-manager").then(mod => ({ default: mod.HTMLFilesManager })), {
-  loading: () => <ComponentLoader text="Loading HTML files..." />,
 })
 
 function ComponentLoader({ text }: { text: string }) {
@@ -259,10 +251,7 @@ export default function AdminPage() {
               <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline sm:inline">Quizzes</span>
             </TabsTrigger>
-            <TabsTrigger value="html" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
-              <Code className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">HTML</span>
-            </TabsTrigger>
+
             <TabsTrigger value="reviews" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline sm:inline">Reviews</span>
@@ -619,43 +608,6 @@ export default function AdminPage() {
                 <QuizManager />
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* HTML Tab */}
-          <TabsContent value="html" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-2">
-              {/* Upload */}
-              <Card className="border-border/50 lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Code className="h-5 w-5 text-primary" />
-                    Upload HTML Files
-                  </CardTitle>
-                  <CardDescription>
-                    Upload custom HTML files. Admin can manage visibility, tags, and organize content.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <HTMLUploadForm onSuccess={() => setActiveTab("html")} />
-                </CardContent>
-              </Card>
-
-              {/* Manage Files */}
-              <Card className="border-border/50 lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-accent" />
-                    Manage HTML Files
-                  </CardTitle>
-                  <CardDescription>
-                    View, edit, delete, and control visibility of uploaded HTML files.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <HTMLFilesManager />
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
 
           {/* Reviews Tab */}

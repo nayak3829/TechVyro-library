@@ -5,8 +5,9 @@ import {
   Plus, Trash2, Edit, ChevronDown, ChevronRight, Clock, FileText,
   CheckCircle, Save, Upload, Copy, ExternalLink, FileUp, Loader2,
   Trophy, Users, Crown, Tag, Eye, EyeOff, Globe, Lock, Link2,
-  FolderOpen, Zap, X
+  FolderOpen, Zap, X, Settings2, Files, AlertCircle
 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -127,6 +128,31 @@ export function QuizManager() {
   const [uploadedFileName, setUploadedFileName] = useState("")
   const [parsedPreview, setParsedPreview] = useState<{ title: string; count: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Multi-file upload state
+  const [uploadEntries, setUploadEntries] = useState<{
+    id: string
+    file: File
+    status: "pending" | "parsing" | "ready" | "error"
+    quiz: Quiz | null
+    error?: string
+    settings: {
+      category: string
+      section: string
+      difficulty: "easy" | "medium" | "hard"
+      visibility: VisibilityType
+      tags: string[]
+    }
+  }[]>([])
+  const [dragActive, setDragActive] = useState(false)
+  const [globalSettings, setGlobalSettings] = useState({
+    category: "Mathematics",
+    section: "General",
+    difficulty: "medium" as "easy" | "medium" | "hard",
+    visibility: "public" as VisibilityType,
+    tags: [] as string[]
+  })
+  const [showGlobalSettings, setShowGlobalSettings] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -406,6 +432,142 @@ export function QuizManager() {
     }
   }
 
+  // Multi-file handlers
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true)
+    } else if (e.type === "dragleave") {
+      setDragActive(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    
+    const files = Array.from(e.dataTransfer.files).filter(
+      f => f.name.endsWith('.html') || f.name.endsWith('.htm')
+    )
+    if (files.length > 0) {
+      processMultipleFiles(files)
+    } else {
+      toast.error("Please drop HTML files only")
+    }
+  }
+
+  const handleMultiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(
+      f => f.name.endsWith('.html') || f.name.endsWith('.htm')
+    )
+    if (files.length > 0) {
+      processMultipleFiles(files)
+    } else {
+      toast.error("Please select HTML files")
+    }
+    if (e.target) e.target.value = ""
+  }
+
+  const processMultipleFiles = async (files: File[]) => {
+    const newEntries = files.map(file => ({
+      id: generateId(),
+      file,
+      status: "pending" as const,
+      quiz: null as Quiz | null,
+      settings: { ...globalSettings }
+    }))
+    
+    setUploadEntries(prev => [...prev, ...newEntries])
+    
+    // Process each file
+    for (const entry of newEntries) {
+      setUploadEntries(prev => prev.map(e => 
+        e.id === entry.id ? { ...e, status: "parsing" as const } : e
+      ))
+      
+      try {
+        const text = await entry.file.text()
+        const quiz = parseQuizHtml(text)
+        
+        if (quiz) {
+          setUploadEntries(prev => prev.map(e => 
+            e.id === entry.id ? { 
+              ...e, 
+              status: "ready" as const, 
+              quiz: {
+                ...quiz,
+                category: e.settings.category,
+                section: e.settings.section,
+                difficulty: e.settings.difficulty,
+                visibility: e.settings.visibility,
+                tags: e.settings.tags
+              }
+            } : e
+          ))
+        } else {
+          setUploadEntries(prev => prev.map(e => 
+            e.id === entry.id ? { ...e, status: "error" as const, error: "Could not parse quiz" } : e
+          ))
+        }
+      } catch (err) {
+        setUploadEntries(prev => prev.map(e => 
+          e.id === entry.id ? { ...e, status: "error" as const, error: "Failed to read file" } : e
+        ))
+      }
+    }
+  }
+
+  const removeUploadEntry = (id: string) => {
+    setUploadEntries(prev => prev.filter(e => e.id !== id))
+  }
+
+  const updateEntrySettings = (id: string, key: string, value: any) => {
+    setUploadEntries(prev => prev.map(e => {
+      if (e.id !== id) return e
+      const newSettings = { ...e.settings, [key]: value }
+      return {
+        ...e,
+        settings: newSettings,
+        quiz: e.quiz ? {
+          ...e.quiz,
+          [key]: value
+        } : null
+      }
+    }))
+  }
+
+  const applyGlobalSettings = () => {
+    setUploadEntries(prev => prev.map(e => ({
+      ...e,
+      settings: { ...globalSettings },
+      quiz: e.quiz ? {
+        ...e.quiz,
+        category: globalSettings.category,
+        section: globalSettings.section,
+        difficulty: globalSettings.difficulty,
+        visibility: globalSettings.visibility,
+        tags: globalSettings.tags
+      } : null
+    })))
+    toast.success("Global settings applied to all files")
+  }
+
+  const importAllReady = () => {
+    const readyEntries = uploadEntries.filter(e => e.status === "ready" && e.quiz)
+    if (readyEntries.length === 0) {
+      toast.error("No valid quizzes to import")
+      return
+    }
+    
+    const newQuizzes = readyEntries.map(e => e.quiz!).filter(Boolean)
+    saveQuizzes([...quizzes, ...newQuizzes])
+    setUploadEntries([])
+    setShowImportDialog(false)
+    toast.success(`Imported ${newQuizzes.length} quizzes successfully!`)
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -457,6 +619,7 @@ export function QuizManager() {
 
   const resetImportDialog = () => {
     setImportHtml("")
+    setUploadEntries([])
     setUploadedFileName("")
     setParsedPreview(null)
     if (fileInputRef.current) fileInputRef.current.value = ""
@@ -950,140 +1113,320 @@ export function QuizManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Import Dialog */}
+      {/* Import Dialog - Multi-File */}
       <Dialog open={showImportDialog} onOpenChange={(open) => {
         setShowImportDialog(open)
         if (!open) resetImportDialog()
       }}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
-            <DialogTitle>Import Quiz from HTML</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Upload className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              Import Quizzes from HTML
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
-            <Tabs defaultValue="upload" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="upload" className="text-xs sm:text-sm">
-                  <FileUp className="h-4 w-4 mr-1.5" />
-                  Upload
-                </TabsTrigger>
-                <TabsTrigger value="paste" className="text-xs sm:text-sm">
-                  <FileText className="h-4 w-4 mr-1.5" />
-                  Paste
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="upload" className="space-y-3 mt-4">
-                <div 
-                  className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".html,.htm"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  
-                  {isUploading ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">Processing...</p>
-                    </div>
-                  ) : uploadedFileName ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle className="h-8 w-8 text-green-500" />
-                      <p className="font-medium text-sm truncate max-w-full px-2">{uploadedFileName}</p>
-                      <p className="text-xs text-muted-foreground">Click to change file</p>
-                    </div>
-                  ) : (
-                    <>
-                      <FileUp className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                      <p className="font-medium text-sm">Click to upload HTML file</p>
-                      <p className="text-xs text-muted-foreground">or drag and drop</p>
-                    </>
-                  )}
+          <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pr-1">
+            {/* Drop Zone */}
+            <div
+              className={`relative border-2 border-dashed rounded-xl p-4 sm:p-6 text-center transition-all duration-300 cursor-pointer group ${
+                dragActive
+                  ? "border-primary bg-primary/10 scale-[1.01]"
+                  : "border-border hover:border-primary/50 hover:bg-muted/30"
+              }`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".html,.htm"
+                multiple
+                onChange={handleMultiFileChange}
+                className="hidden"
+              />
+              
+              <div className="relative">
+                <div className="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform duration-300">
+                  <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                 </div>
-
-                {parsedPreview && (
-                  <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-green-700 dark:text-green-400 truncate">
-                          {parsedPreview.title}
-                        </p>
-                        <p className="text-xs text-green-600 dark:text-green-300">
-                          {parsedPreview.count} questions detected
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="paste" className="space-y-3 mt-4">
-                <div>
-                  <Label className="text-sm">Paste HTML Code</Label>
-                  <Textarea
-                    value={importHtml}
-                    onChange={e => {
-                      setImportHtml(e.target.value)
-                      if (e.target.value.length > 100) {
-                        const quiz = parseQuizHtml(e.target.value)
-                        if (quiz) {
-                          setParsedPreview({ title: quiz.title, count: quiz.questions.length })
-                        } else {
-                          setParsedPreview(null)
-                        }
-                      }
-                    }}
-                    placeholder="Paste your quiz HTML code here..."
-                    rows={6}
-                    className="font-mono text-xs"
-                  />
+                <p className="font-semibold text-xs sm:text-sm text-foreground">Drop HTML files here or click to select</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Multiple files supported</p>
+                
+                <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2 sm:mt-3">
+                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    <Zap className="h-2.5 w-2.5" />
+                    Fast
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-xs text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
+                    <Files className="h-2.5 w-2.5" />
+                    Batch
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-xs text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                    <Settings2 className="h-2.5 w-2.5" />
+                    Customize
+                  </span>
                 </div>
-
-                {parsedPreview && (
-                  <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-green-700 dark:text-green-400 truncate">
-                          {parsedPreview.title}
-                        </p>
-                        <p className="text-xs text-green-600 dark:text-green-300">
-                          {parsedPreview.count} questions detected
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-
-            <div className="bg-muted/50 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-1">Auto-Detection</h4>
-              <p className="text-xs text-muted-foreground">
-                Extracts title, questions, options, answers, and time limit automatically. 
-                Replaces external branding with TechVyro.
-              </p>
+              </div>
             </div>
+
+            {/* Global Settings */}
+            {uploadEntries.length > 0 && (
+              <Collapsible open={showGlobalSettings} onOpenChange={setShowGlobalSettings}>
+                <div className="rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 overflow-hidden">
+                  <CollapsibleTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full flex items-center justify-between p-2 sm:p-3 h-auto hover:bg-muted/50"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-primary/10">
+                          <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-medium text-foreground text-xs sm:text-sm">Global Settings</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">Apply to all files</p>
+                        </div>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${showGlobalSettings ? "rotate-180" : ""}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="p-3 sm:p-4 border-t border-border/50 space-y-3">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <div>
+                          <Label className="text-[10px] sm:text-xs">Category</Label>
+                          <Select value={globalSettings.category} onValueChange={v => setGlobalSettings(p => ({ ...p, category: v }))}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Mathematics">Mathematics</SelectItem>
+                              <SelectItem value="Physics">Physics</SelectItem>
+                              <SelectItem value="Chemistry">Chemistry</SelectItem>
+                              <SelectItem value="Biology">Biology</SelectItem>
+                              <SelectItem value="English">English</SelectItem>
+                              <SelectItem value="General">General</SelectItem>
+                              <SelectItem value="NDA">NDA</SelectItem>
+                              <SelectItem value="SSC">SSC</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] sm:text-xs">Section</Label>
+                          <Select value={globalSettings.section} onValueChange={v => setGlobalSettings(p => ({ ...p, section: v }))}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SECTIONS.map(s => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] sm:text-xs">Difficulty</Label>
+                          <Select value={globalSettings.difficulty} onValueChange={v => setGlobalSettings(p => ({ ...p, difficulty: v as any }))}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DIFFICULTIES.map(d => (
+                                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] sm:text-xs">Visibility</Label>
+                          <Select value={globalSettings.visibility} onValueChange={v => setGlobalSettings(p => ({ ...p, visibility: v as any }))}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="public">Public</SelectItem>
+                              <SelectItem value="unlisted">Unlisted</SelectItem>
+                              <SelectItem value="private">Private</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button size="sm" onClick={applyGlobalSettings} className="w-full h-8 text-xs">
+                        Apply to All Files
+                      </Button>
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            )}
+
+            {/* File List */}
+            {uploadEntries.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium">{uploadEntries.length} file(s)</p>
+                  <div className="flex gap-1.5">
+                    <Badge variant="secondary" className="text-[10px] sm:text-xs bg-green-500/10 text-green-600">
+                      {uploadEntries.filter(e => e.status === "ready").length} ready
+                    </Badge>
+                    {uploadEntries.some(e => e.status === "error") && (
+                      <Badge variant="secondary" className="text-[10px] sm:text-xs bg-red-500/10 text-red-600">
+                        {uploadEntries.filter(e => e.status === "error").length} failed
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-2 max-h-[200px] sm:max-h-[300px] overflow-y-auto">
+                  {uploadEntries.map(entry => (
+                    <div 
+                      key={entry.id}
+                      className={`p-2 sm:p-3 rounded-lg border transition-all ${
+                        entry.status === "ready" 
+                          ? "border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800" 
+                          : entry.status === "error"
+                            ? "border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800"
+                            : "border-border bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {entry.status === "parsing" && <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin text-primary shrink-0" />}
+                          {entry.status === "ready" && <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 shrink-0" />}
+                          {entry.status === "error" && <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 shrink-0" />}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-[11px] sm:text-sm truncate">{entry.file.name}</p>
+                            {entry.quiz && (
+                              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                                {entry.quiz.title} - {entry.quiz.questions.length} questions
+                              </p>
+                            )}
+                            {entry.error && (
+                              <p className="text-[10px] sm:text-xs text-red-500">{entry.error}</p>
+                            )}
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => removeUploadEntry(entry.id)}
+                          className="h-6 w-6 sm:h-7 sm:w-7 p-0 shrink-0"
+                        >
+                          <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </div>
+                      
+                      {entry.status === "ready" && (
+                        <div className="grid grid-cols-2 gap-1.5 mt-2">
+                          <Select 
+                            value={entry.settings.category} 
+                            onValueChange={v => updateEntrySettings(entry.id, "category", v)}
+                          >
+                            <SelectTrigger className="h-6 sm:h-7 text-[10px] sm:text-xs">
+                              <SelectValue placeholder="Category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Mathematics">Mathematics</SelectItem>
+                              <SelectItem value="Physics">Physics</SelectItem>
+                              <SelectItem value="Chemistry">Chemistry</SelectItem>
+                              <SelectItem value="Biology">Biology</SelectItem>
+                              <SelectItem value="English">English</SelectItem>
+                              <SelectItem value="General">General</SelectItem>
+                              <SelectItem value="NDA">NDA</SelectItem>
+                              <SelectItem value="SSC">SSC</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select 
+                            value={entry.settings.difficulty} 
+                            onValueChange={v => updateEntrySettings(entry.id, "difficulty", v)}
+                          >
+                            <SelectTrigger className="h-6 sm:h-7 text-[10px] sm:text-xs">
+                              <SelectValue placeholder="Difficulty" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DIFFICULTIES.map(d => (
+                                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Single file paste option */}
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
+                  <FileText className="h-3 w-3 mr-1.5" />
+                  Or paste HTML code directly
+                  <ChevronDown className="h-3 w-3 ml-auto" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <Textarea
+                  value={importHtml}
+                  onChange={e => {
+                    setImportHtml(e.target.value)
+                    if (e.target.value.length > 100) {
+                      const quiz = parseQuizHtml(e.target.value)
+                      if (quiz) {
+                        setParsedPreview({ title: quiz.title, count: quiz.questions.length })
+                      } else {
+                        setParsedPreview(null)
+                      }
+                    }
+                  }}
+                  placeholder="Paste your quiz HTML code here..."
+                  rows={4}
+                  className="font-mono text-[10px] sm:text-xs"
+                />
+                {parsedPreview && (
+                  <div className="mt-2 p-2 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-400 truncate">
+                          {parsedPreview.title}
+                        </p>
+                        <p className="text-[10px] text-green-600 dark:text-green-300">
+                          {parsedPreview.count} questions detected
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
-          <DialogFooter className="shrink-0 border-t pt-4 gap-2 flex-col sm:flex-row">
-            <Button variant="outline" onClick={() => setShowImportDialog(false)} className="w-full sm:w-auto">
+          <DialogFooter className="shrink-0 border-t pt-3 gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); resetImportDialog() }} size="sm" className="w-full sm:w-auto text-xs">
               Cancel
             </Button>
-            <Button 
-              onClick={handleImportHtml} 
-              disabled={!importHtml.trim() || !parsedPreview}
-              className="w-full sm:w-auto"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import Quiz
-            </Button>
+            {uploadEntries.filter(e => e.status === "ready").length > 0 ? (
+              <Button onClick={importAllReady} size="sm" className="w-full sm:w-auto text-xs">
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+                Import {uploadEntries.filter(e => e.status === "ready").length} Quiz(es)
+              </Button>
+            ) : importHtml && parsedPreview ? (
+              <Button onClick={handleImportHtml} size="sm" className="w-full sm:w-auto text-xs">
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+                Import Quiz
+              </Button>
+            ) : (
+              <Button disabled size="sm" className="w-full sm:w-auto text-xs">
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+                Import
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
