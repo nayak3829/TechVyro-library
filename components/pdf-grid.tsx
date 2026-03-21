@@ -253,19 +253,20 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             <SearchBar value={search} onChange={setSearch} />
           </div>
           
-          {/* Mobile Filter Button */}
-          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="sm:hidden gap-2 h-11">
-                <Filter className="h-4 w-4" />
-                Filters
-                {activeFiltersCount > 0 && (
-                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-primary/10 text-primary">
-                    {activeFiltersCount}
-                  </Badge>
-                )}
-              </Button>
-            </SheetTrigger>
+          {/* Mobile Filter Button + Results */}
+          <div className="flex sm:hidden items-center gap-2">
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 h-10 flex-1">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {activeFiltersCount > 0 && (
+                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-primary/10 text-primary">
+                      {activeFiltersCount}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
             <SheetContent side="bottom" className="h-[70vh]">
               <SheetHeader>
                 <SheetTitle>Filter & Sort</SheetTitle>
@@ -330,7 +331,13 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
               </div>
             </SheetContent>
           </Sheet>
-        </div>
+            
+            {/* Mobile Results Count */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
+              <span className="font-semibold text-foreground">{filteredAndSortedPdfs.length}</span>
+              <span>PDFs</span>
+            </div>
+          </div>
         
         {/* Desktop Filter Bar */}
         <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">

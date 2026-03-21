@@ -233,7 +233,7 @@ export function PDFCard({ pdf, compact = false, showRank = false, rank }: PDFCar
             {pdf.title}
           </h3>
           {pdf.description && (
-            <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-xs text-muted-foreground line-clamp-2 hidden sm:block leading-relaxed">
+            <p className="mt-1 sm:mt-2 text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground line-clamp-1 xs:line-clamp-2 leading-relaxed">
               {pdf.description}
             </p>
           )}

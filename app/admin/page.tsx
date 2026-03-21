@@ -221,56 +221,56 @@ export default function AdminPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-8">
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
             <TabsList className="flex h-auto gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-muted/50 rounded-xl min-w-max sm:min-w-0 sm:flex-wrap">
-            <TabsTrigger value="overview" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="overview" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Overview</span>
+              <span className="xs:inline sm:inline text-[9px] xs:text-[10px] sm:text-sm">Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="upload" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="upload" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Upload className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Upload</span>
+              <span className="xs:inline sm:inline text-[9px] xs:text-[10px] sm:text-sm">Upload</span>
             </TabsTrigger>
-            <TabsTrigger value="pdfs" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="pdfs" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">PDFs</span>
+              <span className="xs:inline sm:inline text-[9px] xs:text-[10px] sm:text-sm">PDFs</span>
               <Badge variant="secondary" className="ml-0.5 sm:ml-1 h-4 sm:h-5 px-1 sm:px-1.5 text-[9px] sm:text-xs bg-primary/10 text-primary">
                 {pdfs.length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="structure" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="structure" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <FolderPlus className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Structure</span>
+              <span className="hidden xs:inline sm:inline text-[10px] sm:text-sm">Structure</span>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="categories" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Database className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Categories</span>
+              <span className="hidden xs:inline sm:inline text-[10px] sm:text-sm">Categories</span>
               <Badge variant="secondary" className="ml-0.5 sm:ml-1 h-4 sm:h-5 px-1 sm:px-1.5 text-[9px] sm:text-xs bg-accent/10 text-accent">
                 {categories.length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="quizzes" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="quizzes" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Quizzes</span>
+              <span className="xs:inline sm:inline text-[9px] xs:text-[10px] sm:text-sm">Quiz</span>
             </TabsTrigger>
 
-            <TabsTrigger value="reviews" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="reviews" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Reviews</span>
+              <span className="hidden xs:inline sm:inline text-[10px] sm:text-sm">Reviews</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="analytics" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Analytics</span>
+              <span className="hidden xs:inline sm:inline text-[10px] sm:text-sm">Analytics</span>
             </TabsTrigger>
-            <TabsTrigger value="homepage" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="homepage" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Home className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Home</span>
+              <span className="xs:inline sm:inline text-[9px] xs:text-[10px] sm:text-sm">Home</span>
             </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="activity" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <History className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Activity</span>
+              <span className="hidden xs:inline sm:inline text-[10px] sm:text-sm">Activity</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+            <TabsTrigger value="settings" className="gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline sm:inline">Settings</span>
+              <span className="hidden xs:inline sm:inline text-[10px] sm:text-sm">Settings</span>
             </TabsTrigger>
           </TabsList>
           </div>

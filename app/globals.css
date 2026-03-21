@@ -75,6 +75,9 @@
 }
 
 @theme inline {
+  /* XS Breakpoint - for small mobile devices */
+  --breakpoint-xs: 480px;
+  
   --font-sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
   --color-background: var(--background);
