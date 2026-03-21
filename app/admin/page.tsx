@@ -55,6 +55,10 @@ const FolderManager = dynamic(() => import("@/components/admin/folder-manager").
   loading: () => <ComponentLoader text="Loading folder manager..." />,
 })
 
+const QuizManager = dynamic(() => import("@/components/admin/quiz-manager").then(mod => ({ default: mod.QuizManager })), {
+  loading: () => <ComponentLoader text="Loading quiz manager..." />,
+})
+
 function ComponentLoader({ text }: { text: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -241,6 +245,10 @@ export default function AdminPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-accent/10 text-accent">
                 {categories.length}
               </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="quizzes" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
+              <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Quizzes</span>
             </TabsTrigger>
             <TabsTrigger value="reviews" className="gap-1.5 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all">
               <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -576,6 +584,25 @@ export default function AdminPage() {
                   categories={categories}
                   onChange={handleCategoryChange}
                 />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Quizzes Tab */}
+          <TabsContent value="quizzes">
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-primary" />
+                  Quiz Management
+                </CardTitle>
+                <CardDescription>
+                  Create and manage quizzes. Import from HTML or create from scratch. 
+                  Quizzes display with TechVyro branding.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <QuizManager />
               </CardContent>
             </Card>
           </TabsContent>
