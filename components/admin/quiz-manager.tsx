@@ -226,8 +226,6 @@ export function QuizManager() {
   // Parse HTML to extract quiz data
   const parseQuizHtml = (html: string): Quiz | null => {
     try {
-      console.log("[v0] Starting HTML parse...")
-      
       // Extract title from multiple possible patterns
       let title = ""
       
@@ -253,8 +251,6 @@ export function QuizManager() {
         }
       }
       
-      console.log("[v0] Extracted title:", title)
-      
       // Clean title - remove other branding
       title = title
         .replace(/Boss_Quiz_Robot/gi, "TechVyro")
@@ -272,19 +268,16 @@ export function QuizManager() {
       const timeMatch = html.match(/const\s+TIME\s*=\s*(\d+)/i)
       if (timeMatch) {
         timeLimit = parseInt(timeMatch[1])
-        console.log("[v0] Found time limit:", timeLimit)
       }
 
       // Method 1: Try JSON format - const Q = [{...}, {...}]
       const jsonArrayMatch = html.match(/const\s+Q\s*=\s*(\[[\s\S]*?\]);/m)
       if (jsonArrayMatch) {
         try {
-          // Try to parse as JSON directly
           const jsonStr = jsonArrayMatch[1]
           questionsData = JSON.parse(jsonStr)
-          console.log("[v0] JSON parse successful, found", questionsData.length, "questions")
         } catch (jsonError) {
-          console.log("[v0] JSON parse failed, trying regex method...")
+          // JSON parse failed, will try regex method
         }
       }
 
@@ -318,7 +311,6 @@ export function QuizManager() {
               })
             }
           }
-          console.log("[v0] Regex method found", questionsData.length, "questions")
         }
       }
 
@@ -327,8 +319,6 @@ export function QuizManager() {
         const questions = [...html.matchAll(/"question"\s*:\s*"([\s\S]*?)"/gi)]
         const optionSets = [...html.matchAll(/"options"\s*:\s*\[([\s\S]*?)\]/gi)]
         const corrects = [...html.matchAll(/"correct"\s*:\s*(\d+)/gi)]
-        
-        console.log("[v0] Pattern match found:", questions.length, "questions")
         
         for (let i = 0; i < questions.length; i++) {
           if (optionSets[i] && corrects[i]) {
@@ -351,10 +341,7 @@ export function QuizManager() {
         }
       }
 
-      console.log("[v0] Total questions extracted:", questionsData.length)
-
       if (questionsData.length === 0) {
-        console.log("[v0] No questions found!")
         return null
       }
 
@@ -390,8 +377,6 @@ export function QuizManager() {
         category = "SSC"
       }
 
-      console.log("[v0] Quiz ready:", title, "-", questions.length, "questions")
-
       return {
         id: generateId(),
         title,
@@ -404,7 +389,6 @@ export function QuizManager() {
       }
 
     } catch (e) {
-      console.log("[v0] Parse error:", e)
       return null
     }
   }
@@ -816,102 +800,103 @@ export function QuizManager() {
           if (fileInputRef.current) fileInputRef.current.value = ""
         }
       }}>
-        <DialogContent className="max-w-2xl max-h-[90vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-lg sm:max-w-xl w-[95vw] max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Import Quiz from HTML</DialogTitle>
           </DialogHeader>
 
-          <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="upload">
-                <FileUp className="h-4 w-4 mr-2" />
-                Upload File
-              </TabsTrigger>
-              <TabsTrigger value="paste">
-                <FileText className="h-4 w-4 mr-2" />
-                Paste HTML
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex-1 overflow-y-auto space-y-4 py-2">
+            <Tabs defaultValue="upload" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="upload">
+                  <FileUp className="h-4 w-4 mr-2" />
+                  Upload File
+                </TabsTrigger>
+                <TabsTrigger value="paste">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Paste HTML
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="upload" className="space-y-4 mt-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".html,.htm"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="html-upload"
-                />
-                
-                {isUploading ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="text-sm text-muted-foreground">Processing file...</p>
-                  </div>
-                ) : uploadedFileName ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <CheckCircle className="h-8 w-8 text-green-500" />
-                    <p className="font-medium">{uploadedFileName}</p>
-                    <p className="text-sm text-muted-foreground">File loaded successfully</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Choose Different File
-                    </Button>
-                  </div>
-                ) : (
-                  <label htmlFor="html-upload" className="cursor-pointer">
-                    <FileUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="font-medium mb-1">Click to upload HTML file</p>
-                    <p className="text-sm text-muted-foreground">
-                      or drag and drop your quiz HTML file here
-                    </p>
-                  </label>
-                )}
-              </div>
-
-              {importHtml && (
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm font-medium mb-1">Preview</p>
-                  <p className="text-sm text-muted-foreground">
-                    {importHtml.length.toLocaleString()} characters loaded
-                  </p>
+              <TabsContent value="upload" className="space-y-4 mt-4">
+                <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".html,.htm"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="html-upload"
+                  />
+                  
+                  {isUploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">Processing file...</p>
+                    </div>
+                  ) : uploadedFileName ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <CheckCircle className="h-8 w-8 text-green-500" />
+                      <p className="font-medium text-sm">{uploadedFileName}</p>
+                      <p className="text-xs text-muted-foreground">File loaded successfully</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Choose Different File
+                      </Button>
+                    </div>
+                  ) : (
+                    <label htmlFor="html-upload" className="cursor-pointer block">
+                      <FileUp className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                      <p className="font-medium text-sm mb-1">Click to upload HTML file</p>
+                      <p className="text-xs text-muted-foreground">
+                        or drag and drop your quiz HTML file here
+                      </p>
+                    </label>
+                  )}
                 </div>
-              )}
-            </TabsContent>
 
-            <TabsContent value="paste" className="space-y-4 mt-4">
-              <div>
-                <Label>Paste HTML Code</Label>
-                <Textarea
-                  value={importHtml}
-                  onChange={e => setImportHtml(e.target.value)}
-                  placeholder="Paste your quiz HTML code here..."
-                  rows={12}
-                  className="font-mono text-xs"
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
+                {importHtml && (
+                  <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                        Ready to import ({importHtml.length.toLocaleString()} characters)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
 
-          <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4">
-            <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-2">
-              Auto-Detection Features
-            </h4>
-            <ul className="text-sm text-blue-600 dark:text-blue-300 space-y-1">
-              <li>• Automatically extracts quiz title</li>
-              <li>• Detects all questions and options</li>
-              <li>• Identifies correct answers</li>
-              <li>• Extracts time limit settings</li>
-              <li>• Auto-categorizes based on title</li>
-              <li>• Replaces external branding with TechVyro</li>
-            </ul>
+              <TabsContent value="paste" className="space-y-4 mt-4">
+                <div>
+                  <Label>Paste HTML Code</Label>
+                  <Textarea
+                    value={importHtml}
+                    onChange={e => setImportHtml(e.target.value)}
+                    placeholder="Paste your quiz HTML code here..."
+                    rows={8}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 text-xs">
+              <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-1.5">
+                Auto-Detection Features
+              </h4>
+              <ul className="text-blue-600 dark:text-blue-300 space-y-0.5">
+                <li>• Extracts quiz title, questions & options</li>
+                <li>• Identifies correct answers & time limit</li>
+                <li>• Auto-categorizes & replaces branding with TechVyro</li>
+              </ul>
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t pt-4 mt-2">
             <Button variant="outline" onClick={() => setShowImportDialog(false)}>
               Cancel
             </Button>
