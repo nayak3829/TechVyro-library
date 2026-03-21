@@ -443,7 +443,6 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
             )}
           </div>
         </div>
-        </div>
 
         {/* Active Filters Display */}
         {(search || selectedCategory || showFavoritesOnly) && (
