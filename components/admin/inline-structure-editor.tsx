@@ -201,6 +201,7 @@ export function InlineStructureEditor({
         description: "",
         icon: formData.icon,
         pdfCount: 0,
+        quizCount: 0,
         order: 0,
         enabled: true
       }
@@ -580,7 +581,12 @@ export function InlineStructureEditor({
                                             <span className="text-[10px] truncate flex-1">{section.name}</span>
                                             {section.pdfCount > 0 && (
                                               <Badge variant="secondary" className="h-3.5 px-1 text-[8px]">
-                                                {section.pdfCount}
+                                                {section.pdfCount}P
+                                              </Badge>
+                                            )}
+                                            {(section.quizCount || 0) > 0 && (
+                                              <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-primary/50 text-primary">
+                                                {section.quizCount}Q
                                               </Badge>
                                             )}
                                             

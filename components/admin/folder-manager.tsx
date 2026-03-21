@@ -125,7 +125,8 @@ export function FolderManager() {
     description: "",
     icon: "Folder",
     color: "#3b82f6",
-    pdfCount: 0
+    pdfCount: 0,
+    quizCount: 0
   })
   
   const [targetFolderId, setTargetFolderId] = useState<string>("")
@@ -266,7 +267,7 @@ export function FolderManager() {
     setTargetFolderId(folderId)
     setTargetCategoryId(categoryId)
     setEditingSection(null)
-    setFormData({ name: "", description: "", icon: "FileText", color: "#3b82f6", pdfCount: 0 })
+    setFormData({ name: "", description: "", icon: "FileText", color: "#3b82f6", pdfCount: 0, quizCount: 0 })
     setSectionDialog(true)
   }
 
@@ -274,7 +275,7 @@ export function FolderManager() {
     setTargetFolderId(folderId)
     setTargetCategoryId(categoryId)
     setEditingSection({ folderId, categoryId, section })
-    setFormData({ name: section.name, description: section.description, icon: section.icon, color: "#3b82f6", pdfCount: section.pdfCount })
+    setFormData({ name: section.name, description: section.description, icon: section.icon, color: "#3b82f6", pdfCount: section.pdfCount, quizCount: section.quizCount || 0 })
     setSectionDialog(true)
   }
 
@@ -297,7 +298,7 @@ export function FolderManager() {
               ...cat,
               sections: cat.sections.map(sec =>
                 sec.id === editingSection.section.id
-                  ? { ...sec, name: formData.name, description: formData.description, icon: formData.icon, pdfCount: formData.pdfCount }
+                  ? { ...sec, name: formData.name, description: formData.description, icon: formData.icon, pdfCount: formData.pdfCount, quizCount: formData.quizCount }
                   : sec
               )
             }
@@ -308,6 +309,7 @@ export function FolderManager() {
               description: formData.description,
               icon: formData.icon,
               pdfCount: formData.pdfCount,
+              quizCount: formData.quizCount,
               order: cat.sections.length,
               enabled: true
             }
@@ -773,12 +775,19 @@ export function FolderManager() {
                                               key={section.id} 
                                               className={`flex items-center justify-between p-1.5 sm:p-2 rounded-md border border-border/50 bg-muted/30 ${!section.enabled ? 'opacity-60' : ''}`}
                                             >
-                                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                              <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
                                                 <SectionIcon className="h-3 w-3 text-muted-foreground shrink-0" />
                                                 <span className="text-[10px] sm:text-xs truncate">{section.name}</span>
-                                                <Badge variant="secondary" className="text-[8px] px-1 shrink-0">
-                                                  {section.pdfCount} PDFs
-                                                </Badge>
+                                                <div className="flex gap-1 shrink-0">
+                                                  <Badge variant="secondary" className="text-[8px] px-1">
+                                                    {section.pdfCount} PDFs
+                                                  </Badge>
+                                                  {(section.quizCount || 0) > 0 && (
+                                                    <Badge variant="outline" className="text-[8px] px-1 border-primary/50 text-primary">
+                                                      {section.quizCount} Quiz
+                                                    </Badge>
+                                                  )}
+                                                </div>
                                               </div>
                                               
                                               <DropdownMenu>
@@ -1037,26 +1046,26 @@ export function FolderManager() {
                 className="min-h-[60px] text-sm"
               />
             </div>
+            <div>
+              <Label className="text-xs">Icon</Label>
+              <Select value={formData.icon} onValueChange={(v) => setFormData({...formData, icon: v})}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ICONS.map(i => {
+                    const Icon = i.icon
+                    return (
+                      <SelectItem key={i.name} value={i.name}>
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-3.5 w-3.5" />
+                          <span className="text-xs">{i.name}</span>
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Icon</Label>
-                <Select value={formData.icon} onValueChange={(v) => setFormData({...formData, icon: v})}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ICONS.map(i => {
-                      const Icon = i.icon
-                      return (
-                        <SelectItem key={i.name} value={i.name}>
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-3.5 w-3.5" />
-                            <span className="text-xs">{i.name}</span>
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
               <div>
                 <Label className="text-xs">PDF Count</Label>
                 <Input 
@@ -1064,6 +1073,16 @@ export function FolderManager() {
                   min={0}
                   value={formData.pdfCount} 
                   onChange={(e) => setFormData({...formData, pdfCount: parseInt(e.target.value) || 0})}
+                  className="h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Quiz Count</Label>
+                <Input 
+                  type="number" 
+                  min={0}
+                  value={formData.quizCount} 
+                  onChange={(e) => setFormData({...formData, quizCount: parseInt(e.target.value) || 0})}
                   className="h-9"
                 />
               </div>
