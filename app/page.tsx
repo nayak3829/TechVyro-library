@@ -27,7 +27,6 @@ async function getPDFs(): Promise<PDF[]> {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("[v0] Error fetching PDFs:", error)
     return []
   }
 
@@ -46,7 +45,6 @@ async function getCategories(): Promise<Category[]> {
     .order("name")
 
   if (error) {
-    console.error("[v0] Error fetching categories:", error)
     return []
   }
 
@@ -104,11 +102,9 @@ export default async function HomePage() {
         {/* Section Divider */}
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-        {/* Featured Section - Clean background */}
+        {/* Featured Section */}
         {configured && pdfs.length > 0 && (
-          <section className="py-12 sm:py-16 bg-background">
-            <FeaturedSection featured={featured} />
-          </section>
+          <FeaturedSection featured={featured} />
         )}
 
         {/* Section Divider */}

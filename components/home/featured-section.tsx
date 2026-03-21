@@ -92,7 +92,7 @@ export function FeaturedSection({ featured }: FeaturedSectionProps) {
   if (currentPdfs.length === 0) return null
 
   return (
-    <section className="py-10 sm:py-16 border-b border-border/40">
+    <section className="py-12 sm:py-16 lg:py-20 bg-background">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6 sm:mb-8">
