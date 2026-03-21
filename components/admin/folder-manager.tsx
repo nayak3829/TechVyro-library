@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { 
   Folder, FolderPlus, ChevronRight, ChevronDown, Plus, Pencil, Trash2, 
   GripVertical, Check, X, Layers, FileText, Eye, EyeOff, Save,
   BookOpen, Code, Calculator, FlaskConical, Globe, Briefcase, Heart,
-  Music, Camera, Palette, Cpu, Database, Server, Shield, Zap
+  Music, Camera, Palette, Cpu, Database, Server, Shield, Zap,
+  Move, ArrowUp, ArrowDown, ArrowRight, FolderInput
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +30,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+} from "@/components/ui/dropdown-menu"
 import {
   Collapsible,
   CollapsibleContent,
@@ -85,17 +96,28 @@ export function FolderManager() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   
+  // Drag state
+  const [dragItem, setDragItem] = useState<{
+    type: 'folder' | 'category' | 'section'
+    id: string
+    folderId?: string
+    categoryId?: string
+  } | null>(null)
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
+  
   // Dialog states
   const [folderDialog, setFolderDialog] = useState(false)
   const [categoryDialog, setCategoryDialog] = useState(false)
   const [sectionDialog, setSectionDialog] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState(false)
+  const [moveDialog, setMoveDialog] = useState(false)
   
   // Edit states
   const [editingFolder, setEditingFolder] = useState<ContentFolder | null>(null)
   const [editingCategory, setEditingCategory] = useState<{ folderId: string; category: ContentCategory } | null>(null)
   const [editingSection, setEditingSection] = useState<{ folderId: string; categoryId: string; section: ContentSection } | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'folder' | 'category' | 'section'; id: string; folderId?: string; categoryId?: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'folder' | 'category' | 'section'; id: string; folderId?: string; categoryId?: string; name: string } | null>(null)
+  const [moveTarget, setMoveTarget] = useState<{ type: 'category' | 'section'; data: any; currentFolderId: string; currentCategoryId?: string } | null>(null)
   
   // Form states
   const [formData, setFormData] = useState({
@@ -106,43 +128,38 @@ export function FolderManager() {
     pdfCount: 0
   })
   
-  // Target parent for adding
   const [targetFolderId, setTargetFolderId] = useState<string>("")
   const [targetCategoryId, setTargetCategoryId] = useState<string>("")
+  const [moveToFolderId, setMoveToFolderId] = useState<string>("")
+  const [moveToCategoryId, setMoveToCategoryId] = useState<string>("")
 
   useEffect(() => {
     const saved = localStorage.getItem("techvyro_folders")
     if (saved) {
       try {
         setFolders(JSON.parse(saved))
-      } catch (e) {
+      } catch {
         setFolders([])
       }
     }
   }, [])
 
-  const saveFolders = (newFolders: ContentFolder[]) => {
+  const saveFolders = useCallback((newFolders: ContentFolder[]) => {
     setFolders(newFolders)
     localStorage.setItem("techvyro_folders", JSON.stringify(newFolders))
-  }
+  }, [])
 
   const toggleFolder = (id: string) => {
     const newSet = new Set(expandedFolders)
-    if (newSet.has(id)) {
-      newSet.delete(id)
-    } else {
-      newSet.add(id)
-    }
+    if (newSet.has(id)) newSet.delete(id)
+    else newSet.add(id)
     setExpandedFolders(newSet)
   }
 
   const toggleCategory = (id: string) => {
     const newSet = new Set(expandedCategories)
-    if (newSet.has(id)) {
-      newSet.delete(id)
-    } else {
-      newSet.add(id)
-    }
+    if (newSet.has(id)) newSet.delete(id)
+    else newSet.add(id)
     setExpandedCategories(newSet)
   }
 
@@ -155,13 +172,7 @@ export function FolderManager() {
 
   const openEditFolder = (folder: ContentFolder) => {
     setEditingFolder(folder)
-    setFormData({ 
-      name: folder.name, 
-      description: folder.description, 
-      icon: folder.icon, 
-      color: folder.color,
-      pdfCount: 0
-    })
+    setFormData({ name: folder.name, description: folder.description, icon: folder.icon, color: folder.color, pdfCount: 0 })
     setFolderDialog(true)
   }
 
@@ -208,13 +219,7 @@ export function FolderManager() {
   const openEditCategory = (folderId: string, category: ContentCategory) => {
     setTargetFolderId(folderId)
     setEditingCategory({ folderId, category })
-    setFormData({ 
-      name: category.name, 
-      description: category.description, 
-      icon: category.icon, 
-      color: category.color,
-      pdfCount: 0
-    })
+    setFormData({ name: category.name, description: category.description, icon: category.icon, color: category.color, pdfCount: 0 })
     setCategoryDialog(true)
   }
 
@@ -269,13 +274,7 @@ export function FolderManager() {
     setTargetFolderId(folderId)
     setTargetCategoryId(categoryId)
     setEditingSection({ folderId, categoryId, section })
-    setFormData({ 
-      name: section.name, 
-      description: section.description, 
-      icon: section.icon, 
-      color: "#3b82f6",
-      pdfCount: section.pdfCount
-    })
+    setFormData({ name: section.name, description: section.description, icon: section.icon, color: "#3b82f6", pdfCount: section.pdfCount })
     setSectionDialog(true)
   }
 
@@ -323,9 +322,9 @@ export function FolderManager() {
     setSectionDialog(false)
   }
 
-  // DELETE OPERATIONS
-  const openDeleteDialog = (type: 'folder' | 'category' | 'section', id: string, folderId?: string, categoryId?: string) => {
-    setDeleteTarget({ type, id, folderId, categoryId })
+  // DELETE
+  const openDeleteDialog = (type: 'folder' | 'category' | 'section', id: string, name: string, folderId?: string, categoryId?: string) => {
+    setDeleteTarget({ type, id, folderId, categoryId, name })
     setDeleteDialog(true)
   }
 
@@ -358,53 +357,174 @@ export function FolderManager() {
     }
 
     saveFolders(updated)
-    toast.success(`${deleteTarget.type.charAt(0).toUpperCase() + deleteTarget.type.slice(1)} deleted`)
+    toast.success(`${deleteTarget.type} deleted`)
     setDeleteDialog(false)
     setDeleteTarget(null)
   }
 
-  // TOGGLE ENABLED
-  const toggleFolderEnabled = (id: string) => {
-    const updated = folders.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f)
-    saveFolders(updated)
-  }
-
-  const toggleCategoryEnabled = (folderId: string, categoryId: string) => {
-    const updated = folders.map(f => 
-      f.id === folderId 
-        ? { ...f, categories: f.categories.map(c => c.id === categoryId ? { ...c, enabled: !c.enabled } : c) }
-        : f
-    )
-    saveFolders(updated)
-  }
-
-  const toggleSectionEnabled = (folderId: string, categoryId: string, sectionId: string) => {
-    const updated = folders.map(f => 
-      f.id === folderId 
-        ? { 
-            ...f, 
-            categories: f.categories.map(c => 
-              c.id === categoryId 
-                ? { ...c, sections: c.sections.map(s => s.id === sectionId ? { ...s, enabled: !s.enabled } : s) }
-                : c
-            )
-          }
-        : f
-    )
-    saveFolders(updated)
-  }
-
   // MOVE OPERATIONS
-  const moveFolder = (index: number, direction: 'up' | 'down') => {
+  const openMoveCategory = (folderId: string, category: ContentCategory) => {
+    setMoveTarget({ type: 'category', data: category, currentFolderId: folderId })
+    setMoveToFolderId("")
+    setMoveDialog(true)
+  }
+
+  const openMoveSection = (folderId: string, categoryId: string, section: ContentSection) => {
+    setMoveTarget({ type: 'section', data: section, currentFolderId: folderId, currentCategoryId: categoryId })
+    setMoveToFolderId("")
+    setMoveToCategoryId("")
+    setMoveDialog(true)
+  }
+
+  const confirmMove = () => {
+    if (!moveTarget) return
+
+    let updated: ContentFolder[]
+
+    if (moveTarget.type === 'category') {
+      if (!moveToFolderId || moveToFolderId === moveTarget.currentFolderId) {
+        toast.error("Select a different folder")
+        return
+      }
+
+      // Remove from current folder
+      updated = folders.map(f => {
+        if (f.id === moveTarget.currentFolderId) {
+          return { ...f, categories: f.categories.filter(c => c.id !== moveTarget.data.id) }
+        }
+        if (f.id === moveToFolderId) {
+          return { ...f, categories: [...f.categories, { ...moveTarget.data, order: f.categories.length }] }
+        }
+        return f
+      })
+
+      toast.success(`Category moved to ${folders.find(f => f.id === moveToFolderId)?.name}`)
+    } else {
+      if (!moveToFolderId || !moveToCategoryId) {
+        toast.error("Select folder and category")
+        return
+      }
+
+      if (moveTarget.currentFolderId === moveToFolderId && moveTarget.currentCategoryId === moveToCategoryId) {
+        toast.error("Select a different location")
+        return
+      }
+
+      // Remove from current and add to new
+      updated = folders.map(f => {
+        let folder = { ...f }
+        
+        // Remove from current location
+        if (f.id === moveTarget.currentFolderId) {
+          folder = {
+            ...folder,
+            categories: folder.categories.map(c => {
+              if (c.id === moveTarget.currentCategoryId) {
+                return { ...c, sections: c.sections.filter(s => s.id !== moveTarget.data.id) }
+              }
+              return c
+            })
+          }
+        }
+        
+        // Add to new location
+        if (f.id === moveToFolderId) {
+          folder = {
+            ...folder,
+            categories: folder.categories.map(c => {
+              if (c.id === moveToCategoryId) {
+                return { ...c, sections: [...c.sections, { ...moveTarget.data, order: c.sections.length }] }
+              }
+              return c
+            })
+          }
+        }
+        
+        return folder
+      })
+
+      const targetFolder = folders.find(f => f.id === moveToFolderId)
+      const targetCategory = targetFolder?.categories.find(c => c.id === moveToCategoryId)
+      toast.success(`Section moved to ${targetCategory?.name}`)
+    }
+
+    saveFolders(updated)
+    setMoveDialog(false)
+    setMoveTarget(null)
+  }
+
+  // REORDER
+  const moveItem = (type: 'folder' | 'category' | 'section', index: number, direction: 'up' | 'down', folderId?: string, categoryId?: string) => {
     const newIndex = direction === 'up' ? index - 1 : index + 1
-    if (newIndex < 0 || newIndex >= folders.length) return
+
+    if (type === 'folder') {
+      if (newIndex < 0 || newIndex >= folders.length) return
+      const newFolders = [...folders]
+      const temp = newFolders[index]
+      newFolders[index] = newFolders[newIndex]
+      newFolders[newIndex] = temp
+      saveFolders(newFolders.map((f, i) => ({ ...f, order: i })))
+    } else if (type === 'category' && folderId) {
+      const updated = folders.map(f => {
+        if (f.id !== folderId) return f
+        if (newIndex < 0 || newIndex >= f.categories.length) return f
+        const newCats = [...f.categories]
+        const temp = newCats[index]
+        newCats[index] = newCats[newIndex]
+        newCats[newIndex] = temp
+        return { ...f, categories: newCats.map((c, i) => ({ ...c, order: i })) }
+      })
+      saveFolders(updated)
+    } else if (type === 'section' && folderId && categoryId) {
+      const updated = folders.map(f => {
+        if (f.id !== folderId) return f
+        return {
+          ...f,
+          categories: f.categories.map(c => {
+            if (c.id !== categoryId) return c
+            if (newIndex < 0 || newIndex >= c.sections.length) return c
+            const newSecs = [...c.sections]
+            const temp = newSecs[index]
+            newSecs[index] = newSecs[newIndex]
+            newSecs[newIndex] = temp
+            return { ...c, sections: newSecs.map((s, i) => ({ ...s, order: i })) }
+          })
+        }
+      })
+      saveFolders(updated)
+    }
+  }
+
+  // TOGGLE ENABLED
+  const toggleEnabled = (type: 'folder' | 'category' | 'section', id: string, folderId?: string, categoryId?: string) => {
+    let updated: ContentFolder[]
     
-    const newFolders = [...folders]
-    const temp = newFolders[index]
-    newFolders[index] = newFolders[newIndex]
-    newFolders[newIndex] = temp
+    if (type === 'folder') {
+      updated = folders.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f)
+    } else if (type === 'category' && folderId) {
+      updated = folders.map(f => 
+        f.id === folderId 
+          ? { ...f, categories: f.categories.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c) }
+          : f
+      )
+    } else if (type === 'section' && folderId && categoryId) {
+      updated = folders.map(f => 
+        f.id === folderId 
+          ? { 
+              ...f, 
+              categories: f.categories.map(c => 
+                c.id === categoryId 
+                  ? { ...c, sections: c.sections.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s) }
+                  : c
+              )
+            }
+          : f
+      )
+    } else {
+      return
+    }
     
-    saveFolders(newFolders.map((f, i) => ({ ...f, order: i })))
+    saveFolders(updated)
   }
 
   const getTotalPdfs = (folder: ContentFolder) => {
@@ -414,33 +534,31 @@ export function FolderManager() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Content Structure</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage folders, categories, and sections
+          <h2 className="text-lg font-semibold">Content Structure</h2>
+          <p className="text-xs text-muted-foreground">
+            Create folders, categories, and sections. Drag to reorder, or use move buttons.
           </p>
         </div>
-        <Button onClick={openAddFolder} className="gap-2">
+        <Button onClick={openAddFolder} size="sm" className="gap-1.5">
           <FolderPlus className="h-4 w-4" />
-          Add Folder
+          <span className="hidden sm:inline">Add Folder</span>
+          <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
       {/* Folder Tree */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {folders.length === 0 ? (
           <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Folder className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground text-center">No folders created yet</p>
-              <p className="text-sm text-muted-foreground/70 text-center mt-1">
-                Create your first folder to organize content
-              </p>
-              <Button onClick={openAddFolder} className="mt-4 gap-2">
-                <Plus className="h-4 w-4" />
+            <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12">
+              <Folder className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <p className="text-muted-foreground text-sm text-center">No folders yet</p>
+              <Button onClick={openAddFolder} size="sm" className="mt-3 gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
                 Create Folder
               </Button>
             </CardContent>
@@ -454,157 +572,288 @@ export function FolderManager() {
               <Card key={folder.id} className={`transition-all ${!folder.enabled ? 'opacity-60' : ''}`}>
                 <Collapsible open={isExpanded} onOpenChange={() => toggleFolder(folder.id)}>
                   <CollapsibleTrigger asChild>
-                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 text-muted-foreground">
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3 px-3 sm:px-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                          {/* Move Buttons */}
+                          <div className="hidden sm:flex flex-col gap-0.5">
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-6 w-6"
-                              onClick={(e) => { e.stopPropagation(); moveFolder(folderIndex, 'up') }}
+                              className="h-5 w-5"
+                              onClick={(e) => { e.stopPropagation(); moveItem('folder', folderIndex, 'up') }}
                               disabled={folderIndex === 0}
                             >
-                              <GripVertical className="h-4 w-4" />
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-5 w-5"
+                              onClick={(e) => { e.stopPropagation(); moveItem('folder', folderIndex, 'down') }}
+                              disabled={folderIndex === folders.length - 1}
+                            >
+                              <ArrowDown className="h-3 w-3" />
                             </Button>
                           </div>
-                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          
+                          {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                          
                           <div 
-                            className="h-10 w-10 rounded-lg flex items-center justify-center"
+                            className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center shrink-0"
                             style={{ backgroundColor: folder.color + '20' }}
                           >
-                            <FolderIcon className="h-5 w-5" style={{ color: folder.color }} />
+                            <FolderIcon className="h-4 w-4" style={{ color: folder.color }} />
                           </div>
-                          <div>
-                            <CardTitle className="text-base flex items-center gap-2">
+                          
+                          <div className="min-w-0 flex-1">
+                            <CardTitle className="text-sm sm:text-base flex items-center gap-1.5 truncate">
                               {folder.name}
-                              {!folder.enabled && (
-                                <Badge variant="secondary" className="text-xs">Hidden</Badge>
-                              )}
+                              {!folder.enabled && <Badge variant="secondary" className="text-[9px] px-1">Hidden</Badge>}
                             </CardTitle>
-                            <CardDescription className="text-xs">
+                            <CardDescription className="text-[10px] sm:text-xs truncate">
                               {folder.categories.length} categories | {getTotalPdfs(folder)} PDFs
                             </CardDescription>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Switch 
                             checked={folder.enabled} 
-                            onCheckedChange={() => toggleFolderEnabled(folder.id)}
+                            onCheckedChange={() => toggleEnabled('folder', folder.id)}
+                            className="scale-75 sm:scale-100"
                           />
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditFolder(folder)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => openDeleteDialog('folder', folder.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                                <GripVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem onClick={() => openEditFolder(folder)}>
+                                <Pencil className="h-3.5 w-3.5 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openAddCategory(folder.id)}>
+                                <Plus className="h-3.5 w-3.5 mr-2" />
+                                Add Category
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => moveItem('folder', folderIndex, 'up')}
+                                disabled={folderIndex === 0}
+                              >
+                                <ArrowUp className="h-3.5 w-3.5 mr-2" />
+                                Move Up
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => moveItem('folder', folderIndex, 'down')}
+                                disabled={folderIndex === folders.length - 1}
+                              >
+                                <ArrowDown className="h-3.5 w-3.5 mr-2" />
+                                Move Down
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => openDeleteDialog('folder', folder.id, folder.name)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </CardHeader>
                   </CollapsibleTrigger>
                   
                   <CollapsibleContent>
-                    <CardContent className="pt-0 pb-4 pl-12">
-                      {/* Categories */}
-                      <div className="space-y-2">
-                        {folder.categories.map((category) => {
-                          const CategoryIcon = getIconComponent(category.icon)
-                          const isCatExpanded = expandedCategories.has(category.id)
-                          
-                          return (
-                            <Collapsible key={category.id} open={isCatExpanded} onOpenChange={() => toggleCategory(category.id)}>
-                              <div className={`border rounded-lg ${!category.enabled ? 'opacity-60' : ''}`}>
-                                <CollapsibleTrigger asChild>
-                                  <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                      {isCatExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                      <div 
-                                        className="h-8 w-8 rounded-md flex items-center justify-center"
-                                        style={{ backgroundColor: category.color + '20' }}
-                                      >
-                                        <CategoryIcon className="h-4 w-4" style={{ color: category.color }} />
-                                      </div>
-                                      <div>
-                                        <p className="font-medium text-sm flex items-center gap-2">
-                                          {category.name}
-                                          {!category.enabled && <Badge variant="secondary" className="text-[10px]">Hidden</Badge>}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">{category.sections.length} sections</p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                      <Switch 
-                                        checked={category.enabled} 
-                                        onCheckedChange={() => toggleCategoryEnabled(folder.id, category.id)}
-                                      />
-                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditCategory(folder.id, category)}>
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => openDeleteDialog('category', category.id, folder.id)}>
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </CollapsibleTrigger>
-                                
-                                <CollapsibleContent>
-                                  <div className="px-3 pb-3 pl-10 space-y-1.5">
-                                    {/* Sections */}
-                                    {category.sections.map((section) => {
-                                      const SectionIcon = getIconComponent(section.icon)
-                                      
-                                      return (
+                    <CardContent className="pt-0 pb-3 pl-6 sm:pl-10 pr-3">
+                      <div className="space-y-1.5">
+                        {folder.categories.length === 0 ? (
+                          <div className="text-center py-4 text-xs text-muted-foreground">
+                            No categories yet.{' '}
+                            <button onClick={() => openAddCategory(folder.id)} className="text-primary hover:underline">
+                              Add one
+                            </button>
+                          </div>
+                        ) : (
+                          folder.categories.map((category, catIndex) => {
+                            const CategoryIcon = getIconComponent(category.icon)
+                            const isCatExpanded = expandedCategories.has(category.id)
+                            
+                            return (
+                              <Collapsible key={category.id} open={isCatExpanded} onOpenChange={() => toggleCategory(category.id)}>
+                                <div className={`border rounded-lg ${!category.enabled ? 'opacity-60' : ''}`}>
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between p-2 sm:p-2.5 cursor-pointer hover:bg-muted/50 transition-colors">
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        {isCatExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
                                         <div 
-                                          key={section.id} 
-                                          className={`flex items-center justify-between p-2 rounded-md bg-muted/30 ${!section.enabled ? 'opacity-60' : ''}`}
+                                          className="h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center shrink-0"
+                                          style={{ backgroundColor: category.color + '20' }}
                                         >
-                                          <div className="flex items-center gap-2">
-                                            <SectionIcon className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-sm">{section.name}</span>
-                                            <Badge variant="outline" className="text-[10px]">{section.pdfCount} PDFs</Badge>
-                                            {!section.enabled && <Badge variant="secondary" className="text-[10px]">Hidden</Badge>}
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <Switch 
-                                              checked={section.enabled} 
-                                              onCheckedChange={() => toggleSectionEnabled(folder.id, category.id, section.id)}
-                                            />
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditSection(folder.id, category.id, section)}>
-                                              <Pencil className="h-3 w-3" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => openDeleteDialog('section', section.id, folder.id, category.id)}>
-                                              <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                          </div>
+                                          <CategoryIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" style={{ color: category.color }} />
                                         </div>
-                                      )
-                                    })}
-                                    
-                                    {/* Add Section Button */}
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      className="w-full mt-2 gap-2 border-dashed"
-                                      onClick={() => openAddSection(folder.id, category.id)}
-                                    >
-                                      <Plus className="h-3.5 w-3.5" />
-                                      Add Section
-                                    </Button>
-                                  </div>
-                                </CollapsibleContent>
-                              </div>
-                            </Collapsible>
-                          )
-                        })}
+                                        <div className="min-w-0 flex-1">
+                                          <p className="font-medium text-xs sm:text-sm truncate">{category.name}</p>
+                                          <p className="text-[9px] sm:text-[10px] text-muted-foreground">{category.sections.length} sections</p>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                                              <GripVertical className="h-3.5 w-3.5" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-44">
+                                            <DropdownMenuItem onClick={() => openEditCategory(folder.id, category)}>
+                                              <Pencil className="h-3.5 w-3.5 mr-2" />
+                                              Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => openAddSection(folder.id, category.id)}>
+                                              <Plus className="h-3.5 w-3.5 mr-2" />
+                                              Add Section
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => openMoveCategory(folder.id, category)}>
+                                              <FolderInput className="h-3.5 w-3.5 mr-2" />
+                                              Move to Folder
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              onClick={() => moveItem('category', catIndex, 'up', folder.id)}
+                                              disabled={catIndex === 0}
+                                            >
+                                              <ArrowUp className="h-3.5 w-3.5 mr-2" />
+                                              Move Up
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              onClick={() => moveItem('category', catIndex, 'down', folder.id)}
+                                              disabled={catIndex === folder.categories.length - 1}
+                                            >
+                                              <ArrowDown className="h-3.5 w-3.5 mr-2" />
+                                              Move Down
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => toggleEnabled('category', category.id, folder.id)}>
+                                              {category.enabled ? <EyeOff className="h-3.5 w-3.5 mr-2" /> : <Eye className="h-3.5 w-3.5 mr-2" />}
+                                              {category.enabled ? 'Hide' : 'Show'}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              className="text-destructive"
+                                              onClick={() => openDeleteDialog('category', category.id, category.name, folder.id)}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                              Delete
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  
+                                  <CollapsibleContent>
+                                    <div className="px-2 pb-2 pl-8 sm:pl-10 space-y-1">
+                                      {category.sections.length === 0 ? (
+                                        <div className="text-center py-2 text-[10px] text-muted-foreground">
+                                          <button onClick={() => openAddSection(folder.id, category.id)} className="text-primary hover:underline">
+                                            Add section
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        category.sections.map((section, secIndex) => {
+                                          const SectionIcon = getIconComponent(section.icon)
+                                          
+                                          return (
+                                            <div 
+                                              key={section.id} 
+                                              className={`flex items-center justify-between p-1.5 sm:p-2 rounded-md border border-border/50 bg-muted/30 ${!section.enabled ? 'opacity-60' : ''}`}
+                                            >
+                                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                <SectionIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                <span className="text-[10px] sm:text-xs truncate">{section.name}</span>
+                                                <Badge variant="secondary" className="text-[8px] px-1 shrink-0">
+                                                  {section.pdfCount} PDFs
+                                                </Badge>
+                                              </div>
+                                              
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0">
+                                                    <GripVertical className="h-3 w-3" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-44">
+                                                  <DropdownMenuItem onClick={() => openEditSection(folder.id, category.id, section)}>
+                                                    <Pencil className="h-3.5 w-3.5 mr-2" />
+                                                    Edit
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem onClick={() => openMoveSection(folder.id, category.id, section)}>
+                                                    <FolderInput className="h-3.5 w-3.5 mr-2" />
+                                                    Move to Category
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem 
+                                                    onClick={() => moveItem('section', secIndex, 'up', folder.id, category.id)}
+                                                    disabled={secIndex === 0}
+                                                  >
+                                                    <ArrowUp className="h-3.5 w-3.5 mr-2" />
+                                                    Move Up
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem 
+                                                    onClick={() => moveItem('section', secIndex, 'down', folder.id, category.id)}
+                                                    disabled={secIndex === category.sections.length - 1}
+                                                  >
+                                                    <ArrowDown className="h-3.5 w-3.5 mr-2" />
+                                                    Move Down
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem onClick={() => toggleEnabled('section', section.id, folder.id, category.id)}>
+                                                    {section.enabled ? <EyeOff className="h-3.5 w-3.5 mr-2" /> : <Eye className="h-3.5 w-3.5 mr-2" />}
+                                                    {section.enabled ? 'Hide' : 'Show'}
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem 
+                                                    className="text-destructive"
+                                                    onClick={() => openDeleteDialog('section', section.id, section.name, folder.id, category.id)}
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                                    Delete
+                                                  </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            </div>
+                                          )
+                                        })
+                                      )}
+                                      
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="w-full h-7 text-[10px] text-muted-foreground hover:text-foreground"
+                                        onClick={() => openAddSection(folder.id, category.id)}
+                                      >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Add Section
+                                      </Button>
+                                    </div>
+                                  </CollapsibleContent>
+                                </div>
+                              </Collapsible>
+                            )
+                          })
+                        )}
                         
-                        {/* Add Category Button */}
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          className="w-full gap-2 border-dashed"
+                          className="w-full h-8 text-xs"
                           onClick={() => openAddCategory(folder.id)}
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-3.5 w-3.5 mr-1.5" />
                           Add Category
                         </Button>
                       </div>
@@ -617,64 +866,69 @@ export function FolderManager() {
         )}
       </div>
 
+      {/* Dialogs */}
       {/* Folder Dialog */}
       <Dialog open={folderDialog} onOpenChange={setFolderDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[90vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingFolder ? "Edit Folder" : "Create Folder"}</DialogTitle>
+            <DialogTitle>{editingFolder ? 'Edit Folder' : 'Create Folder'}</DialogTitle>
             <DialogDescription>
-              {editingFolder ? "Update folder details" : "Create a new folder to organize categories"}
+              Folders contain categories and organize your content structure.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Folder Name</Label>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Name</Label>
               <Input 
                 value={formData.name} 
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
                 placeholder="e.g., Engineering"
+                className="h-9"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
+            <div>
+              <Label className="text-xs">Description</Label>
               <Textarea 
                 value={formData.description} 
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief description"
-                rows={2}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                placeholder="Brief description..."
+                className="min-h-[60px] text-sm"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Icon</Label>
-                <Select value={formData.icon} onValueChange={(v) => setFormData({ ...formData, icon: v })}>
-                  <SelectTrigger>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Icon</Label>
+                <Select value={formData.icon} onValueChange={(v) => setFormData({...formData, icon: v})}>
+                  <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ICONS.map(({ name, icon: Icon }) => (
-                      <SelectItem key={name} value={name}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {ICONS.map(i => {
+                      const Icon = i.icon
+                      return (
+                        <SelectItem key={i.name} value={i.name}>
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-3.5 w-3.5" />
+                            <span className="text-xs">{i.name}</span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Select value={formData.color} onValueChange={(v) => setFormData({ ...formData, color: v })}>
-                  <SelectTrigger>
+              <div>
+                <Label className="text-xs">Color</Label>
+                <Select value={formData.color} onValueChange={(v) => setFormData({...formData, color: v})}>
+                  <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {COLORS.map(({ name, value }) => (
-                      <SelectItem key={value} value={value}>
+                    {COLORS.map(c => (
+                      <SelectItem key={c.value} value={c.value}>
                         <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 rounded-full" style={{ backgroundColor: value }} />
-                          {name}
+                          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: c.value }} />
+                          <span className="text-xs">{c.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -684,73 +938,66 @@ export function FolderManager() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFolderDialog(false)}>Cancel</Button>
-            <Button onClick={saveFolder} className="gap-2">
-              <Save className="h-4 w-4" />
-              {editingFolder ? "Update" : "Create"}
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setFolderDialog(false)}>Cancel</Button>
+            <Button size="sm" onClick={saveFolder}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Category Dialog */}
       <Dialog open={categoryDialog} onOpenChange={setCategoryDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[90vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingCategory ? "Edit Category" : "Create Category"}</DialogTitle>
-            <DialogDescription>
-              {editingCategory ? "Update category details" : "Create a new category inside the folder"}
-            </DialogDescription>
+            <DialogTitle>{editingCategory ? 'Edit Category' : 'Create Category'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Category Name</Label>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Name</Label>
               <Input 
                 value={formData.name} 
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
                 placeholder="e.g., Mathematics"
+                className="h-9"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
+            <div>
+              <Label className="text-xs">Description</Label>
               <Textarea 
                 value={formData.description} 
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief description"
-                rows={2}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                className="min-h-[60px] text-sm"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Icon</Label>
-                <Select value={formData.icon} onValueChange={(v) => setFormData({ ...formData, icon: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Icon</Label>
+                <Select value={formData.icon} onValueChange={(v) => setFormData({...formData, icon: v})}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ICONS.map(({ name, icon: Icon }) => (
-                      <SelectItem key={name} value={name}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {ICONS.map(i => {
+                      const Icon = i.icon
+                      return (
+                        <SelectItem key={i.name} value={i.name}>
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-3.5 w-3.5" />
+                            <span className="text-xs">{i.name}</span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Select value={formData.color} onValueChange={(v) => setFormData({ ...formData, color: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+              <div>
+                <Label className="text-xs">Color</Label>
+                <Select value={formData.color} onValueChange={(v) => setFormData({...formData, color: v})}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {COLORS.map(({ name, value }) => (
-                      <SelectItem key={value} value={value}>
+                    {COLORS.map(c => (
+                      <SelectItem key={c.value} value={c.value}>
                         <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 rounded-full" style={{ backgroundColor: value }} />
-                          {name}
+                          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: c.value }} />
+                          <span className="text-xs">{c.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -760,96 +1007,132 @@ export function FolderManager() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCategoryDialog(false)}>Cancel</Button>
-            <Button onClick={saveCategory} className="gap-2">
-              <Save className="h-4 w-4" />
-              {editingCategory ? "Update" : "Create"}
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCategoryDialog(false)}>Cancel</Button>
+            <Button size="sm" onClick={saveCategory}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Section Dialog */}
       <Dialog open={sectionDialog} onOpenChange={setSectionDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[90vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingSection ? "Edit Section" : "Create Section"}</DialogTitle>
-            <DialogDescription>
-              {editingSection ? "Update section details" : "Create a new section inside the category"}
-            </DialogDescription>
+            <DialogTitle>{editingSection ? 'Edit Section' : 'Create Section'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Section Name</Label>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Name</Label>
               <Input 
                 value={formData.name} 
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
                 placeholder="e.g., Calculus"
+                className="h-9"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
+            <div>
+              <Label className="text-xs">Description</Label>
               <Textarea 
                 value={formData.description} 
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief description"
-                rows={2}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                className="min-h-[60px] text-sm"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Icon</Label>
-                <Select value={formData.icon} onValueChange={(v) => setFormData({ ...formData, icon: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Icon</Label>
+                <Select value={formData.icon} onValueChange={(v) => setFormData({...formData, icon: v})}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ICONS.map(({ name, icon: Icon }) => (
-                      <SelectItem key={name} value={name}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {ICONS.map(i => {
+                      const Icon = i.icon
+                      return (
+                        <SelectItem key={i.name} value={i.name}>
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-3.5 w-3.5" />
+                            <span className="text-xs">{i.name}</span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>PDF Count</Label>
+              <div>
+                <Label className="text-xs">PDF Count</Label>
                 <Input 
-                  type="number"
+                  type="number" 
                   min={0}
                   value={formData.pdfCount} 
-                  onChange={(e) => setFormData({ ...formData, pdfCount: parseInt(e.target.value) || 0 })}
-                  placeholder="0"
+                  onChange={(e) => setFormData({...formData, pdfCount: parseInt(e.target.value) || 0})}
+                  className="h-9"
                 />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSectionDialog(false)}>Cancel</Button>
-            <Button onClick={saveSection} className="gap-2">
-              <Save className="h-4 w-4" />
-              {editingSection ? "Update" : "Create"}
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSectionDialog(false)}>Cancel</Button>
+            <Button size="sm" onClick={saveSection}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[90vw] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete {deleteTarget?.type}?</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. {deleteTarget?.type === 'folder' && "All categories and sections inside will also be deleted."}
-              {deleteTarget?.type === 'category' && "All sections inside will also be deleted."}
+              Are you sure you want to delete "{deleteTarget?.name}"? 
+              {deleteTarget?.type === 'folder' && ' All categories and sections inside will also be deleted.'}
+              {deleteTarget?.type === 'category' && ' All sections inside will also be deleted.'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+            <Button variant="outline" size="sm" onClick={() => setDeleteDialog(false)}>Cancel</Button>
+            <Button variant="destructive" size="sm" onClick={confirmDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move Dialog */}
+      <Dialog open={moveDialog} onOpenChange={setMoveDialog}>
+        <DialogContent className="max-w-[90vw] sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Move {moveTarget?.type}</DialogTitle>
+            <DialogDescription>
+              Select where to move "{moveTarget?.data?.name}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Target Folder</Label>
+              <Select value={moveToFolderId} onValueChange={setMoveToFolderId}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select folder" /></SelectTrigger>
+                <SelectContent>
+                  {folders.filter(f => f.id !== moveTarget?.currentFolderId || moveTarget?.type === 'section').map(f => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {moveTarget?.type === 'section' && moveToFolderId && (
+              <div>
+                <Label className="text-xs">Target Category</Label>
+                <Select value={moveToCategoryId} onValueChange={setMoveToCategoryId}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {folders.find(f => f.id === moveToFolderId)?.categories.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setMoveDialog(false)}>Cancel</Button>
+            <Button size="sm" onClick={confirmMove}>Move</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

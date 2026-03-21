@@ -75,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -121,10 +121,26 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
-/* Utility to hide scrollbar while maintaining scroll functionality */
+/* =====================================================
+   RESPONSIVE UTILITIES
+   ===================================================== */
+
+/* Container responsive padding */
+.container {
+  @apply px-4 sm:px-6 lg:px-8;
+}
+
+/* Scrollbar hide */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -133,227 +149,212 @@
   display: none;
 }
 
-/* Prevent text overflow issues */
-.text-balance {
-  text-wrap: balance;
-}
-
-/* Ensure proper line breaks */
+/* Text utilities */
+.text-balance { text-wrap: balance; }
+.text-pretty { text-wrap: pretty; }
 .break-words {
   word-break: break-word;
   overflow-wrap: break-word;
 }
 
-/* Performance optimizations */
-@layer base {
-  /* Reduce paint on scroll */
-  html {
-    scroll-behavior: smooth;
-  }
-  
-  /* Content-visibility for lazy rendering */
-  .lazy-section {
-    content-visibility: auto;
-    contain-intrinsic-size: 0 500px;
-  }
-  
-  /* Optimize images for lazy loading */
-  img {
-    content-visibility: auto;
-  }
-  
-  /* Reduce motion for accessibility */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
-}
+/* =====================================================
+   MOBILE OPTIMIZATIONS
+   ===================================================== */
 
-/* Mobile touch optimization */
-@media (hover: none) and (pointer: coarse) {
-  .group:hover .group-hover\:opacity-100 {
-    opacity: 1;
-  }
-  
-  /* Larger touch targets on mobile */
-  button, a {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
-/* Smooth card hover effects */
-.card-hover {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  will-change: transform;
-}
-
-.card-hover:hover {
-  transform: translateY(-4px) scale(1.02);
-}
-
-/* Download counter animation */
-@keyframes countUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.count-up {
-  animation: countUp 0.6s ease-out forwards;
-}
-
-/* Skeleton loading shimmer */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--muted)) 25%,
-    hsl(var(--muted-foreground) / 0.1) 50%,
-    hsl(var(--muted)) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-/* Safe area insets for mobile devices */
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
-}
+/* Safe areas for notched devices */
+.safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-left { padding-left: env(safe-area-inset-left, 0px); }
+.safe-right { padding-right: env(safe-area-inset-right, 0px); }
 
 /* Mobile bottom navigation spacing */
 @media (max-width: 768px) {
-  .pb-safe {
+  .pb-safe-nav {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
-/* Improved tap highlight for mobile */
-@media (hover: none) {
-  button, a {
-    -webkit-tap-highlight-color: transparent;
+/* Touch optimization */
+@media (hover: none) and (pointer: coarse) {
+  /* Better touch targets */
+  button, a, [role="button"] {
+    min-height: 44px;
   }
   
-  button:active, a:active {
-    opacity: 0.8;
+  /* Disable hover effects on touch */
+  .group:hover .group-hover\:opacity-100 {
+    opacity: 1;
+  }
+  
+  /* Active state feedback */
+  button:active, a:active, [role="button"]:active {
+    opacity: 0.85;
     transform: scale(0.98);
   }
 }
 
-/* Card lift animation */
-@keyframes cardLift {
-  0% {
-    transform: translateY(0) scale(1);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  }
-  100% {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+/* =====================================================
+   TABLET OPTIMIZATIONS
+   ===================================================== */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Tablet specific grid adjustments */
+  .tablet-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* Pulse animation for badges */
+/* =====================================================
+   DESKTOP OPTIMIZATIONS
+   ===================================================== */
+
+@media (min-width: 1024px) {
+  /* Smooth hover transitions */
+  .card-hover {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    will-change: transform;
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+}
+
+/* =====================================================
+   ANIMATIONS
+   ===================================================== */
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Marquee for testimonials */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.animate-marquee {
+  animation: marquee 35s linear infinite;
+}
+
+.animate-marquee-reverse {
+  animation: marquee-reverse 35s linear infinite;
+}
+
+/* Pause on hover */
+.animate-marquee:hover,
+.animate-marquee-reverse:hover {
+  animation-play-state: paused;
+}
+
+/* Shimmer loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Count up animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.count-up {
+  animation: countUp 0.5s ease-out forwards;
+}
+
+/* Pulse for badges */
 @keyframes badgePulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .badge-pulse {
   animation: badgePulse 2s ease-in-out infinite;
 }
 
-/* Notification dot animation */
+/* Notification dot */
 @keyframes notifyDot {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
 }
 
 .notify-dot {
   animation: notifyDot 1.5s ease-in-out infinite;
 }
 
-/* Smooth scrolling for search results */
-.smooth-scroll {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
+/* =====================================================
+   GLASS & EFFECTS
+   ===================================================== */
 
-/* Glass morphism effect */
 .glass {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .dark .glass {
   background: rgba(0, 0, 0, 0.2);
 }
 
-/* Focus visible for accessibility */
+/* =====================================================
+   FOCUS & ACCESSIBILITY
+   ===================================================== */
+
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
-/* Hide focus outline for mouse users */
 :focus:not(:focus-visible) {
   outline: none;
 }
 
-/* Marquee animation for testimonials */
-@keyframes marquee {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
-@keyframes marquee-reverse {
-  0% {
-    transform: translateX(-50%);
-  }
-  100% {
-    transform: translateX(0);
-  }
-}
+/* =====================================================
+   PRINT STYLES
+   ===================================================== */
 
-.animate-marquee {
-  animation: marquee 40s linear infinite;
-}
-
-.animate-marquee-reverse {
-  animation: marquee-reverse 40s linear infinite;
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
 }
