@@ -341,106 +341,107 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
           
           {/* Desktop Filter Bar */}
           <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Favorites Button */}
-          {isLoaded && favorites.length > 0 && (
-            <Button
-              variant={showFavoritesOnly ? "default" : "outline"}
-              size="sm"
-              className={`gap-1.5 text-xs h-9 px-3 transition-all duration-300 ${
-                showFavoritesOnly 
-                  ? "bg-gradient-to-r from-pink-500 to-rose-500 border-0 shadow-md shadow-pink-500/20" 
-                  : "hover:border-pink-500/50 hover:text-pink-500"
-              }`}
-              onClick={() => {
-                setShowFavoritesOnly(!showFavoritesOnly)
-                if (!showFavoritesOnly) setSelectedCategory(null)
-              }}
-            >
-              <Heart className={`h-3.5 w-3.5 ${showFavoritesOnly ? "fill-current" : ""}`} />
-              Favorites
-              <span className="bg-background/20 px-1.5 py-0.5 rounded-md text-[10px] font-semibold">
-                {favorites.length}
-              </span>
-            </Button>
-          )}
-
-          {/* Sort Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9 px-3 hover:border-primary/50">
-                <ArrowUpDown className="h-3.5 w-3.5" />
-                {sortLabels[sortBy].label}
+            {/* Favorites Button */}
+            {isLoaded && favorites.length > 0 && (
+              <Button
+                variant={showFavoritesOnly ? "default" : "outline"}
+                size="sm"
+                className={`gap-1.5 text-xs h-9 px-3 transition-all duration-300 ${
+                  showFavoritesOnly 
+                    ? "bg-gradient-to-r from-pink-500 to-rose-500 border-0 shadow-md shadow-pink-500/20" 
+                    : "hover:border-pink-500/50 hover:text-pink-500"
+                }`}
+                onClick={() => {
+                  setShowFavoritesOnly(!showFavoritesOnly)
+                  if (!showFavoritesOnly) setSelectedCategory(null)
+                }}
+              >
+                <Heart className={`h-3.5 w-3.5 ${showFavoritesOnly ? "fill-current" : ""}`} />
+                Favorites
+                <span className="bg-background/20 px-1.5 py-0.5 rounded-md text-[10px] font-semibold">
+                  {favorites.length}
+                </span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[180px]">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Sort by</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSortBy("newest")} className="gap-2 text-sm cursor-pointer">
-                <Clock className="h-4 w-4 text-primary" /> Newest First
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy("oldest")} className="gap-2 text-sm cursor-pointer">
-                <Clock className="h-4 w-4 text-muted-foreground" /> Oldest First
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSortBy("most-viewed")} className="gap-2 text-sm cursor-pointer">
-                <Eye className="h-4 w-4 text-blue-500" /> Most Viewed
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy("most-downloaded")} className="gap-2 text-sm cursor-pointer">
-                <Download className="h-4 w-4 text-green-500" /> Most Downloaded
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy("rating")} className="gap-2 text-sm cursor-pointer">
-                <Sparkles className="h-4 w-4 text-amber-500" /> Top Rated
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSortBy("alphabetical")} className="gap-2 text-sm cursor-pointer">
-                <SortAsc className="h-4 w-4 text-accent" /> A-Z
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 border border-border/50 rounded-lg p-0.5">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "compact" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => setViewMode("compact")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Clear Filters */}
-          {activeFiltersCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-xs h-9 px-3 text-muted-foreground hover:text-destructive"
-              onClick={clearAllFilters}
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear
-            </Button>
-          )}
-
-          {/* Results count */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto bg-muted/50 px-3 py-1.5 rounded-lg">
-            <span className="font-medium text-foreground">{filteredAndSortedPdfs.length}</span>
-            <span>{filteredAndSortedPdfs.length === 1 ? "PDF" : "PDFs"}</span>
-            {totalPages > 1 && (
-              <>
-                <span className="h-1 w-1 rounded-full bg-border" />
-                <span>Page <span className="font-medium text-foreground">{currentPage}</span>/{totalPages}</span>
-              </>
             )}
+
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9 px-3 hover:border-primary/50">
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  {sortLabels[sortBy].label}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[180px]">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Sort by</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSortBy("newest")} className="gap-2 text-sm cursor-pointer">
+                  <Clock className="h-4 w-4 text-primary" /> Newest First
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy("oldest")} className="gap-2 text-sm cursor-pointer">
+                  <Clock className="h-4 w-4 text-muted-foreground" /> Oldest First
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSortBy("most-viewed")} className="gap-2 text-sm cursor-pointer">
+                  <Eye className="h-4 w-4 text-blue-500" /> Most Viewed
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy("most-downloaded")} className="gap-2 text-sm cursor-pointer">
+                  <Download className="h-4 w-4 text-green-500" /> Most Downloaded
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy("rating")} className="gap-2 text-sm cursor-pointer">
+                  <Sparkles className="h-4 w-4 text-amber-500" /> Top Rated
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSortBy("alphabetical")} className="gap-2 text-sm cursor-pointer">
+                  <SortAsc className="h-4 w-4 text-accent" /> A-Z
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 border border-border/50 rounded-lg p-0.5">
+              <Button
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode("grid")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "compact" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode("compact")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Clear Filters */}
+            {activeFiltersCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs h-9 px-3 text-muted-foreground hover:text-destructive"
+                onClick={clearAllFilters}
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            )}
+
+            {/* Results count */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto bg-muted/50 px-3 py-1.5 rounded-lg">
+              <span className="font-medium text-foreground">{filteredAndSortedPdfs.length}</span>
+              <span>{filteredAndSortedPdfs.length === 1 ? "PDF" : "PDFs"}</span>
+              {totalPages > 1 && (
+                <>
+                  <span className="h-1 w-1 rounded-full bg-border" />
+                  <span>Page <span className="font-medium text-foreground">{currentPage}</span>/{totalPages}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
