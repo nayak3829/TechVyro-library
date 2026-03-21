@@ -267,7 +267,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
                   )}
                 </Button>
               </SheetTrigger>
-            <SheetContent side="bottom" className="h-[70vh]">
+              <SheetContent side="bottom" className="h-[70vh]">
               <SheetHeader>
                 <SheetTitle>Filter & Sort</SheetTitle>
                 <SheetDescription>Customize how PDFs are displayed</SheetDescription>
@@ -338,9 +338,9 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
               <span>PDFs</span>
             </div>
           </div>
-        
-        {/* Desktop Filter Bar */}
-        <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">
+          
+          {/* Desktop Filter Bar */}
+          <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Favorites Button */}
           {isLoaded && favorites.length > 0 && (
             <Button
@@ -442,6 +442,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
               </>
             )}
           </div>
+        </div>
         </div>
 
         {/* Active Filters Display */}
