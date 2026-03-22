@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { WhatsAppPopup } from "@/components/whatsapp-popup"
 import { MobileNav } from "@/components/mobile-nav"
+import { Chatbot } from "@/components/chatbot"
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -106,6 +107,7 @@ export default function RootLayout({
           <MobileNav />
           <Toaster richColors position="top-right" />
           <WhatsAppPopup />
+          <Chatbot />
         </ThemeProvider>
         <Analytics />
       </body>
