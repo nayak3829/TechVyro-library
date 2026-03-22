@@ -8,6 +8,7 @@ import { CategoriesSection } from "@/components/home/categories-section"
 import { QuizSection } from "@/components/home/quiz-section"
 import { TestimonialsSection } from "@/components/home/testimonials-section"
 import { HomeAutoRefresh } from "@/components/home/home-auto-refresh"
+import { Chatbot } from "@/components/chatbot"
 import { PDFGrid } from "@/components/pdf-grid"
 import { Footer } from "@/components/footer"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -261,6 +262,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <Footer />
       <HomeAutoRefresh />
+      <Chatbot />
     </div>
   )
 }
