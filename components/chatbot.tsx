@@ -559,7 +559,12 @@ function AdminLiveChat({ onBack }: { onBack: () => void }) {
       const newMsgs: LiveMessage[] = data.messages || []
 
       if (newMsgs.length > 0) {
-        setLiveMessages(prev => [...prev, ...newMsgs])
+        setLiveMessages(prev => {
+          // Deduplicate: filter out messages already in the list (by DB id)
+          const existingIds = new Set(prev.map(m => m.id))
+          const unique = newMsgs.filter(m => !existingIds.has(m.id))
+          return unique.length > 0 ? [...prev, ...unique] : prev
+        })
         setLastSince(newMsgs[newMsgs.length - 1].created_at)
         setAdminTyping(false)
       }
@@ -615,23 +620,36 @@ function AdminLiveChat({ onBack }: { onBack: () => void }) {
     if (!input.trim() || sending || !sessionId) return
     const text = input.trim()
 
+    const tempId = `temp_${Date.now()}`
     const tempMsg: LiveMessage = {
-      id: Date.now().toString(),
+      id: tempId,
       sender: "student",
       message: text,
       created_at: new Date().toISOString(),
     }
 
-    setLiveMessages(prev => [...prev, tempMsg])
+    // Use snapshot (not functional updater) to prevent React Strict Mode double-add
+    setLiveMessages(current => {
+      // Deduplicate: don't add if same tempId already exists
+      if (current.some(m => m.id === tempId)) return current
+      return [...current, tempMsg]
+    })
     setInput("")
     setSending(true)
 
     try {
-      await fetch("/api/admin-chat/send", {
+      const res = await fetch("/api/admin-chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, message: text, studentName }),
       })
+      const data = await res.json()
+      // Replace tempId with real DB id to prevent poll from adding duplicate
+      if (data.messageId) {
+        setLiveMessages(current =>
+          current.map(m => m.id === tempId ? { ...m, id: data.messageId } : m)
+        )
+      }
       setLastSince(new Date().toISOString())
     } catch {}
 
