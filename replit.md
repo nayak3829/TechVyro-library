@@ -12,6 +12,8 @@ All public pages follow a consistent premium design language:
 - Conic-gradient score rings on quiz results
 - Podium visualization on leaderboard (gold/silver/bronze)
 - Mobile-first: full-width CTAs, horizontal-scrollable filter chips
+- **Responsive breakpoints**: hero grid activates at `md` (768px), not `lg`; featured cards go 4-col at `md`; stats bottom row side-by-side at `md`
+- `pb-20 md:pb-0` wrapper in `app/layout.tsx` ensures mobile nav (60px) never overlaps content
 
 ## Tech Stack
 - **Framework**: Next.js 16.1.6 (App Router, Turbopack)

@@ -100,7 +100,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="pb-16 md:pb-0">
+          <div className="pb-20 md:pb-0">
             {children}
           </div>
           <MobileNav />

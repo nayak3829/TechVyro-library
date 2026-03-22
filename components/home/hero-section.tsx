@@ -192,11 +192,11 @@ export function HeroSection() {
       <div className="absolute top-20 left-10 w-80 h-80 bg-primary/6 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/6 rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="container mx-auto px-4 pt-12 pb-6 sm:pt-20 sm:pb-10 lg:pt-28 lg:pb-16 relative">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-20 items-center">
+      <div className="container mx-auto px-4 pt-10 pb-6 sm:pt-16 sm:pb-8 md:pt-20 md:pb-10 lg:pt-28 lg:pb-16 relative">
+        <div className="grid md:grid-cols-2 gap-8 md:gap-10 lg:gap-20 items-center">
 
           {/* ── LEFT — Text ── */}
-          <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+          <div className="flex flex-col items-center md:items-start text-center md:text-left">
 
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/8 border border-primary/20 text-xs font-semibold text-primary mb-5 sm:mb-7">
@@ -206,7 +206,7 @@ export function HeroSection() {
             </div>
 
             {/* Trust pills */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 mb-5 sm:mb-7">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-5 sm:mb-7">
               {activeTrustStats.map((stat, index) => (
                 <div
                   key={index}
@@ -219,7 +219,7 @@ export function HeroSection() {
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-5xl xl:text-6xl font-extrabold tracking-tight mb-3 sm:mb-4 leading-[1.08]">
+            <h1 className="text-4xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold tracking-tight mb-3 sm:mb-4 leading-[1.08]">
               <span className="text-foreground">Welcome to </span>
               <span className="relative inline-block">
                 <span className="bg-gradient-to-r from-[#ef4444] via-primary to-accent bg-clip-text text-transparent">
@@ -239,8 +239,8 @@ export function HeroSection() {
             </h1>
 
             {/* Animated tagline */}
-            <div className="h-7 sm:h-9 mb-4 sm:mb-6 overflow-hidden">
-              <p className={`text-lg sm:text-2xl font-bold text-foreground/60 transition-all duration-400 ${isAnimating ? "opacity-0 -translate-y-2" : "opacity-100 translate-y-0"}`}>
+            <div className="h-7 md:h-8 lg:h-9 mb-4 sm:mb-6 overflow-hidden">
+              <p className={`text-lg md:text-xl lg:text-2xl font-bold text-foreground/60 transition-all duration-400 ${isAnimating ? "opacity-0 -translate-y-2" : "opacity-100 translate-y-0"}`}>
                 {taglines[taglineIndex] || ""}
               </p>
             </div>
@@ -251,7 +251,7 @@ export function HeroSection() {
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-3 w-full sm:w-auto mb-7 sm:mb-9">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center md:justify-start gap-3 w-full sm:w-auto mb-7 sm:mb-9">
               <a
                 href="#content"
                 className="group inline-flex items-center justify-center gap-2 px-7 sm:px-8 h-12 sm:h-13 rounded-xl bg-gradient-to-r from-primary to-accent text-white text-sm font-semibold hover:opacity-92 shadow-xl shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5"
@@ -274,7 +274,7 @@ export function HeroSection() {
             </div>
 
             {/* Feature pills */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
               {features.map((feature, index) => (
                 <div
                   key={index}
@@ -288,7 +288,7 @@ export function HeroSection() {
           </div>
 
           {/* ── RIGHT — Visual Panel ── */}
-          <div className="relative hidden sm:flex items-center justify-center mt-4 lg:mt-0">
+          <div className="relative hidden md:flex items-center justify-center mt-4 lg:mt-0">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/8 to-transparent rounded-3xl blur-3xl scale-95 pointer-events-none" />
 
             <div className="relative w-full max-w-[420px] mx-auto">
@@ -399,7 +399,7 @@ export function HeroSection() {
           </div>
 
           {/* Mobile stats strip */}
-          <div className="sm:hidden grid grid-cols-3 gap-2 -mt-4">
+          <div className="md:hidden grid grid-cols-3 gap-2 -mt-4">
             {miniStats.map((s, i) => (
               <div key={i} className="flex flex-col items-center p-3 rounded-2xl bg-card/80 border border-border/50">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${s.bg} mb-1.5`}>

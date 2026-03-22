@@ -170,7 +170,7 @@ export function FeaturedSection({ featured: initialFeatured }: FeaturedSectionPr
         </div>
 
         {/* Cards grid */}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity duration-300 ${isRefreshing ? "opacity-50" : "opacity-100"}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 transition-opacity duration-300 ${isRefreshing ? "opacity-50" : "opacity-100"}`}>
           {currentPdfs.slice(0, 4).map((pdf, index) => (
             <FeaturedCard key={pdf.id} pdf={pdf} index={index} />
           ))}

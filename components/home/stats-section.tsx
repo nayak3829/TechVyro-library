@@ -208,9 +208,9 @@ export function StatsSection({ stats: initialStats }: StatsSectionProps) {
         </div>
 
         {/* Bottom row: Rating + Why Us */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {stats.avgRating > 0 && (
-            <div className="lg:col-span-2">
+            <div className="md:col-span-2">
               <div className="h-full bg-card rounded-2xl p-6 sm:p-7 border border-amber-500/20 hover:border-amber-500/35 hover:shadow-xl hover:shadow-amber-500/8 transition-all duration-300 flex flex-col items-center text-center justify-center gap-4 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-orange-500/5" />
                 <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20">
@@ -230,7 +230,7 @@ export function StatsSection({ stats: initialStats }: StatsSectionProps) {
             </div>
           )}
 
-          <div className={stats.avgRating > 0 ? "lg:col-span-3" : "lg:col-span-5"}>
+          <div className={stats.avgRating > 0 ? "md:col-span-3" : "md:col-span-5"}>
             <div className="mb-4 flex items-center gap-3">
               <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
               <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap px-2">Why Students Choose Us</span>
