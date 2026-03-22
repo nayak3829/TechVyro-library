@@ -303,6 +303,13 @@ export function Chatbot() {
 
       {/* ── Floating Trigger Button — Advanced Design ── */}
       <div className="relative">
+        {/* Animated glow rings */}
+        {!open && (
+          <>
+            <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 opacity-40 animate-ping scale-110" style={{ animationDuration: "2.5s" }} />
+            <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-500 opacity-20 animate-ping scale-125" style={{ animationDuration: "2.5s", animationDelay: "0.6s" }} />
+          </>
+        )}
 
         <button
           onClick={() => { setOpen(o => !o); setUnread(0) }}
