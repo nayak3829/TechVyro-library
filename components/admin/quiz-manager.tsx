@@ -5,7 +5,8 @@ import {
   Plus, Trash2, Edit, ChevronDown, ChevronRight, Clock, FileText,
   CheckCircle, Save, Upload, Copy, ExternalLink, FileUp, Loader2,
   Trophy, Users, Crown, Tag, Eye, EyeOff, Globe, Lock, Link2,
-  FolderOpen, Zap, X, Settings2, Files, AlertCircle
+  FolderOpen, Zap, X, Settings2, Files, AlertCircle, CheckSquare,
+  Square, MoveRight, MoreHorizontal, ArrowUpDown
 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
@@ -40,8 +41,18 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { InlineStructureEditor } from "./inline-structure-editor"
+import { StructureSelector } from "./structure-selector"
 
 interface Question {
   id: string
@@ -67,6 +78,11 @@ interface Quiz {
   visibility?: VisibilityType
   section?: string
   difficulty?: "easy" | "medium" | "hard"
+  structureLocation?: {
+    folderId: string
+    categoryId: string
+    sectionId: string
+  }
 }
 
 const STORAGE_KEY = "techvyro-quizzes"
@@ -154,6 +170,11 @@ export function QuizManager() {
     tags: [] as string[]
   })
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
+  
+  // Bulk selection state
+  const [selectedQuizzes, setSelectedQuizzes] = useState<Set<string>>(new Set())
+  const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false)
+  const [bulkMoveTarget, setBulkMoveTarget] = useState({ category: "", section: "" })
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -229,6 +250,72 @@ export function QuizManager() {
     saveQuizzes(quizzes.map(q => 
       q.id === quizId ? { ...q, enabled: !q.enabled } : q
     ))
+  }
+
+  // Bulk Operations
+  const toggleQuizSelection = (quizId: string) => {
+    setSelectedQuizzes(prev => {
+      const next = new Set(prev)
+      if (next.has(quizId)) next.delete(quizId)
+      else next.add(quizId)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedQuizzes.size === quizzes.length) {
+      setSelectedQuizzes(new Set())
+    } else {
+      setSelectedQuizzes(new Set(quizzes.map(q => q.id)))
+    }
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedQuizzes.size === 0) return
+    if (!confirm(`Delete ${selectedQuizzes.size} selected quizzes?`)) return
+    
+    saveQuizzes(quizzes.filter(q => !selectedQuizzes.has(q.id)))
+    setSelectedQuizzes(new Set())
+    toast.success(`Deleted ${selectedQuizzes.size} quizzes`)
+  }
+
+  const handleBulkToggle = (enable: boolean) => {
+    if (selectedQuizzes.size === 0) return
+    
+    saveQuizzes(quizzes.map(q => 
+      selectedQuizzes.has(q.id) ? { ...q, enabled: enable } : q
+    ))
+    toast.success(`${enable ? "Enabled" : "Disabled"} ${selectedQuizzes.size} quizzes`)
+  }
+
+  const handleBulkMove = () => {
+    if (selectedQuizzes.size === 0 || !bulkMoveTarget.category) return
+    
+    saveQuizzes(quizzes.map(q => 
+      selectedQuizzes.has(q.id) 
+        ? { ...q, category: bulkMoveTarget.category, section: bulkMoveTarget.section || q.section } 
+        : q
+    ))
+    setSelectedQuizzes(new Set())
+    setShowBulkMoveDialog(false)
+    setBulkMoveTarget({ category: "", section: "" })
+    toast.success(`Moved ${selectedQuizzes.size} quizzes to ${bulkMoveTarget.category}`)
+  }
+
+  const handleBulkDuplicate = () => {
+    if (selectedQuizzes.size === 0) return
+    
+    const selectedQuizList = quizzes.filter(q => selectedQuizzes.has(q.id))
+    const duplicates = selectedQuizList.map(q => ({
+      ...q,
+      id: generateId(),
+      title: `${q.title} (Copy)`,
+      createdAt: new Date().toISOString()
+    }))
+    
+    saveQuizzes([...quizzes, ...duplicates])
+    setSelectedQuizzes(new Set())
+    toast.success(`Duplicated ${selectedQuizzes.size} quizzes`)
   }
 
   const handleAddQuestion = (quizId: string) => {
@@ -656,7 +743,92 @@ export function QuizManager() {
           <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
           <span className="hidden sm:inline">Leaderboard</span> ({leaderboard.length})
         </Button>
+        
+        {quizzes.length > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={toggleSelectAll}
+              className="text-xs h-8 gap-1.5"
+            >
+              {selectedQuizzes.size === quizzes.length ? (
+                <CheckSquare className="h-3.5 w-3.5" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {selectedQuizzes.size === quizzes.length ? "Deselect All" : "Select All"}
+              </span>
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedQuizzes.size > 0 && (
+        <div className="flex items-center gap-2 p-2 sm:p-3 bg-primary/5 border border-primary/20 rounded-lg">
+          <Badge variant="secondary" className="text-xs">
+            {selectedQuizzes.size} selected
+          </Badge>
+          
+          <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleBulkToggle(true)}
+              className="text-xs h-7 sm:h-8 px-2 sm:px-3"
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              <span className="hidden sm:inline">Enable</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleBulkToggle(false)}
+              className="text-xs h-7 sm:h-8 px-2 sm:px-3"
+            >
+              <EyeOff className="h-3 w-3 mr-1" />
+              <span className="hidden sm:inline">Disable</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowBulkMoveDialog(true)}
+              className="text-xs h-7 sm:h-8 px-2 sm:px-3"
+            >
+              <MoveRight className="h-3 w-3 mr-1" />
+              <span className="hidden sm:inline">Move</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleBulkDuplicate}
+              className="text-xs h-7 sm:h-8 px-2 sm:px-3"
+            >
+              <Copy className="h-3 w-3 mr-1" />
+              <span className="hidden sm:inline">Duplicate</span>
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={handleBulkDelete}
+              className="text-xs h-7 sm:h-8 px-2 sm:px-3"
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              <span className="hidden sm:inline">Delete</span>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedQuizzes(new Set())}
+              className="text-xs h-7 sm:h-8 px-2"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {quizzes.length === 0 ? (
@@ -680,20 +852,27 @@ export function QuizManager() {
               open={expandedQuizzes.has(quiz.id)}
               onOpenChange={() => toggleExpanded(quiz.id)}
             >
-              <Card className={!quiz.enabled ? "opacity-60" : ""}>
+              <Card className={`${!quiz.enabled ? "opacity-60" : ""} ${selectedQuizzes.has(quiz.id) ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}>
                 <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
-                    <CollapsibleTrigger className="flex items-start gap-2 text-left w-full sm:w-auto">
-                      {expandedQuizzes.has(quiz.id) ? (
-                        <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground shrink-0 mt-1" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground shrink-0 mt-1" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <CardTitle className="text-sm sm:text-lg line-clamp-2">{quiz.title}</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm line-clamp-1">{quiz.description}</CardDescription>
-                      </div>
-                    </CollapsibleTrigger>
+                    <div className="flex items-start gap-2 w-full sm:w-auto">
+                      <Checkbox 
+                        checked={selectedQuizzes.has(quiz.id)}
+                        onCheckedChange={() => toggleQuizSelection(quiz.id)}
+                        className="mt-1.5 shrink-0"
+                      />
+                      <CollapsibleTrigger className="flex items-start gap-2 text-left flex-1">
+                        {expandedQuizzes.has(quiz.id) ? (
+                          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground shrink-0 mt-1" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground shrink-0 mt-1" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <CardTitle className="text-sm sm:text-lg line-clamp-2">{quiz.title}</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm line-clamp-1">{quiz.description}</CardDescription>
+                        </div>
+                      </CollapsibleTrigger>
+                    </div>
                     
                     <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap ml-6 sm:ml-0">
                       <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2">{quiz.category}</Badge>
@@ -915,6 +1094,21 @@ export function QuizManager() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Content Structure Location */}
+              <div>
+                <Label className="text-xs sm:text-sm flex items-center gap-1 mb-1.5">
+                  <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                  Content Location (optional)
+                </Label>
+                <StructureSelector
+                  value={editingQuiz.structureLocation}
+                  onChange={(location) => setEditingQuiz({ ...editingQuiz, structureLocation: location })}
+                  placeholder="Select where to add this quiz"
+                  className="w-full"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">Link quiz to a specific folder/category/section</p>
               </div>
 
               {/* Visibility */}
@@ -1542,6 +1736,58 @@ export function QuizManager() {
             )}
             <Button variant="outline" onClick={() => setShowLeaderboardDialog(false)} className="w-full sm:w-auto">
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Move Dialog */}
+      <Dialog open={showBulkMoveDialog} onOpenChange={setShowBulkMoveDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm sm:text-base">
+              Move {selectedQuizzes.size} Quizzes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs">Category</Label>
+              <Select value={bulkMoveTarget.category} onValueChange={v => setBulkMoveTarget(p => ({ ...p, category: v }))}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mathematics">Mathematics</SelectItem>
+                  <SelectItem value="Physics">Physics</SelectItem>
+                  <SelectItem value="Chemistry">Chemistry</SelectItem>
+                  <SelectItem value="Biology">Biology</SelectItem>
+                  <SelectItem value="English">English</SelectItem>
+                  <SelectItem value="General">General</SelectItem>
+                  <SelectItem value="NDA">NDA</SelectItem>
+                  <SelectItem value="SSC">SSC</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Section (optional)</Label>
+              <Select value={bulkMoveTarget.section} onValueChange={v => setBulkMoveTarget(p => ({ ...p, section: v }))}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Keep existing" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECTIONS.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkMoveDialog(false)} size="sm">
+              Cancel
+            </Button>
+            <Button onClick={handleBulkMove} disabled={!bulkMoveTarget.category} size="sm">
+              Move Quizzes
             </Button>
           </DialogFooter>
         </DialogContent>

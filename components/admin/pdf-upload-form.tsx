@@ -19,6 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { toast } from "sonner"
 import type { Category } from "@/lib/types"
 import { InlineStructureEditor } from "./inline-structure-editor"
+import { StructureSelector } from "./structure-selector"
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB in bytes
 const MAX_PARALLEL_UPLOADS = 8
@@ -31,6 +32,11 @@ interface FileEntry {
   title: string
   description: string
   categoryId: string
+  structureLocation: {
+    folderId: string
+    categoryId: string
+    sectionId: string
+  }
   tags: string[]
   visibility: VisibilityType
   scheduledAt: string | null
@@ -112,6 +118,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         title,
         description: "",
         categoryId: globalCategory,
+        structureLocation: { folderId: "", categoryId: "", sectionId: "" },
         tags: [...globalTags],
         visibility: globalVisibility,
         scheduledAt: null,
@@ -649,26 +656,15 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                   )}
                 </div>
 
-                {/* Category Select */}
-                <Select
-                  value={entry.categoryId}
-                  onValueChange={(v) => updateEntry(entry.id, { categoryId: v })}
-                  disabled={entry.status !== "pending"}
-                >
-                  <SelectTrigger className="w-32 h-9 text-xs">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
-                          {cat.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Structure Location Selector */}
+                {entry.status === "pending" && (
+                  <StructureSelector
+                    value={entry.structureLocation}
+                    onChange={(location) => updateEntry(entry.id, { structureLocation: location })}
+                    placeholder="Select location"
+                    className="w-auto max-w-[200px] sm:max-w-[280px]"
+                  />
+                )}
 
                 {/* Actions */}
                 {entry.status === "pending" && (
