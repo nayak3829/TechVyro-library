@@ -164,7 +164,7 @@ export function StatsSection({ stats }: StatsSectionProps) {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-10 lg:mb-12">
           {statsConfig.map((stat) => {
             const Icon = stat.icon
             const value = stats[stat.key as keyof typeof stats]
@@ -172,29 +172,27 @@ export function StatsSection({ stats }: StatsSectionProps) {
             return (
               <div
                 key={stat.key}
-                className={`group relative bg-card rounded-2xl p-5 sm:p-6 border border-border/50 hover:border-border hover:shadow-xl ${stat.glow} transition-all duration-300 hover:-translate-y-1.5 overflow-hidden`}
+                className={`group relative bg-card rounded-2xl p-4 sm:p-5 lg:p-6 border border-border/50 hover:border-border hover:shadow-xl ${stat.glow} transition-all duration-300 hover:-translate-y-1.5 overflow-hidden`}
               >
                 {/* Gradient accent top bar */}
                 <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${stat.gradient} opacity-60 group-hover:opacity-100 transition-opacity`} />
-
-                {/* Background glow on hover */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${stat.bg} opacity-0 group-hover:opacity-50 transition-opacity duration-300 rounded-2xl`} />
 
                 <div className="relative">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl ${stat.bg} ring-1 ${stat.ring} group-hover:scale-110 transition-transform duration-300`}>
-                      <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${stat.iconColor}`} />
+                  <div className="flex items-start justify-between mb-3 sm:mb-4">
+                    <div className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl ${stat.bg} ring-1 ${stat.ring} group-hover:scale-110 transition-transform duration-300`}>
+                      <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${stat.iconColor}`} />
                     </div>
-                    <ArrowUpRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+                    <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
                   </div>
 
-                  <p className="text-3xl sm:text-4xl font-extrabold text-foreground mb-1 tracking-tight">
+                  <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground mb-0.5 sm:mb-1 tracking-tight">
                     <AnimatedCounter value={typeof value === 'number' ? Math.round(value) : 0} />
                   </p>
-                  <p className="text-sm font-semibold text-foreground/80 mb-1">{stat.label}</p>
-                  <p className="text-xs text-muted-foreground">{stat.sublabel}</p>
+                  <p className="text-xs sm:text-sm font-semibold text-foreground/80 mb-0.5 sm:mb-1">{stat.label}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{stat.sublabel}</p>
 
-                  <div className="mt-3 pt-3 border-t border-border/30">
+                  <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-border/30">
                     <span className="text-[10px] font-medium text-emerald-500">{stat.trend}</span>
                   </div>
                 </div>

@@ -18,10 +18,10 @@ interface FeaturedSectionProps {
 }
 
 const tabs = [
-  { id: "popular", label: "Most Downloaded", icon: Flame, color: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/30" },
-  { id: "trending", label: "Trending", icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/30" },
-  { id: "recent", label: "New", icon: Clock, color: "text-green-500", bg: "bg-green-500/10", border: "border-green-500/30" },
-  { id: "topRated", label: "Top Rated", icon: Star, color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/30" },
+  { id: "popular", label: "Most Downloaded", mobileLabel: "Popular", icon: Flame, color: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/30" },
+  { id: "trending", label: "Trending", mobileLabel: "Trending", icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/30" },
+  { id: "recent", label: "New", mobileLabel: "New", icon: Clock, color: "text-green-500", bg: "bg-green-500/10", border: "border-green-500/30" },
+  { id: "topRated", label: "Top Rated", mobileLabel: "Top Rated", icon: Star, color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/30" },
 ]
 
 function FeaturedCard({ pdf, index }: { pdf: PDF; index: number }) {
@@ -107,8 +107,8 @@ export function FeaturedSection({ featured }: FeaturedSectionProps) {
           </p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-8 sm:mb-10 flex-wrap">
+        {/* Tabs — horizontally scrollable on mobile */}
+        <div className="flex items-center gap-2 sm:gap-3 mb-8 sm:mb-10 overflow-x-auto pb-1 sm:pb-0 sm:justify-center no-scrollbar">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -117,14 +117,15 @@ export function FeaturedSection({ featured }: FeaturedSectionProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 ${
+                className={`flex shrink-0 items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 ${
                   isActive 
                     ? `${tab.bg} ${tab.color} ${tab.border} border shadow-lg` 
                     : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
                 }`}
               >
-                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? tab.color : ""}`} />
-                {tab.label}
+                <Icon className={`h-4 w-4 ${isActive ? tab.color : ""}`} />
+                <span className="sm:hidden">{tab.mobileLabel}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             )
           })}

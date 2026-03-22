@@ -348,6 +348,18 @@
 }
 
 /* =====================================================
+   UTILITY: HIDE SCROLLBAR (for horizontal scroll containers)
+   ===================================================== */
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* =====================================================
    PRINT STYLES
    ===================================================== */
 
