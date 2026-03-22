@@ -5,9 +5,9 @@ import {
   Plus, Trash2, Edit, ChevronDown, ChevronRight, Clock, FileText,
   CheckCircle, Save, Upload, Copy, ExternalLink, FileUp, Loader2,
   Trophy, Users, Crown, Tag, Eye, EyeOff, Globe, Lock, Link2,
-  FolderOpen, Zap, X, Settings2, Files, AlertCircle, CheckSquare,
+  FolderOpen, FolderPlus, Zap, X, Settings2, Files, AlertCircle, CheckSquare,
   Square, MoveRight, ChevronUp, ArrowUp, ArrowDown, Search, Filter,
-  Download, BarChart2, Shuffle, Minus, RefreshCw
+  Download, BarChart2, Shuffle, Minus, RefreshCw, Sparkles
 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
@@ -181,6 +181,13 @@ export function QuizManager() {
     structureLocation: { folderId: "", categoryId: "", sectionId: "" }
   })
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
+  const [globalTagInput, setGlobalTagInput] = useState("")
+  function addGlobalTag(raw: string) {
+    const tag = raw.trim().replace(/^#/, "").toLowerCase()
+    if (tag && !globalSettings.tags.includes(tag)) setGlobalSettings(p => ({ ...p, tags: [...p.tags, tag] }))
+    setGlobalTagInput("")
+  }
+  function removeGlobalTag(tag: string) { setGlobalSettings(p => ({ ...p, tags: p.tags.filter(t => t !== tag) })) }
   const [importTab, setImportTab] = useState<"html"|"json">("html")
   const [showPasteHtml, setShowPasteHtml] = useState(false)
 
@@ -865,7 +872,15 @@ export function QuizManager() {
   const applyGlobalSettings = () => {
     setUploadEntries(prev => prev.map(e => ({
       ...e, settings: { ...globalSettings },
-      quiz: e.quiz ? { ...e.quiz, category: globalSettings.category, section: globalSettings.section, difficulty: globalSettings.difficulty, visibility: globalSettings.visibility, tags: globalSettings.tags } : null
+      quiz: e.quiz ? {
+        ...e.quiz,
+        category: globalSettings.category,
+        section: globalSettings.section,
+        difficulty: globalSettings.difficulty,
+        visibility: globalSettings.visibility,
+        tags: globalSettings.tags,
+        structureLocation: globalSettings.structureLocation,
+      } : null
     })))
     toast.success("Global settings applied to all files")
   }
@@ -898,6 +913,9 @@ export function QuizManager() {
   const resetImportDialog = () => {
     setImportHtml(""); setParsedPreview(null); setShowPasteHtml(false)
     setUploadEntries([])
+    setGlobalTagInput("")
+    setGlobalSettings(p => ({ ...p, tags: [], structureLocation: { folderId: "", categoryId: "", sectionId: "" } }))
+    setShowGlobalSettings(false)
     setJsonEntries([]); setPasteJsonText(""); setShowPasteJson(false); setShowJsonGlobalSettings(false)
     if (fileInputRef.current) fileInputRef.current.value = ""
     if (jsonImportRef.current) jsonImportRef.current.value = ""
@@ -1540,53 +1558,96 @@ export function QuizManager() {
                 {/* Global Settings */}
                 {uploadEntries.length > 0 && (
                   <Collapsible open={showGlobalSettings} onOpenChange={setShowGlobalSettings}>
-                    <div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
+                    <div className="rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 overflow-hidden">
                       <CollapsibleTrigger asChild>
-                        <Button variant="ghost" className="w-full flex items-center justify-between p-3 h-auto hover:bg-muted/50">
-                          <div className="flex items-center gap-2">
-                            <Settings2 className="h-4 w-4 text-primary" />
-                            <span className="font-medium text-xs sm:text-sm">Global Settings (apply to all)</span>
+                        <Button variant="ghost" className="w-full flex items-center justify-between p-3 sm:p-4 h-auto hover:bg-muted/50">
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-primary/10">
+                              <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+                            </div>
+                            <div className="text-left">
+                              <p className="font-medium text-foreground text-xs sm:text-sm">Global Import Settings</p>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground">Apply to all pending files</p>
+                            </div>
                           </div>
-                          <ChevronDown className={`h-4 w-4 transition-transform ${showGlobalSettings ? "rotate-180" : ""}`} />
+                          {showGlobalSettings ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                         </Button>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className="p-3 border-t border-border/50 space-y-3">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <Label className="text-xs">Category</Label>
+                        <div className="p-4 pt-0 space-y-4 border-t border-border/50">
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <FolderPlus className="h-4 w-4 text-muted-foreground" /> Category
+                              </Label>
                               <Select value={globalSettings.category} onValueChange={v => setGlobalSettings(p => ({ ...p, category: v }))}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                                 <SelectContent>{allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                               </Select>
                             </div>
-                            <div>
-                              <Label className="text-xs">Difficulty</Label>
-                              <Select value={globalSettings.difficulty} onValueChange={v => setGlobalSettings(p => ({ ...p, difficulty: v as any }))}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>{DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Section</Label>
-                              <Select value={globalSettings.section} onValueChange={v => setGlobalSettings(p => ({ ...p, section: v }))}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>{SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Visibility</Label>
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <Eye className="h-4 w-4 text-muted-foreground" /> Visibility
+                              </Label>
                               <Select value={globalSettings.visibility} onValueChange={v => setGlobalSettings(p => ({ ...p, visibility: v as any }))}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="public">Public</SelectItem>
-                                  <SelectItem value="unlisted">Unlisted</SelectItem>
-                                  <SelectItem value="private">Private</SelectItem>
+                                  <SelectItem value="public"><span className="flex items-center gap-2"><Globe className="h-3.5 w-3.5" /> Public</span></SelectItem>
+                                  <SelectItem value="unlisted"><span className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Unlisted</span></SelectItem>
+                                  <SelectItem value="private"><span className="flex items-center gap-2"><Lock className="h-3.5 w-3.5" /> Private</span></SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <BarChart2 className="h-4 w-4 text-muted-foreground" /> Difficulty
+                              </Label>
+                              <Select value={globalSettings.difficulty} onValueChange={v => setGlobalSettings(p => ({ ...p, difficulty: v as any }))}>
+                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                <SelectContent>{DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <FolderOpen className="h-4 w-4 text-muted-foreground" /> Section
+                              </Label>
+                              <Select value={globalSettings.section} onValueChange={v => setGlobalSettings(p => ({ ...p, section: v }))}>
+                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                <SelectContent>{SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
                           </div>
-                          <Button size="sm" onClick={applyGlobalSettings} className="w-full h-8 text-xs">Apply to All Files</Button>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <FolderPlus className="h-4 w-4 text-muted-foreground" /> Content Location
+                            </Label>
+                            <StructureSelector value={globalSettings.structureLocation} onChange={loc => setGlobalSettings(p => ({ ...p, structureLocation: loc }))} placeholder="Select folder/category/section" className="w-full" />
+                            <p className="text-xs text-muted-foreground">All imported quizzes will be placed at this location</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <Tag className="h-4 w-4 text-muted-foreground" /> Tags (for search &amp; filtering)
+                            </Label>
+                            <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg border border-border bg-background">
+                              {globalSettings.tags.map(tag => (
+                                <Badge key={tag} variant="secondary" className="gap-1 pr-1 cursor-pointer hover:bg-destructive/20" onClick={() => removeGlobalTag(tag)}>
+                                  #{tag}<X className="h-3 w-3" />
+                                </Badge>
+                              ))}
+                              <Input
+                                value={globalTagInput}
+                                onChange={e => setGlobalTagInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addGlobalTag(globalTagInput) } }}
+                                onBlur={() => addGlobalTag(globalTagInput)}
+                                placeholder="Type and press Enter..."
+                                className="flex-1 min-w-[120px] border-0 shadow-none h-7 px-1 focus-visible:ring-0"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Press Enter or comma to add tags</p>
+                          </div>
+                          <Button onClick={applyGlobalSettings} className="w-full gap-2" variant="outline">
+                            <Sparkles className="h-4 w-4" /> Apply to All Pending Files
+                          </Button>
                         </div>
                       </CollapsibleContent>
                     </div>
