@@ -123,7 +123,7 @@ export function FeaturedSection({ featured }: FeaturedSectionProps) {
                     : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
                 }`}
               >
-                <Icon className={`h-4 w-4 sm:h-4.5 sm:w-4.5 ${isActive ? tab.color : ""}`} />
+                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? tab.color : ""}`} />
                 {tab.label}
               </button>
             )

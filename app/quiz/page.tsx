@@ -14,13 +14,11 @@ interface Quiz {
   title: string
   description: string
   category: string
-  timeLimit: number
+  time_limit: number
   questions: { id: string }[]
   enabled: boolean
-  createdAt: string
+  created_at: string
 }
-
-const STORAGE_KEY = "techvyro-quizzes"
 
 const categoryColors: Record<string, string> = {
   Mathematics: "bg-blue-500",
@@ -38,17 +36,14 @@ export default function QuizzesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const allQuizzes: Quiz[] = JSON.parse(saved)
-        // Only show enabled quizzes with questions
-        setQuizzes(allQuizzes.filter(q => q.enabled && q.questions.length > 0))
-      }
-    } catch (e) {
-      // Failed to load quizzes
-    }
-    setLoading(false)
+    fetch("/api/quizzes")
+      .then(r => r.json())
+      .then(data => {
+        const all: Quiz[] = data.quizzes || []
+        setQuizzes(all.filter(q => q.enabled && q.questions.length > 0))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   return (
@@ -56,7 +51,6 @@ export default function QuizzesPage() {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
-        {/* Hero Section */}
         <div className="text-center mb-8 sm:mb-12">
           <Badge className="mb-3 sm:mb-4 bg-primary/10 text-primary border-primary/20 text-xs sm:text-sm px-2.5 sm:px-3 py-1">
             <BookOpen className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
@@ -70,7 +64,6 @@ export default function QuizzesPage() {
           </p>
         </div>
 
-        {/* Quizzes Grid */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
@@ -132,7 +125,7 @@ export default function QuizzesPage() {
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>{Math.floor(quiz.timeLimit / 60)} min</span>
+                      <span>{Math.floor(quiz.time_limit / 60)} min</span>
                     </div>
                   </div>
                   

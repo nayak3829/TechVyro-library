@@ -152,9 +152,9 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
         <span>Back to Library</span>
       </Link>
 
-      <div className="grid gap-5 sm:gap-8 lg:grid-cols-3">
+      <div className="grid gap-5 sm:gap-8 md:grid-cols-3">
         {/* PDF Info Sidebar */}
-        <Card className="lg:col-span-1 h-fit border-border/50 overflow-hidden">
+        <Card className="md:col-span-1 h-fit border-border/50 overflow-hidden">
           {/* PDF Preview Header */}
           <div className="relative aspect-[4/3] bg-gradient-to-br from-primary/15 via-accent/10 to-primary/5 flex items-center justify-center overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_70%)]" />
@@ -278,7 +278,7 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
         </Card>
 
         {/* PDF Preview */}
-        <Card className="lg:col-span-2 border-border/50 overflow-hidden shadow-xl">
+        <Card className="md:col-span-2 border-border/50 overflow-hidden shadow-xl">
           <CardContent className="p-0">
             <div className="bg-gradient-to-r from-muted/50 to-muted/30 px-4 py-3 border-b border-border/50 flex items-center justify-between">
               <div className="flex items-center gap-3">

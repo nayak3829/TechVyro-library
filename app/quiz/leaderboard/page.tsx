@@ -20,13 +20,11 @@ interface LeaderboardEntry {
   correct: number
   wrong: number
   skipped: number
-  totalTime: number
-  quizId: string
-  quizTitle: string
-  timestamp: string
+  total_time: number
+  quiz_id: string
+  quiz_title: string
+  created_at: string
 }
-
-const LEADERBOARD_KEY = "techvyro-leaderboard"
 
 export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
@@ -34,15 +32,11 @@ export default function LeaderboardPage() {
   const [filter, setFilter] = useState<"all" | "today" | "week">("all")
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LEADERBOARD_KEY)
-      if (saved) {
-        setEntries(JSON.parse(saved))
-      }
-    } catch (e) {
-      // Silent fail
-    }
-    setLoading(false)
+    fetch("/api/quiz-results")
+      .then(r => r.json())
+      .then(data => setEntries(data.results || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   const formatTime = (seconds: number) => {
@@ -63,21 +57,15 @@ export default function LeaderboardPage() {
 
   const getFilteredEntries = () => {
     const now = new Date()
-    
     return entries.filter(entry => {
-      const entryDate = new Date(entry.timestamp)
-      
-      if (filter === "today") {
-        return entryDate.toDateString() === now.toDateString()
-      }
-      
+      const entryDate = new Date(entry.created_at)
+      if (filter === "today") return entryDate.toDateString() === now.toDateString()
       if (filter === "week") {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
         return entryDate >= weekAgo
       }
-      
       return true
-    }).sort((a, b) => b.percentage - a.percentage)
+    }).sort((a, b) => Number(b.percentage) - Number(a.percentage))
   }
 
   const filteredEntries = getFilteredEntries()
@@ -110,7 +98,6 @@ export default function LeaderboardPage() {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <Link 
             href="/quiz" 
@@ -156,7 +143,6 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
-        {/* Stats Summary */}
         {entries.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             <Card className="p-4 text-center">
@@ -167,28 +153,27 @@ export default function LeaderboardPage() {
             <Card className="p-4 text-center">
               <Target className="h-6 w-6 mx-auto text-green-500 mb-2" />
               <div className="text-2xl font-bold">
-                {entries.length > 0 ? Math.round(entries.reduce((sum, e) => sum + e.percentage, 0) / entries.length) : 0}%
+                {entries.length > 0 ? Math.round(entries.reduce((sum, e) => sum + Number(e.percentage), 0) / entries.length) : 0}%
               </div>
               <div className="text-xs text-muted-foreground">Avg Score</div>
             </Card>
             <Card className="p-4 text-center">
               <Star className="h-6 w-6 mx-auto text-amber-500 mb-2" />
               <div className="text-2xl font-bold">
-                {entries.length > 0 ? Math.max(...entries.map(e => e.percentage)) : 0}%
+                {entries.length > 0 ? Math.max(...entries.map(e => Number(e.percentage))) : 0}%
               </div>
               <div className="text-xs text-muted-foreground">Highest Score</div>
             </Card>
             <Card className="p-4 text-center">
               <Calendar className="h-6 w-6 mx-auto text-blue-500 mb-2" />
               <div className="text-2xl font-bold">
-                {entries.filter(e => new Date(e.timestamp).toDateString() === new Date().toDateString()).length}
+                {entries.filter(e => new Date(e.created_at).toDateString() === new Date().toDateString()).length}
               </div>
               <div className="text-xs text-muted-foreground">Today</div>
             </Card>
           </div>
         )}
 
-        {/* Leaderboard */}
         {loading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -205,28 +190,22 @@ export default function LeaderboardPage() {
                 : "Be the first to take a quiz and get on the leaderboard!"}
             </p>
             <Button asChild>
-              <Link href="/quiz">
-                Take a Quiz
-              </Link>
+              <Link href="/quiz">Take a Quiz</Link>
             </Button>
           </Card>
         ) : (
           <div className="space-y-3">
             {filteredEntries.map((entry, index) => {
               const style = getRankStyle(index)
-              
               return (
                 <Card 
                   key={entry.id}
                   className={`p-4 border-2 transition-all hover:scale-[1.01] ${style.bg}`}
                 >
                   <div className="flex items-center gap-4">
-                    {/* Rank */}
                     <div className="shrink-0 w-10 flex justify-center">
                       {style.icon}
                     </div>
-                    
-                    {/* User Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold truncate">{entry.name}</h3>
@@ -237,11 +216,9 @@ export default function LeaderboardPage() {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate">
-                        {entry.quizTitle}
+                        {entry.quiz_title}
                       </p>
                     </div>
-                    
-                    {/* Stats */}
                     <div className="hidden sm:flex items-center gap-6 text-sm">
                       <div className="text-center">
                         <div className="text-green-500 font-medium">{entry.correct}</div>
@@ -254,22 +231,20 @@ export default function LeaderboardPage() {
                       <div className="text-center">
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Clock className="h-3.5 w-3.5" />
-                          {formatTime(entry.totalTime)}
+                          {formatTime(entry.total_time)}
                         </div>
                         <div className="text-xs text-muted-foreground">Time</div>
                       </div>
                     </div>
-                    
-                    {/* Score */}
                     <div className="text-right shrink-0">
                       <div className={`text-2xl font-bold ${
-                        entry.percentage >= 70 ? "text-green-500" :
-                        entry.percentage >= 40 ? "text-amber-500" : "text-red-500"
+                        Number(entry.percentage) >= 70 ? "text-green-500" :
+                        Number(entry.percentage) >= 40 ? "text-amber-500" : "text-red-500"
                       }`}>
-                        {entry.percentage}%
+                        {Math.round(Number(entry.percentage))}%
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatDate(entry.timestamp)}
+                        {formatDate(entry.created_at)}
                       </div>
                     </div>
                   </div>
@@ -278,8 +253,6 @@ export default function LeaderboardPage() {
             })}
           </div>
         )}
-
-
       </main>
 
       <Footer />

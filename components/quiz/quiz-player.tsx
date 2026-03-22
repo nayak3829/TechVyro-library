@@ -29,7 +29,7 @@ interface QuizPlayerProps {
   onComplete?: (result: QuizResult) => void
 }
 
-const LEADERBOARD_KEY = "techvyro-leaderboard"
+const LEADERBOARD_KEY = "techvyro-leaderboard" // kept for theme only
 
 interface LeaderboardEntry {
   id: string
@@ -109,20 +109,30 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
       const savedTheme = localStorage.getItem("quiz-theme")
       if (savedTheme === "dark") setDarkMode(true)
       
-      // Load top leaderboard entries for this quiz
-      try {
-        const saved = localStorage.getItem(LEADERBOARD_KEY)
-        if (saved) {
-          const all: LeaderboardEntry[] = JSON.parse(saved)
+      // Load top leaderboard entries for this quiz from API
+      fetch("/api/quiz-results")
+        .then(r => r.json())
+        .then(data => {
+          const all: LeaderboardEntry[] = (data.results || []).map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            score: e.score,
+            percentage: Number(e.percentage),
+            correct: e.correct,
+            wrong: e.wrong,
+            skipped: e.skipped,
+            totalTime: e.total_time,
+            quizId: e.quiz_id,
+            quizTitle: e.quiz_title,
+            timestamp: e.created_at,
+          }))
           const forThisQuiz = all
             .filter(e => !quizId || e.quizId === quizId)
             .sort((a, b) => b.percentage - a.percentage)
             .slice(0, 5)
           setTopLeaderboard(forThisQuiz)
-        }
-      } catch (e) {
-        // Silent fail
-      }
+        })
+        .catch(() => {})
     }
   }, [quizId])
 
@@ -289,22 +299,31 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
         timestamp: new Date().toISOString()
       }
       
-      try {
-        const existing = localStorage.getItem(LEADERBOARD_KEY)
-        const entries: LeaderboardEntry[] = existing ? JSON.parse(existing) : []
-        entries.unshift(entry)
-        const trimmed = entries.slice(0, 100)
-        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(trimmed))
-        setSavedToLeaderboard(true)
-        
-        const forThisQuiz = trimmed
-          .filter(e => !quizId || e.quizId === quizId)
-          .sort((a, b) => b.percentage - a.percentage)
-          .slice(0, 5)
-        setTopLeaderboard(forThisQuiz)
-      } catch (e) {
-        // Silent fail
-      }
+      fetch("/api/quiz-results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: entry.id,
+          name: entry.name,
+          score: entry.score,
+          percentage: entry.percentage,
+          correct: entry.correct,
+          wrong: entry.wrong,
+          skipped: entry.skipped,
+          totalTime: entry.totalTime,
+          quizId: entry.quizId,
+          quizTitle: entry.quizTitle,
+          timestamp: entry.timestamp,
+        }),
+      })
+        .then(() => {
+          setSavedToLeaderboard(true)
+          setTopLeaderboard(prev => {
+            const updated = [entry, ...prev].sort((a, b) => b.percentage - a.percentage).slice(0, 5)
+            return updated
+          })
+        })
+        .catch(() => {})
     }
   }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete, playerName, questions.length, quizId, title])
 
@@ -354,23 +373,31 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
         timestamp: new Date().toISOString()
       }
       
-      try {
-        const existing = localStorage.getItem(LEADERBOARD_KEY)
-        const entries: LeaderboardEntry[] = existing ? JSON.parse(existing) : []
-        entries.unshift(entry)
-        const trimmed = entries.slice(0, 100)
-        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(trimmed))
-        setSavedToLeaderboard(true)
-        
-        // Refresh top leaderboard
-        const forThisQuiz = trimmed
-          .filter(e => !quizId || e.quizId === quizId)
-          .sort((a, b) => b.percentage - a.percentage)
-          .slice(0, 5)
-        setTopLeaderboard(forThisQuiz)
-      } catch (e) {
-        // Silent fail
-      }
+      fetch("/api/quiz-results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: entry.id,
+          name: entry.name,
+          score: entry.score,
+          percentage: entry.percentage,
+          correct: entry.correct,
+          wrong: entry.wrong,
+          skipped: entry.skipped,
+          totalTime: entry.totalTime,
+          quizId: entry.quizId,
+          quizTitle: entry.quizTitle,
+          timestamp: entry.timestamp,
+        }),
+      })
+        .then(() => {
+          setSavedToLeaderboard(true)
+          setTopLeaderboard(prev => {
+            const updated = [entry, ...prev].sort((a, b) => b.percentage - a.percentage).slice(0, 5)
+            return updated
+          })
+        })
+        .catch(() => {})
     }
   }
 

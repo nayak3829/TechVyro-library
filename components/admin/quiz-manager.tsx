@@ -85,8 +85,40 @@ interface Quiz {
   }
 }
 
-const STORAGE_KEY = "techvyro-quizzes"
-const LEADERBOARD_KEY = "techvyro-leaderboard"
+const STORAGE_KEY = "techvyro-quizzes" // legacy - no longer used
+const LEADERBOARD_KEY = "techvyro-leaderboard" // legacy - no longer used
+
+function getAdminToken(): string {
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem("admin_token") || ""
+  }
+  return ""
+}
+
+function adminHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${getAdminToken()}`,
+  }
+}
+
+function dbRowToQuiz(row: any): Quiz {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || "",
+    category: row.category || "General",
+    timeLimit: row.time_limit || 1200,
+    questions: row.questions || [],
+    enabled: row.enabled ?? true,
+    createdAt: row.created_at,
+    tags: row.tags || [],
+    visibility: row.visibility || "public",
+    section: row.section || "General",
+    difficulty: row.difficulty || "medium",
+    structureLocation: row.structure_location || undefined,
+  }
+}
 
 interface LeaderboardEntry {
   id: string
@@ -183,28 +215,73 @@ export function QuizManager() {
   })
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      try {
-        setQuizzes(JSON.parse(saved))
-      } catch (e) {
-        // Silent fail
-      }
-    }
-    
-    const savedLeaderboard = localStorage.getItem(LEADERBOARD_KEY)
-    if (savedLeaderboard) {
-      try {
-        setLeaderboard(JSON.parse(savedLeaderboard))
-      } catch (e) {
-        // Failed to parse
-      }
-    }
+    // Load quizzes from API
+    fetch("/api/quizzes")
+      .then(r => r.json())
+      .then(data => {
+        if (data.quizzes) setQuizzes(data.quizzes.map(dbRowToQuiz))
+      })
+      .catch(() => {})
+
+    // Load leaderboard from API
+    fetch("/api/quiz-results")
+      .then(r => r.json())
+      .then(data => {
+        if (data.results) {
+          setLeaderboard(data.results.map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            score: e.score,
+            percentage: Number(e.percentage),
+            correct: e.correct,
+            wrong: e.wrong,
+            skipped: e.skipped,
+            totalTime: e.total_time,
+            quizId: e.quiz_id,
+            quizTitle: e.quiz_title,
+            timestamp: e.created_at,
+          })))
+        }
+      })
+      .catch(() => {})
   }, [])
 
-  const saveQuizzes = (updated: Quiz[]) => {
+  // saveQuizzes: diffs old vs new state, calls API for changes, updates local state
+  const saveQuizzes = async (updated: Quiz[]) => {
+    const prev = quizzes
     setQuizzes(updated)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+
+    const prevMap = new Map(prev.map(q => [q.id, q]))
+    const updatedMap = new Map(updated.map(q => [q.id, q]))
+
+    const toCreate = updated.filter(q => !prevMap.has(q.id))
+    const toDelete = prev.filter(q => !updatedMap.has(q.id))
+    const toUpdate = updated.filter(q => {
+      const old = prevMap.get(q.id)
+      return old && JSON.stringify(old) !== JSON.stringify(q)
+    })
+
+    const headers = adminHeaders()
+
+    await Promise.all([
+      ...toCreate.map(q =>
+        fetch("/api/quizzes", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(q),
+        }).catch(() => {})
+      ),
+      ...toDelete.map(q =>
+        fetch(`/api/quizzes/${q.id}`, { method: "DELETE", headers }).catch(() => {})
+      ),
+      ...toUpdate.map(q =>
+        fetch(`/api/quizzes/${q.id}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(q),
+        }).catch(() => {})
+      ),
+    ])
   }
 
   const generateId = () => Math.random().toString(36).substr(2, 9)

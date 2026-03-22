@@ -22,13 +22,11 @@ interface Quiz {
   title: string
   description: string
   category: string
-  timeLimit: number
+  time_limit: number
   questions: Question[]
   enabled: boolean
-  createdAt: string
+  created_at: string
 }
-
-const STORAGE_KEY = "techvyro-quizzes"
 
 export default function QuizPage() {
   const params = useParams()
@@ -38,30 +36,24 @@ export default function QuizPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const quizzes: Quiz[] = JSON.parse(saved)
-        const found = quizzes.find(q => q.id === id)
-        
-        if (found) {
-          if (!found.enabled) {
-            setError("This quiz is currently disabled")
-          } else if (found.questions.length === 0) {
-            setError("This quiz has no questions yet")
-          } else {
-            setQuiz(found)
-          }
-        } else {
+    fetch(`/api/quizzes/${id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error || !data.quiz) {
           setError("Quiz not found")
+          return
         }
-      } else {
-        setError("No quizzes available")
-      }
-    } catch (e) {
-      setError("Failed to load quiz")
-    }
-    setLoading(false)
+        const q: Quiz = data.quiz
+        if (!q.enabled) {
+          setError("This quiz is currently disabled")
+        } else if (!q.questions || q.questions.length === 0) {
+          setError("This quiz has no questions yet")
+        } else {
+          setQuiz(q)
+        }
+      })
+      .catch(() => setError("Failed to load quiz"))
+      .finally(() => setLoading(false))
   }, [id])
 
   if (loading) {
@@ -100,7 +92,6 @@ export default function QuizPage() {
     )
   }
 
-  // Transform questions to match QuizPlayer format
   const transformedQuestions = quiz.questions.map(q => ({
     qid: q.id,
     question: q.question,
@@ -115,7 +106,7 @@ export default function QuizPage() {
       title={quiz.title}
       quizId={quiz.id}
       questions={transformedQuestions}
-      timeLimit={quiz.timeLimit}
+      timeLimit={quiz.time_limit}
     />
   )
 }
