@@ -61,8 +61,7 @@ function ComponentLoader({ text }: { text: string }) {
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: Activity, group: "main" },
-  { id: "upload", label: "Upload PDF", icon: Upload, group: "content" },
-  { id: "pdfs", label: "All PDFs", icon: FileText, group: "content" },
+  { id: "pdfs", label: "PDF Manager", icon: FileText, group: "content" },
   { id: "structure", label: "Structure", icon: Layers, group: "content" },
   { id: "categories", label: "Categories", icon: Database, group: "content" },
   { id: "quizzes", label: "Quizzes", icon: Zap, group: "content" },
@@ -88,6 +87,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
+  const [pdfSubTab, setPdfSubTab] = useState<"import" | "library">("import")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [lastRefreshed, setLastRefreshed] = useState(new Date())
@@ -139,8 +139,15 @@ export default function AdminPage() {
     window.location.reload()
   }
 
-  function navigate(tab: string) {
-    setActiveTab(tab)
+  function navigate(tab: string, pdfSub?: "import" | "library") {
+    // "upload" is now unified inside "pdfs" PDF Manager
+    if (tab === "upload") {
+      setActiveTab("pdfs")
+      setPdfSubTab("import")
+    } else {
+      setActiveTab(tab)
+      if (tab === "pdfs" && pdfSub) setPdfSubTab(pdfSub)
+    }
     setSidebarOpen(false)
   }
 
@@ -601,18 +608,139 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── Upload ── */}
-          {activeTab === "upload" && (
-            <PageSection icon={Upload} title="Upload New PDFs" description="Add new PDF documents to your library. Supports parallel uploads up to 50MB each.">
-              <PDFUploadForm categories={categories} onSuccess={fetchData} />
-            </PageSection>
-          )}
-
-          {/* ── PDFs ── */}
+          {/* ── PDF Manager (unified upload + library) ── */}
           {activeTab === "pdfs" && (
-            <PageSection icon={FileText} title="All PDFs" description="View, edit, and manage all uploaded PDFs. Use search and filters to find specific files.">
-              <PDFList pdfs={pdfs} categories={categories} loading={loading} onDelete={fetchData} onUpdate={fetchData} />
-            </PageSection>
+            <div className="max-w-7xl mx-auto space-y-5">
+              {/* Header row */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    PDF Manager
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Import new files and manage your entire library in one place
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 rounded-full px-3 py-1.5">
+                    <FileText className="h-3 w-3" />
+                    {pdfs.length} PDFs
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 rounded-full px-3 py-1.5">
+                    <HardDrive className="h-3 w-3" />
+                    {formatBytes(totalStorage)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-tab switcher */}
+              <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-xl w-fit border border-border/40">
+                <button
+                  onClick={() => setPdfSubTab("import")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    pdfSubTab === "import"
+                      ? "bg-background text-foreground shadow-sm border border-border/60"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Import Files
+                </button>
+                <button
+                  onClick={() => setPdfSubTab("library")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    pdfSubTab === "library"
+                      ? "bg-background text-foreground shadow-sm border border-border/60"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  All PDFs
+                  {pdfs.length > 0 && (
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                      pdfSubTab === "library" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {pdfs.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Import Files panel */}
+              {pdfSubTab === "import" && (
+                <Card className="border-border/50">
+                  <CardHeader className="pb-2 border-b border-border/40">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                          <Upload className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">Import New Files</CardTitle>
+                          <CardDescription className="text-xs mt-0.5">
+                            PDF &amp; HTML supported · Auto-split over 50MB · Parallel upload
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 text-xs text-muted-foreground hidden sm:flex"
+                        onClick={() => { fetchData(); setPdfSubTab("library") }}
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        View Library
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <PDFUploadForm
+                      categories={categories}
+                      onSuccess={() => { fetchData(); setPdfSubTab("library") }}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* All PDFs panel */}
+              {pdfSubTab === "library" && (
+                <Card className="border-border/50">
+                  <CardHeader className="pb-2 border-b border-border/40">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10">
+                          <FileText className="h-4 w-4 text-accent" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">Library</CardTitle>
+                          <CardDescription className="text-xs mt-0.5">
+                            Search, filter, edit metadata, replace files, delete entries
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="gap-2 text-xs hidden sm:flex"
+                        onClick={() => setPdfSubTab("import")}
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import Files
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <PDFList
+                      pdfs={pdfs}
+                      categories={categories}
+                      loading={loading}
+                      onDelete={fetchData}
+                      onUpdate={fetchData}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
 
           {/* ── Structure ── */}
