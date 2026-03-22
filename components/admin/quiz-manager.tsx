@@ -155,8 +155,7 @@ export function QuizManager() {
   const [editingQuestion, setEditingQuestion] = useState<{ quizId: string; question: Question } | null>(null)
   const [showQuizDialog, setShowQuizDialog] = useState(false)
   const [showQuestionDialog, setShowQuestionDialog] = useState(false)
-  const [showImportDialog, setShowImportDialog] = useState(false)
-  const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false)
+  const [mainTab, setMainTab] = useState<"quizzes" | "import" | "leaderboard">("quizzes")
   const [importHtml, setImportHtml] = useState("")
   const [expandedQuizzes, setExpandedQuizzes] = useState<Set<string>>(new Set())
   const [parsedPreview, setParsedPreview] = useState<{ title: string; count: number } | null>(null)
@@ -398,7 +397,7 @@ export function QuizManager() {
       }))
       if (!imported.length) { toast.error("No valid quizzes found in JSON file"); return }
       saveQuizzes([...quizzes, ...imported])
-      setShowImportDialog(false)
+      setMainTab("quizzes"); resetImportDialog()
       toast.success(`Imported ${imported.length} quiz${imported.length > 1 ? "zes" : ""}`)
     } catch {
       toast.error("Invalid JSON file")
@@ -558,7 +557,7 @@ export function QuizManager() {
       ...toImport,
     ]
     saveQuizzes(updatedQuizzes)
-    setShowImportDialog(false); resetImportDialog()
+    setMainTab("quizzes"); resetImportDialog()
     toast.success(`Imported ${toImport.length} quiz${toImport.length !== 1 ? "zes" : ""}${toReplace.length ? `, replaced ${toReplace.length}` : ""}`)
   }
 
@@ -889,7 +888,7 @@ export function QuizManager() {
       ...toImport,
     ]
     saveQuizzes(updated)
-    setUploadEntries([]); setShowImportDialog(false)
+    setUploadEntries([]); setMainTab("quizzes")
     toast.success(`Imported ${toImport.length} quiz${toImport.length !== 1 ? "zes" : ""}${toReplace.length ? `, replaced ${toReplace.length}` : ""}`)
   }
 
@@ -935,16 +934,64 @@ export function QuizManager() {
   return (
     <div className="space-y-4 sm:space-y-6">
 
-      {/* Top bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Sub-tab switcher */}
+      <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-xl w-fit border border-border/40">
+        <button
+          onClick={() => setMainTab("quizzes")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            mainTab === "quizzes"
+              ? "bg-background text-foreground shadow-sm border border-border/60"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <FileText className="h-3.5 w-3.5" />
+          All Quizzes
+          {quizzes.length > 0 && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+              mainTab === "quizzes" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+            }`}>{quizzes.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setMainTab("import")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            mainTab === "import"
+              ? "bg-background text-foreground shadow-sm border border-border/60"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Upload className="h-3.5 w-3.5" />
+          Import
+        </button>
+        <button
+          onClick={() => setMainTab("leaderboard")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            mainTab === "leaderboard"
+              ? "bg-background text-foreground shadow-sm border border-border/60"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Trophy className="h-3.5 w-3.5" />
+          Leaderboard
+          {leaderboard.length > 0 && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+              mainTab === "leaderboard" ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"
+            }`}>{leaderboard.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* ── All Quizzes Tab ────────────────────────────────────────────────── */}
+      {mainTab === "quizzes" && (
+      <div className="space-y-4">
+
+      {/* Action bar */}
+      <div className="flex items-center gap-2 flex-wrap">
         <Button onClick={handleAddQuiz} size="sm" className="h-8 sm:h-9 text-xs sm:text-sm">
           <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Quiz
         </Button>
-        <Button variant="outline" onClick={() => setShowImportDialog(true)} size="sm" className="h-8 sm:h-9 text-xs sm:text-sm">
-          <Upload className="h-3.5 w-3.5 mr-1.5" /> Import
-        </Button>
-        <Button variant="outline" onClick={() => setShowLeaderboardDialog(true)} size="sm" className="h-8 sm:h-9 text-xs sm:text-sm">
-          <Trophy className="h-3.5 w-3.5 mr-1.5" /> Leaderboard ({leaderboard.length})
+        <Button variant="outline" size="sm" onClick={() => setMainTab("import")} className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5">
+          <Upload className="h-3.5 w-3.5" /> Import
         </Button>
         {quizzes.length > 0 && (
           <Button variant="outline" size="sm" onClick={toggleSelectAll} className="ml-auto h-8 text-xs gap-1.5">
@@ -1020,7 +1067,7 @@ export function QuizManager() {
                 <p className="text-sm text-muted-foreground mb-4">Create your first quiz or import from HTML/JSON</p>
                 <div className="flex justify-center gap-3">
                   <Button onClick={handleAddQuiz} size="sm">Create Quiz</Button>
-                  <Button variant="outline" onClick={() => setShowImportDialog(true)} size="sm">Import</Button>
+                  <Button variant="outline" onClick={() => setMainTab("import")} size="sm">Import</Button>
                 </div>
               </>
             ) : (
@@ -1140,6 +1187,9 @@ export function QuizManager() {
           Showing {filteredQuizzes.length} of {quizzes.length} quizzes
         </p>
       )}
+
+      </div>
+      )} {/* end mainTab === "quizzes" */}
 
       {/* ── Quiz Dialog ──────────────────────────────────────────────────────── */}
       <Dialog open={showQuizDialog} onOpenChange={setShowQuizDialog}>
@@ -1444,16 +1494,28 @@ export function QuizManager() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Import Dialog ────────────────────────────────────────────────────── */}
-      <Dialog open={showImportDialog} onOpenChange={open => { setShowImportDialog(open); if (!open) resetImportDialog() }}>
-        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
-          <DialogHeader className="shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
-              <Upload className="h-4 w-4 text-primary" /> Import Quizzes
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pr-1">
+      {/* ── Import Panel ─────────────────────────────────────────────────────── */}
+      {mainTab === "import" && (
+      <Card className="border-border/50">
+        <CardHeader className="pb-2 border-b border-border/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                <Upload className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Import Quizzes</CardTitle>
+                <CardDescription className="text-xs mt-0.5">HTML &amp; JSON supported · Per-file settings · Conflict resolution</CardDescription>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" className="gap-2 text-xs text-muted-foreground hidden sm:flex"
+              onClick={() => { setMainTab("quizzes"); resetImportDialog() }}>
+              <FileText className="h-3.5 w-3.5" /> View All Quizzes
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-5">
+          <div className="space-y-4">
             <Tabs value={importTab} onValueChange={v => setImportTab(v as "html"|"json")}>
               <TabsList className="w-full grid grid-cols-2">
                 <TabsTrigger value="html" className="text-xs sm:text-sm">From HTML File</TabsTrigger>
@@ -1984,75 +2046,98 @@ export function QuizManager() {
             </Tabs>
           </div>
 
-          <DialogFooter className="shrink-0 border-t pt-3 gap-2 flex-col sm:flex-row">
-            <Button variant="outline" onClick={() => { setShowImportDialog(false); resetImportDialog() }} size="sm" className="w-full sm:w-auto text-xs">Cancel</Button>
-            {importTab === "html" && htmlReadyCount > 0 ? (
-              <Button onClick={importAllReady} size="sm" className="w-full sm:w-auto text-xs">
-                <Upload className="h-3.5 w-3.5 mr-1.5" />
-                Import {htmlReadyCount} Quiz{htmlReadyCount !== 1 ? "zes" : ""}
-                {htmlConflictCount > 0 && <span className="ml-1.5 text-[10px] opacity-80">({htmlConflictCount} conflict{htmlConflictCount !== 1 ? "s" : ""})</span>}
+            <div className="flex items-center gap-2 pt-4 border-t border-border/40 flex-wrap">
+              <Button variant="outline" onClick={() => { setMainTab("quizzes"); resetImportDialog() }} size="sm" className="text-xs gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Back to Quizzes
               </Button>
-            ) : importTab === "json" && jsonReadyCount > 0 ? (
-              <Button onClick={importAllJsonQuizzes} size="sm" className="w-full sm:w-auto text-xs bg-blue-500 hover:bg-blue-600">
-                <Upload className="h-3.5 w-3.5 mr-1.5" />
-                Import {jsonReadyCount} Quiz{jsonReadyCount !== 1 ? "zes" : ""}
-                {jsonConflictCount > 0 && <span className="ml-1.5 text-[10px] opacity-80">({jsonConflictCount} conflict{jsonConflictCount !== 1 ? "s" : ""})</span>}
-              </Button>
-            ) : (
-              <Button disabled size="sm" className="w-full sm:w-auto text-xs"><Upload className="h-3.5 w-3.5 mr-1.5" /> Import</Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Leaderboard Dialog ──────────────────────────────────────────────── */}
-      <Dialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog}>
-        <DialogContent className="max-w-2xl w-[95vw] max-h-[85vh] flex flex-col overflow-hidden">
-          <DialogHeader className="shrink-0">
-            <DialogTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-primary" /> Leaderboard Management</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {leaderboard.length === 0 ? (
-              <div className="text-center py-12"><Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" /><p className="text-muted-foreground">No leaderboard entries yet</p></div>
-            ) : (
-              <div className="space-y-2">
-                {leaderboard.map((entry, idx) => (
-                  <div key={entry.id} className={`flex items-center gap-3 p-3 rounded-lg border ${idx===0?"bg-yellow-500/10 border-yellow-500/30":idx===1?"bg-gray-400/10 border-gray-400/30":idx===2?"bg-amber-700/10 border-amber-700/30":"bg-card border-border/50"}`}>
-                    <div className="shrink-0 w-8 text-center">{idx===0 ? <Crown className="h-5 w-5 text-yellow-500 mx-auto" /> : <span className="font-bold text-muted-foreground">{idx+1}</span>}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{entry.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{entry.quizTitle}</p>
-                    </div>
-                    <div className="text-right shrink-0 mr-2">
-                      <p className="font-bold text-primary">{entry.percentage}%</p>
-                      <p className="text-xs text-muted-foreground">{new Date(entry.timestamp).toLocaleDateString()}</p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        fetch(`/api/quiz-results/${entry.id}`, { method: "DELETE", headers: adminHeaders() })
-                          .then(r => r.json()).then(d => { if (d.success) { setLeaderboard(prev => prev.filter(e=>e.id!==entry.id)); toast.success("Entry deleted") } else toast.error("Failed") })
-                          .catch(() => toast.error("Failed"))
-                      }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+              <div className="ml-auto flex items-center gap-2">
+                {importTab === "html" && htmlReadyCount > 0 ? (
+                  <Button onClick={importAllReady} size="sm" className="text-xs">
+                    <Upload className="h-3.5 w-3.5 mr-1.5" />
+                    Import {htmlReadyCount} Quiz{htmlReadyCount !== 1 ? "zes" : ""}
+                    {htmlConflictCount > 0 && <span className="ml-1.5 text-[10px] opacity-80">({htmlConflictCount} conflict{htmlConflictCount !== 1 ? "s" : ""})</span>}
+                  </Button>
+                ) : importTab === "json" && jsonReadyCount > 0 ? (
+                  <Button onClick={importAllJsonQuizzes} size="sm" className="text-xs bg-blue-500 hover:bg-blue-600">
+                    <Upload className="h-3.5 w-3.5 mr-1.5" />
+                    Import {jsonReadyCount} Quiz{jsonReadyCount !== 1 ? "zes" : ""}
+                    {jsonConflictCount > 0 && <span className="ml-1.5 text-[10px] opacity-80">({jsonConflictCount} conflict{jsonConflictCount !== 1 ? "s" : ""})</span>}
+                  </Button>
+                ) : (
+                  <Button disabled size="sm" className="text-xs"><Upload className="h-3.5 w-3.5 mr-1.5" /> Import</Button>
+                )}
               </div>
-            )}
-          </div>
-          <DialogFooter className="shrink-0 border-t pt-4 gap-2 flex-col sm:flex-row">
-            {leaderboard.length > 0 && (
-              <Button variant="destructive" onClick={() => {
-                if (!confirm("Clear all leaderboard entries?")) return
-                fetch("/api/quiz-results", { method: "DELETE", headers: adminHeaders() }).then(r=>r.json()).then(d => { if (d.success) { setLeaderboard([]); toast.success("Leaderboard cleared") } else toast.error("Failed") }).catch(()=>toast.error("Failed"))
-              }} className="w-full sm:w-auto">
-                <Trash2 className="h-4 w-4 mr-2" /> Clear All
+            </div>
+        </CardContent>
+      </Card>
+      )} {/* end mainTab === "import" */}
+
+      {/* ── Leaderboard Panel ─────────────────────────────────────────────────── */}
+      {mainTab === "leaderboard" && (
+      <Card className="border-border/50">
+        <CardHeader className="pb-2 border-b border-border/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                <Trophy className="h-4 w-4 text-amber-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Leaderboard</CardTitle>
+                <CardDescription className="text-xs mt-0.5">{leaderboard.length} total entries · Top scores across all quizzes</CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {leaderboard.length > 0 && (
+                <Button variant="destructive" size="sm" className="gap-1.5 text-xs hidden sm:flex"
+                  onClick={() => {
+                    if (!confirm("Clear all leaderboard entries?")) return
+                    fetch("/api/quiz-results", { method: "DELETE", headers: adminHeaders() }).then(r=>r.json()).then(d => { if (d.success) { setLeaderboard([]); toast.success("Leaderboard cleared") } else toast.error("Failed") }).catch(()=>toast.error("Failed"))
+                  }}>
+                  <Trash2 className="h-3.5 w-3.5" /> Clear All
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" className="gap-2 text-xs text-muted-foreground hidden sm:flex"
+                onClick={() => setMainTab("quizzes")}>
+                <FileText className="h-3.5 w-3.5" /> View All Quizzes
               </Button>
-            )}
-            <Button variant="outline" onClick={() => setShowLeaderboardDialog(false)} className="w-full sm:w-auto">Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-5">
+          {leaderboard.length === 0 ? (
+            <div className="text-center py-16">
+              <Users className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+              <p className="font-medium text-muted-foreground">No leaderboard entries yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Entries appear here after users complete quizzes</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {leaderboard.map((entry, idx) => (
+                <div key={entry.id} className={`flex items-center gap-3 p-3 rounded-lg border ${idx===0?"bg-yellow-500/10 border-yellow-500/30":idx===1?"bg-gray-400/10 border-gray-400/30":idx===2?"bg-amber-700/10 border-amber-700/30":"bg-card border-border/50"}`}>
+                  <div className="shrink-0 w-8 text-center">{idx===0 ? <Crown className="h-5 w-5 text-yellow-500 mx-auto" /> : <span className="font-bold text-muted-foreground text-sm">{idx+1}</span>}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{entry.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{entry.quizTitle}</p>
+                  </div>
+                  <div className="text-right shrink-0 mr-2">
+                    <p className="font-bold text-primary">{entry.percentage}%</p>
+                    <p className="text-xs text-muted-foreground">{new Date(entry.timestamp).toLocaleDateString()}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      fetch(`/api/quiz-results/${entry.id}`, { method: "DELETE", headers: adminHeaders() })
+                        .then(r => r.json()).then(d => { if (d.success) { setLeaderboard(prev => prev.filter(e=>e.id!==entry.id)); toast.success("Entry deleted") } else toast.error("Failed") })
+                        .catch(() => toast.error("Failed"))
+                    }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      )} {/* end mainTab === "leaderboard" */}
 
       {/* ── Bulk Move Dialog ────────────────────────────────────────────────── */}
       <Dialog open={showBulkMoveDialog} onOpenChange={setShowBulkMoveDialog}>

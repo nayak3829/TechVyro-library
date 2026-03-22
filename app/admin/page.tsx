@@ -759,9 +759,27 @@ export default function AdminPage() {
 
           {/* ── Quizzes ── */}
           {activeTab === "quizzes" && (
-            <PageSection icon={Zap} title="Quiz Management" description="Create and manage quizzes. Import from HTML or create from scratch. Quizzes display with TechVyro branding.">
+            <div className="max-w-7xl mx-auto space-y-5">
+              {/* Header row */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-primary" />
+                    Quiz Manager
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Create, import, and manage quizzes — all in one place
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 rounded-full px-3 py-1.5">
+                    <Zap className="h-3 w-3" />
+                    {quizCount} Quizzes
+                  </div>
+                </div>
+              </div>
               <QuizManager />
-            </PageSection>
+            </div>
           )}
 
           {/* ── Reviews ── */}
