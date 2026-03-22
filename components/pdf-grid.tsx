@@ -268,7 +268,7 @@ export function PDFGrid({ pdfs, categories }: PDFGridProps) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="bottom" className="h-[70vh]">
-              <SheetHeader>
+                <SheetHeader>
                 <SheetTitle>Filter & Sort</SheetTitle>
                 <SheetDescription>Customize how PDFs are displayed</SheetDescription>
               </SheetHeader>

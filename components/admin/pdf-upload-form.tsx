@@ -19,6 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { toast } from "sonner"
 import type { Category } from "@/lib/types"
 import { InlineStructureEditor } from "./inline-structure-editor"
+import { StructureSelector } from "./structure-selector"
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB in bytes
 const MAX_PARALLEL_UPLOADS = 8
@@ -31,6 +32,11 @@ interface FileEntry {
   title: string
   description: string
   categoryId: string
+  structureLocation: {
+    folderId: string
+    categoryId: string
+    sectionId: string
+  }
   tags: string[]
   visibility: VisibilityType
   scheduledAt: string | null
@@ -76,6 +82,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
   const [globalVisibility, setGlobalVisibility] = useState<VisibilityType>("public")
   const [globalTags, setGlobalTags] = useState<string[]>([])
   const [globalTagInput, setGlobalTagInput] = useState("")
+  const [globalStructureLocation, setGlobalStructureLocation] = useState<{ folderId: string; categoryId: string; sectionId: string }>({ folderId: "", categoryId: "", sectionId: "" })
   const [isUploading, setIsUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
@@ -112,6 +119,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         title,
         description: "",
         categoryId: globalCategory,
+        structureLocation: { ...globalStructureLocation },
         tags: [...globalTags],
         visibility: globalVisibility,
         scheduledAt: null,
@@ -166,6 +174,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         categoryId: globalCategory || e.categoryId,
         visibility: globalVisibility,
         tags: [...new Set([...e.tags, ...globalTags])],
+        structureLocation: globalStructureLocation.sectionId ? { ...globalStructureLocation } : e.structureLocation,
       } : e))
     )
     toast.success("Global settings applied to all pending files")
@@ -467,6 +476,21 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                   </div>
                 </div>
 
+                {/* Content Structure Location */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                    Content Location
+                  </Label>
+                  <StructureSelector
+                    value={globalStructureLocation}
+                    onChange={setGlobalStructureLocation}
+                    placeholder="Select folder/category/section"
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">All new PDFs will be added to this location</p>
+                </div>
+
                 {/* Tags Input */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium flex items-center gap-2">
@@ -649,26 +673,15 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                   )}
                 </div>
 
-                {/* Category Select */}
-                <Select
-                  value={entry.categoryId}
-                  onValueChange={(v) => updateEntry(entry.id, { categoryId: v })}
-                  disabled={entry.status !== "pending"}
-                >
-                  <SelectTrigger className="w-32 h-9 text-xs">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
-                          {cat.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Structure Location Selector */}
+                {entry.status === "pending" && (
+                  <StructureSelector
+                    value={entry.structureLocation}
+                    onChange={(location) => updateEntry(entry.id, { structureLocation: location })}
+                    placeholder="Select location"
+                    className="w-auto max-w-[200px] sm:max-w-[280px]"
+                  />
+                )}
 
                 {/* Actions */}
                 {entry.status === "pending" && (
