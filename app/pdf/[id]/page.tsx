@@ -2,7 +2,10 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import { Header } from "@/components/header"
 import { PDFViewer } from "@/components/pdf-viewer"
+import { PageAutoRefresh } from "@/components/page-auto-refresh"
 import type { PDF } from "@/lib/types"
+
+export const revalidate = 30
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -57,6 +60,7 @@ export default async function PDFDetailPage({ params }: PageProps) {
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         <PDFViewer pdf={pdf} />
       </main>
+      <PageAutoRefresh interval={60000} label="Live" showToast={false} />
     </div>
   )
 }

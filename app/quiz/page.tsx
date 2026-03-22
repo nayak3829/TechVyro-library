@@ -1,16 +1,17 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { PageAutoRefresh } from "@/components/page-auto-refresh"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
   Clock, FileText, Play, BookOpen, ArrowRight, Search, 
   Trophy, X, ArrowUpDown, Zap, Target, Flame, ChevronRight,
-  Brain, Sparkles, ListFilter
+  Brain, Sparkles, ListFilter, Wifi
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -52,23 +53,34 @@ const sortOptions = [
   { value: "shortest", label: "Shortest Time" },
 ]
 
+const REFRESH_INTERVAL = 2 * 60 * 1000
+
 export default function QuizzesPage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("All")
   const [sortBy, setSortBy] = useState("newest")
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const fetchQuizzes = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true)
+    try {
+      const res = await fetch("/api/quizzes", { cache: "no-store" })
+      const data = await res.json()
+      const all: Quiz[] = data.quizzes || []
+      setQuizzes(all.filter(q => q.enabled && q.questions.length > 0))
+      setLastUpdated(new Date())
+    } catch {}
+    if (showLoading) setLoading(false)
+  }, [])
 
   useEffect(() => {
-    fetch("/api/quizzes")
-      .then(r => r.json())
-      .then(data => {
-        const all: Quiz[] = data.quizzes || []
-        setQuizzes(all.filter(q => q.enabled && q.questions.length > 0))
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    fetchQuizzes(true)
+    timerRef.current = setInterval(() => fetchQuizzes(false), REFRESH_INTERVAL)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [fetchQuizzes])
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(quizzes.map(q => q.category).filter(Boolean)))
@@ -354,6 +366,12 @@ export default function QuizzesPage() {
       </main>
 
       <Footer />
+      <PageAutoRefresh
+        interval={REFRESH_INTERVAL}
+        label="Live"
+        showToast={true}
+        onRefresh={async () => { await fetchQuizzes(false) }}
+      />
     </div>
   )
 }

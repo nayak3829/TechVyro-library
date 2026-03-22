@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { PageAutoRefresh } from "@/components/page-auto-refresh"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { 
@@ -32,18 +33,29 @@ const FILTERS = [
   { key: "today", label: "Today" },
 ]
 
+const REFRESH_INTERVAL = 60 * 1000
+
 export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "today" | "week">("all")
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const fetchEntries = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true)
+    try {
+      const res = await fetch("/api/quiz-results", { cache: "no-store" })
+      const data = await res.json()
+      setEntries(data.results || [])
+    } catch {}
+    if (showLoading) setLoading(false)
+  }, [])
 
   useEffect(() => {
-    fetch("/api/quiz-results")
-      .then(r => r.json())
-      .then(data => setEntries(data.results || []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    fetchEntries(true)
+    timerRef.current = setInterval(() => fetchEntries(false), REFRESH_INTERVAL)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [fetchEntries])
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
@@ -332,6 +344,12 @@ export default function LeaderboardPage() {
       </main>
 
       <Footer />
+      <PageAutoRefresh
+        interval={REFRESH_INTERVAL}
+        label="Live Rankings"
+        showToast={true}
+        onRefresh={async () => { await fetchEntries(false) }}
+      />
     </div>
   )
 }

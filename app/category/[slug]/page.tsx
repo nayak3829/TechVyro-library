@@ -2,11 +2,14 @@ import { Suspense } from "react"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { Header } from "@/components/header"
 import { CategoryPDFList } from "@/components/category-pdf-list"
+import { PageAutoRefresh } from "@/components/page-auto-refresh"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, FolderOpen, BookOpen, TrendingUp, Search } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { PDF, Category } from "@/lib/types"
+
+export const revalidate = 30
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -198,6 +201,7 @@ export default async function CategoryPage({ params }: PageProps) {
           <CategoryPDFList pdfs={pdfs} categoryName={category.name} />
         </Suspense>
       </main>
+      <PageAutoRefresh interval={60000} label="Live" showToast={false} />
     </div>
   )
 }
