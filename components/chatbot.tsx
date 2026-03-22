@@ -302,13 +302,6 @@ export function Chatbot() {
 
       {/* ── Floating Trigger Button — Advanced Design ── */}
       <div className="relative">
-        {/* Animated glow ring */}
-        {!open && (
-          <>
-            <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 opacity-40 animate-ping scale-110" style={{ animationDuration: "2.5s" }} />
-            <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-500 opacity-20 animate-ping scale-125" style={{ animationDuration: "2.5s", animationDelay: "0.5s" }} />
-          </>
-        )}
 
         <button
           onClick={() => { setOpen(o => !o); setUnread(0) }}
@@ -344,17 +337,6 @@ export function Chatbot() {
           )}
         </button>
 
-        {/* "Ask AI" tooltip label */}
-        {!open && (
-          <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-background border border-border/60 shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-[11px] font-semibold text-foreground">Ask AI</span>
-            </div>
-            {/* Arrow */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-2 h-2 bg-background border-r border-t border-border/60 rotate-45" />
-          </div>
-        )}
       </div>
     </div>
   )
