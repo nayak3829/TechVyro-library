@@ -57,8 +57,8 @@ export async function PUT(request: Request) {
     // Use admin client (service role key) to bypass RLS for write operations
     const supabase = createAdminClient()
 
-    // Ensure table exists before upserting
-    await supabase.rpc("create_site_settings_if_not_exists").catch(() => {})
+    // Ensure table exists before upserting (ignore errors if RPC doesn't exist)
+    try { await supabase.rpc("create_site_settings_if_not_exists") } catch { /* ignore */ }
 
     const entries = Object.entries(body as Record<string, unknown>).map(([key, value]) => ({
       key,
