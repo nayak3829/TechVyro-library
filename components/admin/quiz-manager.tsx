@@ -1828,10 +1828,17 @@ export function QuizManager() {
                       size="sm"
                       className="shrink-0 h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => {
-                        const updated = leaderboard.filter(e => e.id !== entry.id)
-                        setLeaderboard(updated)
-                        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(updated))
-                        toast.success("Entry deleted")
+                        fetch(`/api/quiz-results/${entry.id}`, { method: "DELETE", headers: adminHeaders() })
+                          .then(r => r.json())
+                          .then(data => {
+                            if (data.success) {
+                              setLeaderboard(prev => prev.filter(e => e.id !== entry.id))
+                              toast.success("Entry deleted")
+                            } else {
+                              toast.error("Failed to delete entry")
+                            }
+                          })
+                          .catch(() => toast.error("Failed to delete entry"))
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1848,9 +1855,17 @@ export function QuizManager() {
                 variant="destructive" 
                 onClick={() => {
                   if (confirm("Are you sure you want to clear all leaderboard entries? This cannot be undone.")) {
-                    setLeaderboard([])
-                    localStorage.removeItem(LEADERBOARD_KEY)
-                    toast.success("Leaderboard cleared")
+                    fetch("/api/quiz-results", { method: "DELETE", headers: adminHeaders() })
+                      .then(r => r.json())
+                      .then(data => {
+                        if (data.success) {
+                          setLeaderboard([])
+                          toast.success("Leaderboard cleared")
+                        } else {
+                          toast.error("Failed to clear leaderboard")
+                        }
+                      })
+                      .catch(() => toast.error("Failed to clear leaderboard"))
                   }
                 }}
                 className="w-full sm:w-auto"

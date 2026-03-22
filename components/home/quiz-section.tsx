@@ -15,7 +15,7 @@ interface Quiz {
   title: string
   description: string
   category: string
-  timeLimit: number
+  time_limit: number
   questions: { id: string }[]
   enabled: boolean
 }
@@ -25,13 +25,10 @@ interface LeaderboardEntry {
   name: string
   score: number
   percentage: number
-  quizId: string
-  quizTitle: string
-  timestamp: string
+  quiz_id: string
+  quiz_title: string
+  created_at: string
 }
-
-const QUIZ_STORAGE_KEY = "techvyro-quizzes"
-const LEADERBOARD_KEY = "techvyro-leaderboard"
 
 const categoryColors: Record<string, string> = {
   Mathematics: "bg-blue-500",
@@ -50,36 +47,24 @@ export function QuizSection() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Load quizzes
-    try {
-      const savedQuizzes = localStorage.getItem(QUIZ_STORAGE_KEY)
-      if (savedQuizzes) {
-        const allQuizzes: Quiz[] = JSON.parse(savedQuizzes)
-        setQuizzes(allQuizzes.filter(q => q.enabled && q.questions.length > 0).slice(0, 4))
-      }
-    } catch (e) {
-      // Silent fail
-    }
+    Promise.all([
+      fetch("/api/quizzes").then(r => r.json()).catch(() => ({ quizzes: [] })),
+      fetch("/api/quiz-results").then(r => r.json()).catch(() => ({ results: [] })),
+    ]).then(([quizData, resultsData]) => {
+      const allQuizzes: Quiz[] = quizData.quizzes || []
+      setQuizzes(allQuizzes.filter(q => q.enabled && q.questions.length > 0).slice(0, 4))
 
-    // Load leaderboard
-    try {
-      const savedLeaderboard = localStorage.getItem(LEADERBOARD_KEY)
-      if (savedLeaderboard) {
-        const entries: LeaderboardEntry[] = JSON.parse(savedLeaderboard)
-        // Get top 5 unique users by highest score
-        const uniqueUsers = new Map<string, LeaderboardEntry>()
-        entries.sort((a, b) => b.percentage - a.percentage).forEach(entry => {
+      const results: LeaderboardEntry[] = resultsData.results || []
+      const uniqueUsers = new Map<string, LeaderboardEntry>()
+      results
+        .sort((a, b) => b.percentage - a.percentage)
+        .forEach(entry => {
           if (!uniqueUsers.has(entry.name)) {
             uniqueUsers.set(entry.name, entry)
           }
         })
-        setLeaderboard(Array.from(uniqueUsers.values()).slice(0, 5))
-      }
-    } catch (e) {
-      // Silent fail
-    }
-
-    setLoading(false)
+      setLeaderboard(Array.from(uniqueUsers.values()).slice(0, 5))
+    }).finally(() => setLoading(false))
   }, [])
 
   const getRankIcon = (rank: number) => {
@@ -191,7 +176,7 @@ export function QuizSection() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          <span>{Math.floor(quiz.timeLimit / 60)} min</span>
+                          <span>{Math.floor(quiz.time_limit / 60)} min</span>
                         </div>
                       </div>
                       
@@ -248,13 +233,13 @@ export function QuizSection() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-[11px] sm:text-sm truncate">{entry.name}</p>
-                            <p className="text-[9px] sm:text-xs text-muted-foreground truncate">{entry.quizTitle}</p>
+                            <p className="text-[9px] sm:text-xs text-muted-foreground truncate">{entry.quiz_title}</p>
                           </div>
                           <div className="text-right shrink-0">
                             <p className="font-bold text-[11px] sm:text-sm text-primary">{entry.percentage}%</p>
                             <div className="flex items-center gap-0.5 justify-end">
                               <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500 fill-amber-500" />
-                              <span className="text-[9px] sm:text-xs text-muted-foreground">{entry.score.toFixed(1)}</span>
+                              <span className="text-[9px] sm:text-xs text-muted-foreground">{Number(entry.score).toFixed(1)}</span>
                             </div>
                           </div>
                         </div>
