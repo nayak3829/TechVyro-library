@@ -153,11 +153,12 @@ export function Chatbot() {
       {open && (
         <div className={cn(
           "absolute bottom-[72px] right-0",
-          "w-[340px] sm:w-[390px]",
+          "w-[calc(100vw-2rem)] sm:w-[360px]",
+          "max-w-[360px]",
           "bg-background border border-border/50 rounded-2xl shadow-2xl shadow-violet-500/10",
           "flex flex-col overflow-hidden",
           "transition-all duration-300 ease-out origin-bottom-right",
-          minimized ? "h-[52px]" : "h-[530px] sm:h-[570px]",
+          minimized ? "h-[52px]" : "h-[420px] sm:h-[480px] max-h-[calc(100dvh-160px)]",
         )}>
 
           {/* Header */}
