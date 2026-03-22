@@ -231,13 +231,16 @@ function AiChat({ onSwitchToAdmin }: { onSwitchToAdmin: () => void }) {
     const aiMsgId = (Date.now() + 1).toString()
     const aiMsg: Message = { id: aiMsgId, role: "assistant", content: "", timestamp: new Date(), streaming: true }
 
-    setMessages(prev => [...prev, userMsg, aiMsg])
+    // Snapshot current messages to avoid stale closure & React Strict Mode double-run
+    const currentMessages = messages
+    setMessages([...currentMessages, userMsg, aiMsg])
     setInput("")
     setStreaming(true)
     setShowSuggestions(false)
 
-    const history = [...messages, userMsg]
+    const history = currentMessages
       .filter(m => m.id !== "welcome" && !m.streaming)
+      .concat([{ ...userMsg }])
       .map(m => ({ role: m.role, content: m.content }))
 
     abortRef.current = new AbortController()
@@ -324,7 +327,15 @@ function AiChat({ onSwitchToAdmin }: { onSwitchToAdmin: () => void }) {
                   : "bg-card border border-border/40 text-foreground rounded-tl-sm shadow-sm"
               )}>
                 {msg.role === "assistant"
-                  ? <div>{renderMarkdown(msg.content)}{msg.streaming && <span className="inline-block w-0.5 h-3 bg-violet-500 animate-pulse ml-0.5 align-middle" />}</div>
+                  ? msg.streaming && msg.content === ""
+                    ? (
+                      <div className="flex items-center gap-1 py-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                    )
+                    : <div>{renderMarkdown(msg.content)}{msg.streaming && <span className="inline-block w-0.5 h-3 bg-violet-500 animate-pulse ml-0.5 align-middle" />}</div>
                   : <p className="text-xs leading-relaxed">{msg.content}</p>
                 }
               </div>
@@ -348,20 +359,6 @@ function AiChat({ onSwitchToAdmin }: { onSwitchToAdmin: () => void }) {
             </div>
           </div>
         ))}
-
-        {/* Streaming thinking dots (before first token) */}
-        {streaming && messages[messages.length - 1]?.content === "" && (
-          <div className="flex gap-2">
-            <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/50 dark:to-purple-900/50 text-violet-600 dark:text-violet-400 border border-violet-200/60 dark:border-violet-700/60">
-              <GraduationCap className="h-3 w-3" />
-            </div>
-            <div className="bg-card border border-border/40 px-3 py-2.5 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-            </div>
-          </div>
-        )}
 
         <div ref={messagesEndRef} />
       </div>
