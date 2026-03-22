@@ -75,6 +75,7 @@ export function SiteSettings() {
     emailOnLowRating: true,
     emailOnHighDownloads: true,
     downloadThreshold: 100,
+    telegramChatId: "",
   })
 
   const [heroSettings, setHeroSettings] = useState({
@@ -875,54 +876,86 @@ export function SiteSettings() {
               Notification Settings
             </CardTitle>
             <CardDescription>
-              Configure email alerts and notification preferences
+              Configure Telegram alerts for new PDF uploads and quiz results
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-              <div className="flex gap-3">
-                <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-blue-600">Coming Soon</p>
-                  <p className="text-xs text-muted-foreground">
-                    Email notifications require additional setup. Configure your email service 
-                    provider (SendGrid, Resend, etc.) to enable these features.
-                  </p>
+
+            {/* Telegram Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Send className="h-4 w-4 text-blue-500" />
+                <h3 className="font-semibold text-sm">Telegram Bot Notifications</h3>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Live</Badge>
+              </div>
+
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="flex gap-3">
+                  <Info className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-green-700 dark:text-green-400">Telegram Bot is configured</p>
+                    <p className="text-xs text-muted-foreground">
+                      Your <code className="bg-muted px-1 rounded">TELEGRAM_BOT_TOKEN</code> secret is set. Add your Chat ID below to start receiving alerts when new PDFs are uploaded or students complete quizzes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Telegram Chat ID</Label>
+                <Input
+                  value={settings.telegramChatId}
+                  onChange={e => setSettings(s => ({ ...s, telegramChatId: e.target.value }))}
+                  placeholder="-100123456789 or @yourchannel"
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add your bot to a channel/group, then use <code className="bg-muted px-1 rounded">@userinfobot</code> to get the Chat ID. For channels, it starts with <code className="bg-muted px-1 rounded">-100</code>.
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-lg border border-border/50 bg-muted/20">
+                  <p className="text-xs font-medium mb-1">📄 New PDF Alert</p>
+                  <p className="text-xs text-muted-foreground">Sent when admin uploads a new PDF — includes title, category, and file size.</p>
+                </div>
+                <div className="p-3 rounded-lg border border-border/50 bg-muted/20">
+                  <p className="text-xs font-medium mb-1">🏆 Quiz Result Alert</p>
+                  <p className="text-xs text-muted-foreground">Sent when a student completes a quiz — includes name, score, and percentage.</p>
                 </div>
               </div>
             </div>
 
             <Separator />
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50 opacity-60">
-                <div>
-                  <p className="font-medium">New Review Notifications</p>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified when users submit new reviews
-                  </p>
-                </div>
-                <Switch checked={settings.emailOnNewReview} onCheckedChange={(checked) => setSettings(s => ({ ...s, emailOnNewReview: checked }))} disabled />
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold text-sm text-muted-foreground">Email Notifications</h3>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Coming Soon</Badge>
               </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50 opacity-60">
-                <div>
-                  <p className="font-medium">Low Rating Alerts</p>
-                  <p className="text-sm text-muted-foreground">
-                    Alert when a PDF receives 1-2 star rating
-                  </p>
+              <div className="space-y-3 opacity-60 pointer-events-none">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div>
+                    <p className="font-medium text-sm">New Review Notifications</p>
+                    <p className="text-xs text-muted-foreground">Get notified when users submit new reviews</p>
+                  </div>
+                  <Switch checked={settings.emailOnNewReview} disabled />
                 </div>
-                <Switch checked={settings.emailOnLowRating} onCheckedChange={(checked) => setSettings(s => ({ ...s, emailOnLowRating: checked }))} disabled />
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50 opacity-60">
-                <div>
-                  <p className="font-medium">High Download Milestone</p>
-                  <p className="text-sm text-muted-foreground">
-                    Celebrate when a PDF hits {settings.downloadThreshold}+ downloads
-                  </p>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div>
+                    <p className="font-medium text-sm">Low Rating Alerts</p>
+                    <p className="text-xs text-muted-foreground">Alert when a PDF receives 1–2 star rating</p>
+                  </div>
+                  <Switch checked={settings.emailOnLowRating} disabled />
                 </div>
-                <Switch checked={settings.emailOnHighDownloads} onCheckedChange={(checked) => setSettings(s => ({ ...s, emailOnHighDownloads: checked }))} disabled />
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div>
+                    <p className="font-medium text-sm">High Download Milestone</p>
+                    <p className="text-xs text-muted-foreground">Celebrate when a PDF hits {settings.downloadThreshold}+ downloads</p>
+                  </div>
+                  <Switch checked={settings.emailOnHighDownloads} disabled />
+                </div>
               </div>
             </div>
           </CardContent>

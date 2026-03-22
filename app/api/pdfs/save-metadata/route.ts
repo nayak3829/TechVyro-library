@@ -1,5 +1,13 @@
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
+import { sendTelegramMessage } from "@/lib/telegram"
+
+function formatFileSize(bytes: number | null): string {
+  if (!bytes) return "Unknown size"
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${bytes} B`
+}
 
 export async function POST(request: Request) {
   try {
@@ -38,12 +46,10 @@ export async function POST(request: Request) {
 
     if (existingPdf) {
       if (!replace) {
-        // Not replacing — clean up the newly uploaded file and return error
         await supabase.storage.from("pdfs").remove([filePath])
         return NextResponse.json({ error: "A PDF with this title already exists", duplicate: true }, { status: 400 })
       }
 
-      // Replace mode — delete the old file from storage, update DB record
       if (existingPdf.file_path && existingPdf.file_path !== filePath) {
         await supabase.storage.from("pdfs").remove([existingPdf.file_path]).catch(() => {})
       }
@@ -88,6 +94,32 @@ export async function POST(request: Request) {
       console.error("[save-metadata] Database insert error:", dbError)
       await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
       return NextResponse.json({ error: "Failed to save PDF metadata" }, { status: 500 })
+    }
+
+    // Send Telegram notification (fire and forget)
+    if (pdf) {
+      let categoryName = "General"
+      if (categoryId) {
+        const { data: cat } = await supabase
+          .from("categories")
+          .select("name")
+          .eq("id", categoryId)
+          .single()
+        if (cat?.name) categoryName = cat.name
+      }
+
+      const message = [
+        "📚 <b>New PDF Uploaded!</b>",
+        "",
+        `📄 <b>Title:</b> ${title.trim()}`,
+        `📁 <b>Category:</b> ${categoryName}`,
+        `📊 <b>Size:</b> ${formatFileSize(fileSize)}`,
+        `🕐 <b>Uploaded:</b> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST`,
+        "",
+        "#TechVyro #NewPDF",
+      ].join("\n")
+
+      sendTelegramMessage(message).catch(() => {})
     }
 
     return NextResponse.json({ pdf })

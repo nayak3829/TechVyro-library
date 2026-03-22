@@ -91,6 +91,18 @@ Components that fetch from API:
 | `/api/stats` | GET | — | Dashboard stats |
 | `/api/stats/summary` | GET | — | Aggregate stats (pdfs, downloads, views, recent/popular PDFs) |
 | `/api/pdfs/search` | GET | — | Live PDF title search with `?q=` and `?limit=` params |
+| `/api/ai/generate-summary` | POST | Admin | AI-generated PDF description (GPT-3.5-turbo) |
+| `/api/ai/generate-quiz` | POST | Admin | AI-generated quiz questions (GPT-4o-mini) |
+
+### AI Features
+- **AI PDF Summary** (`/api/ai/generate-summary`): Takes PDF title, description, category → returns a 2-3 sentence student-friendly description via GPT-3.5-turbo. Button appears in the PDF upload form's "Advanced Options" section next to the description textarea.
+- **AI Quiz Generator** (`/api/ai/generate-quiz`): Takes topic, category, count (3-20), difficulty → returns a full quiz JSON (title, description, questions with options + explanations) via GPT-4o-mini. Button "Generate with AI" appears in Quiz Manager action bar.
+
+### Telegram Notifications
+- **Helper**: `lib/telegram.ts` — reads `telegramChatId` from `general_settings` in `site_settings`, sends message via Bot API (fire and forget).
+- **New PDF Alert**: Fired from `/api/pdfs/save-metadata` after successful insert (not on replace). Includes title, category name, file size, IST timestamp.
+- **Quiz Result Alert**: Fired from `/api/quiz-results` POST after result saved. Includes student name, quiz title, score/percentage, time taken.
+- **Config**: Admin sets `telegramChatId` in Admin > Settings > Notifications. Bot token comes from `TELEGRAM_BOT_TOKEN` env secret.
 
 ### Key Components
 - `app/admin/page.tsx` — Admin dashboard with tabs

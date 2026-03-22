@@ -205,6 +205,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
   const [dragActive, setDragActive] = useState(false)
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
   const [showBulkTitleEditor, setShowBulkTitleEditor] = useState(false)
+  const [aiLoadingIds, setAiLoadingIds] = useState<Set<string>>(new Set())
 
   // Bulk title editor state
   const [bulkPrefix, setBulkPrefix] = useState("")
@@ -446,6 +447,34 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
 
   function updateEntry(id: string, patch: Partial<FileEntry>) {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
+  }
+
+  // ── AI Summary Generation ─────────────────────────────────────────
+  async function generateAiSummary(entryId: string) {
+    const entry = entries.find(e => e.id === entryId)
+    if (!entry) return
+    const token = sessionStorage.getItem("admin_token")
+    if (!token) { toast.error("Not authenticated"); return }
+
+    setAiLoadingIds(prev => new Set(prev).add(entryId))
+    try {
+      const categoryName = categoriesList.find(c => c.id === entry.categoryId)?.name || ""
+      const res = await fetch("/api/ai/generate-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: entry.title, description: entry.description, category: categoryName }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || "AI generation failed"); return }
+      if (data.summary) {
+        updateEntry(entryId, { description: data.summary })
+        toast.success("AI summary generated!")
+      }
+    } catch {
+      toast.error("Failed to generate summary")
+    } finally {
+      setAiLoadingIds(prev => { const s = new Set(prev); s.delete(entryId); return s })
+    }
   }
 
   // ── Bulk Title Editor Actions ──────────────────────────────────────
@@ -1180,9 +1209,25 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
               {entry.showAdvanced && entry.status === "pending" && (
                 <div className="border-t border-border/50 p-4 space-y-4 bg-muted/20">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" /> Description
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" /> Description
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+                        onClick={() => generateAiSummary(entry.id)}
+                        disabled={aiLoadingIds.has(entry.id) || !entry.title.trim()}
+                      >
+                        {aiLoadingIds.has(entry.id) ? (
+                          <><Loader2 className="h-3 w-3 animate-spin" /> Generating...</>
+                        ) : (
+                          <><Sparkles className="h-3 w-3" /> AI Summary</>
+                        )}
+                      </Button>
+                    </div>
                     <Textarea
                       value={entry.description}
                       onChange={(e) => updateEntry(entry.id, { description: e.target.value })}

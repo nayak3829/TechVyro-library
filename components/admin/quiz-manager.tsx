@@ -268,6 +268,14 @@ export function QuizManager() {
   const [filterDifficulty, setFilterDifficulty] = useState("all")
   const [filterEnabled, setFilterEnabled] = useState("all")
 
+  // AI Quiz Generation
+  const [showAiQuizDialog, setShowAiQuizDialog] = useState(false)
+  const [aiQuizTopic, setAiQuizTopic] = useState("")
+  const [aiQuizCategory, setAiQuizCategory] = useState("Mathematics")
+  const [aiQuizCount, setAiQuizCount] = useState(10)
+  const [aiQuizDifficulty, setAiQuizDifficulty] = useState<"easy"|"medium"|"hard">("medium")
+  const [aiQuizLoading, setAiQuizLoading] = useState(false)
+
   useEffect(() => {
     fetch("/api/quizzes").then(r => r.json()).then(data => {
       if (data.quizzes) setQuizzes(data.quizzes.map(dbRowToQuiz))
@@ -306,6 +314,36 @@ export function QuizManager() {
   const handleAddQuiz = () => {
     setEditingQuiz({ ...defaultQuiz, id: generateId(), createdAt: new Date().toISOString() })
     setShowQuizDialog(true)
+  }
+
+  const handleGenerateAiQuiz = async () => {
+    if (!aiQuizTopic.trim()) { toast.error("Topic is required"); return }
+    setAiQuizLoading(true)
+    try {
+      const res = await fetch("/api/ai/generate-quiz", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({
+          topic: aiQuizTopic.trim(),
+          category: aiQuizCategory,
+          count: aiQuizCount,
+          difficulty: aiQuizDifficulty,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || "AI generation failed"); return }
+      if (data.quiz) {
+        setShowAiQuizDialog(false)
+        setEditingQuiz(data.quiz)
+        setShowQuizDialog(true)
+        setAiQuizTopic("")
+        toast.success(`Generated ${data.quiz.questions.length} questions! Review and save.`)
+      }
+    } catch {
+      toast.error("Failed to generate quiz")
+    } finally {
+      setAiQuizLoading(false)
+    }
   }
   const handleEditQuiz = (quiz: Quiz) => { setEditingQuiz({ ...quiz }); setShowQuizDialog(true) }
   const handleSaveQuiz = () => {
@@ -1046,6 +1084,9 @@ export function QuizManager() {
       <div className="flex items-center gap-2 flex-wrap">
         <Button onClick={handleAddQuiz} size="sm" className="h-8 sm:h-9 text-xs sm:text-sm">
           <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Quiz
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setShowAiQuizDialog(true)} className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30">
+          <Sparkles className="h-3.5 w-3.5" /> Generate with AI
         </Button>
         <Button variant="outline" size="sm" onClick={() => setMainTab("import")} className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5">
           <Upload className="h-3.5 w-3.5" /> Import
@@ -2321,6 +2362,83 @@ export function QuizManager() {
         </CardContent>
       </Card>
       )} {/* end mainTab === "leaderboard" */}
+
+      {/* ── AI Quiz Generation Dialog ─────────────────────────────────────── */}
+      <Dialog open={showAiQuizDialog} onOpenChange={setShowAiQuizDialog}>
+        <DialogContent className="max-w-md w-[95vw]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Sparkles className="h-4 w-4 text-violet-500" /> Generate Quiz with AI
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
+              <p className="text-xs text-muted-foreground">
+                Describe a topic and AI will generate a complete quiz with questions, options, and explanations. You can review and edit before saving.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Topic / Subject <span className="text-destructive">*</span></Label>
+              <Textarea
+                value={aiQuizTopic}
+                onChange={e => setAiQuizTopic(e.target.value)}
+                placeholder="e.g. Newton's Laws of Motion, World War II, Photosynthesis, Python Loops..."
+                rows={3}
+                className="text-sm resize-none"
+                disabled={aiQuizLoading}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Category</Label>
+                <Select value={aiQuizCategory} onValueChange={setAiQuizCategory} disabled={aiQuizLoading}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Difficulty</Label>
+                <Select value={aiQuizDifficulty} onValueChange={v => setAiQuizDifficulty(v as "easy"|"medium"|"hard")} disabled={aiQuizLoading}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DIFFICULTIES.map(d => (
+                      <SelectItem key={d.value} value={d.value}>
+                        <span className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${d.color}`} />{d.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Number of Questions: {aiQuizCount}</Label>
+              <input
+                type="range"
+                min={3}
+                max={20}
+                value={aiQuizCount}
+                onChange={e => setAiQuizCount(Number(e.target.value))}
+                className="w-full accent-violet-500"
+                disabled={aiQuizLoading}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>3</span><span>20</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAiQuizDialog(false)} size="sm" disabled={aiQuizLoading}>Cancel</Button>
+            <Button
+              onClick={handleGenerateAiQuiz}
+              size="sm"
+              disabled={aiQuizLoading || !aiQuizTopic.trim()}
+              className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5"
+            >
+              {aiQuizLoading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating...</> : <><Sparkles className="h-3.5 w-3.5" /> Generate {aiQuizCount} Questions</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Bulk Move Dialog ────────────────────────────────────────────────── */}
       <Dialog open={showBulkMoveDialog} onOpenChange={setShowBulkMoveDialog}>

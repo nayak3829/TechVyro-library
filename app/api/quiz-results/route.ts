@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { sendTelegramMessage } from "@/lib/telegram"
 
 function verifyAdminToken(token: string | null): boolean {
   if (!token) return false
@@ -15,6 +16,13 @@ function verifyAdminToken(token: string | null): boolean {
   } catch {
     return false
   }
+}
+
+function formatTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
 export async function GET() {
@@ -60,6 +68,26 @@ export async function POST(request: Request) {
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Send Telegram notification (fire and forget)
+    const total = (body.correct || 0) + (body.wrong || 0) + (body.skipped || 0)
+    const percentage = body.percentage || 0
+    const medal = percentage >= 90 ? "🥇" : percentage >= 75 ? "🥈" : percentage >= 50 ? "🥉" : "📝"
+
+    const message = [
+      `${medal} <b>New Quiz Result!</b>`,
+      "",
+      `👤 <b>Student:</b> ${body.name || "Anonymous"}`,
+      `📝 <b>Quiz:</b> ${body.quizTitle || "Unknown Quiz"}`,
+      `✅ <b>Score:</b> ${percentage}% (${body.correct || 0}/${total} correct)`,
+      body.wrong > 0 ? `❌ <b>Wrong:</b> ${body.wrong}` : "",
+      body.totalTime > 0 ? `⏱️ <b>Time:</b> ${formatTime(body.totalTime)}` : "",
+      "",
+      "#TechVyro #Quiz #Leaderboard",
+    ].filter(line => line !== "").join("\n")
+
+    sendTelegramMessage(message).catch(() => {})
+
     return NextResponse.json({ result: data })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
