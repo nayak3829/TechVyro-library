@@ -107,7 +107,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
   // Theme persistence and load leaderboard
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("quiz-theme")
+      const savedTheme = sessionStorage.getItem("quiz-theme")
       if (savedTheme === "dark") setDarkMode(true)
       
       // Load top leaderboard entries for this quiz from API
@@ -188,7 +188,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
   const toggleTheme = () => {
     setDarkMode(prev => {
       if (typeof window !== "undefined") {
-        localStorage.setItem("quiz-theme", !prev ? "dark" : "light")
+        sessionStorage.setItem("quiz-theme", !prev ? "dark" : "light")
       }
       return !prev
     })

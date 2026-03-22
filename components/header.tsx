@@ -55,8 +55,10 @@ export function Header() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem(RECENT_SEARCHES_KEY)
-    if (stored) setRecentSearches(JSON.parse(stored))
+    try {
+      const stored = sessionStorage.getItem(RECENT_SEARCHES_KEY)
+      if (stored) setRecentSearches(JSON.parse(stored))
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -134,12 +136,12 @@ export function Header() {
     if (!query.trim()) return
     const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, MAX_RECENT_SEARCHES)
     setRecentSearches(updated)
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated))
+    try { sessionStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated)) } catch {}
   }, [recentSearches])
 
   const clearRecentSearches = () => {
     setRecentSearches([])
-    localStorage.removeItem(RECENT_SEARCHES_KEY)
+    try { sessionStorage.removeItem(RECENT_SEARCHES_KEY) } catch {}
   }
 
   const handleSearch = (e: React.FormEvent) => {

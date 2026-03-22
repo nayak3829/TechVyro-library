@@ -8,26 +8,22 @@ export function useFavorites() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [isLoaded, setIsLoaded] = useState(false)
 
-  // Load favorites from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(FAVORITES_KEY)
+      const stored = sessionStorage.getItem(FAVORITES_KEY)
       if (stored) {
         setFavorites(new Set(JSON.parse(stored)))
       }
-    } catch (error) {
-      console.error("Failed to load favorites:", error)
+    } catch {
     }
     setIsLoaded(true)
   }, [])
 
-  // Save favorites to localStorage when changed
   useEffect(() => {
     if (isLoaded) {
       try {
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites]))
-      } catch (error) {
-        console.error("Failed to save favorites:", error)
+        sessionStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites]))
+      } catch {
       }
     }
   }, [favorites, isLoaded])
@@ -47,25 +43,13 @@ export function useFavorites() {
   const toggleFavorite = useCallback((id: string) => {
     setFavorites((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }, [])
 
-  const isFavorite = useCallback((id: string) => {
-    return favorites.has(id)
-  }, [favorites])
+  const isFavorite = useCallback((id: string) => favorites.has(id), [favorites])
 
-  return {
-    favorites: [...favorites],
-    isLoaded,
-    addFavorite,
-    removeFavorite,
-    toggleFavorite,
-    isFavorite,
-  }
+  return { favorites: [...favorites], isLoaded, addFavorite, removeFavorite, toggleFavorite, isFavorite }
 }
