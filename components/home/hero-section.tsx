@@ -321,7 +321,11 @@ export function HeroSection() {
                       <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${s.bg} mb-1.5`}>
                         <s.icon className={`h-3.5 w-3.5 ${s.color}`} />
                       </div>
-                      <p className="text-sm font-bold text-foreground tabular-nums">{s.value}</p>
+                      {!liveStats ? (
+                        <div className="h-4 w-10 rounded-md bg-muted animate-pulse mb-0.5" />
+                      ) : (
+                        <p className="text-sm font-bold text-foreground tabular-nums">{s.value}</p>
+                      )}
                       <p className="text-[9px] text-muted-foreground mt-0.5">{s.label}</p>
                     </div>
                   ))}
@@ -401,7 +405,11 @@ export function HeroSection() {
                 <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${s.bg} mb-1.5`}>
                   <s.icon className={`h-4 w-4 ${s.color}`} />
                 </div>
-                <p className="text-base font-bold text-foreground">{s.value}</p>
+                {!liveStats ? (
+                  <div className="h-5 w-12 rounded-md bg-muted animate-pulse mb-0.5" />
+                ) : (
+                  <p className="text-base font-bold text-foreground">{s.value}</p>
+                )}
                 <p className="text-[10px] text-muted-foreground">{s.label}</p>
               </div>
             ))}

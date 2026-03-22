@@ -1,50 +1,61 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-
-const FAVORITES_KEY = "pdf_favorites"
+import { useState, useEffect, useCallback, useRef } from "react"
 
 export function useFavorites() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [isLoaded, setIsLoaded] = useState(false)
+  const pendingRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(FAVORITES_KEY)
-      if (stored) {
-        setFavorites(new Set(JSON.parse(stored)))
-      }
-    } catch {
-    }
-    setIsLoaded(true)
+    fetch("/api/favorites")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data.favorites)) {
+          setFavorites(new Set(data.favorites))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoaded(true))
   }, [])
 
-  useEffect(() => {
-    if (isLoaded) {
-      try {
-        sessionStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites]))
-      } catch {
-      }
-    }
-  }, [favorites, isLoaded])
+  const toggleFavorite = useCallback(async (id: string) => {
+    if (pendingRef.current.has(id)) return
+    pendingRef.current.add(id)
 
-  const addFavorite = useCallback((id: string) => {
-    setFavorites((prev) => new Set([...prev, id]))
-  }, [])
-
-  const removeFavorite = useCallback((id: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev)
-      next.delete(id)
-      return next
-    })
-  }, [])
-
-  const toggleFavorite = useCallback((id: string) => {
-    setFavorites((prev) => {
+    setFavorites(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
+      return next
+    })
+
+    try {
+      await fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdfId: id }),
+      })
+    } catch {
+      setFavorites(prev => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        return next
+      })
+    } finally {
+      pendingRef.current.delete(id)
+    }
+  }, [])
+
+  const addFavorite = useCallback((id: string) => {
+    setFavorites(prev => new Set([...prev, id]))
+  }, [])
+
+  const removeFavorite = useCallback((id: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev)
+      next.delete(id)
       return next
     })
   }, [])
