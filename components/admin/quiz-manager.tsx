@@ -177,6 +177,31 @@ export function QuizManager() {
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
   const [importTab, setImportTab] = useState<"html"|"json">("html")
 
+  // ── JSON Import state ──────────────────────────────────────────────────────
+  type ConflictAction = "skip" | "replace" | "copy"
+  interface JsonQuizItem {
+    quiz: Quiz
+    included: boolean
+    conflictId: string | null
+    conflictAction: ConflictAction
+  }
+  interface JsonFileEntry {
+    id: string
+    file: File | null
+    fileName: string
+    status: "pending" | "parsing" | "ready" | "error"
+    quizzes: JsonQuizItem[]
+    error?: string
+    settings: { category: string; section: string; difficulty: "easy"|"medium"|"hard"; visibility: VisibilityType }
+    expanded: boolean
+  }
+  const [jsonEntries, setJsonEntries] = useState<JsonFileEntry[]>([])
+  const [jsonDragActive, setJsonDragActive] = useState(false)
+  const [pasteJsonText, setPasteJsonText] = useState("")
+  const [showPasteJson, setShowPasteJson] = useState(false)
+  const [showJsonGlobalSettings, setShowJsonGlobalSettings] = useState(false)
+  const [jsonGs, setJsonGs] = useState({ category: "Mathematics", section: "General", difficulty: "medium" as "easy"|"medium"|"hard", visibility: "public" as VisibilityType })
+
   // Bulk selection
   const [selectedQuizzes, setSelectedQuizzes] = useState<Set<string>>(new Set())
   const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false)
@@ -372,6 +397,166 @@ export function QuizManager() {
     }
   }
 
+  // ── JSON Import Logic ──────────────────────────────────────────────────────
+
+  const normalizeImportedQuiz = (q: any, settings?: JsonFileEntry["settings"]): Quiz => ({
+    ...defaultQuiz,
+    title: String(q.title || "").replace(/Boss_Quiz_Robot|LearnWithSumit|Sumit\s*Raftaar|Sumit/gi, "TechVyro").trim() || "Imported Quiz",
+    description: q.description || "",
+    category: settings?.category || q.category || "General",
+    section: settings?.section || q.section || "General",
+    difficulty: settings?.difficulty || q.difficulty || "medium",
+    visibility: settings?.visibility || q.visibility || "public",
+    timeLimit: q.timeLimit || q.time_limit || 1200,
+    tags: q.tags || [],
+    negativeMarking: q.negativeMarking ?? q.negative_marking ?? 0,
+    passingPercentage: q.passingPercentage ?? q.passing_percentage ?? 0,
+    shuffleQuestions: q.shuffleQuestions ?? q.shuffle_questions ?? false,
+    shuffleOptions: q.shuffleOptions ?? q.shuffle_options ?? false,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+    questions: (q.questions || []).map((qq: any) => ({
+      ...defaultQuestion,
+      id: generateId(),
+      type: qq.type || "mcq",
+      question: String(qq.question || ""),
+      options: qq.options || ["","","",""],
+      correct: qq.correct || 1,
+      correctOptions: qq.correctOptions || [],
+      marks: qq.marks || 1,
+      negativeMarks: qq.negativeMarks ?? 0,
+      explanation: qq.explanation || "",
+      timeLimit: qq.timeLimit ?? 0,
+    })),
+    enabled: q.enabled ?? true,
+    structureLocation: q.structureLocation || undefined,
+  })
+
+  const findConflict = (title: string): string | null => {
+    const norm = title.toLowerCase().trim()
+    return quizzes.find(q => q.title.toLowerCase().trim() === norm)?.id || null
+  }
+
+  const buildJsonItems = (items: any[], settings?: JsonFileEntry["settings"]): JsonQuizItem[] =>
+    items.filter(q => q.title && Array.isArray(q.questions)).map(q => {
+      const quiz = normalizeImportedQuiz(q, settings)
+      const conflictId = findConflict(quiz.title)
+      return { quiz, included: true, conflictId, conflictAction: "copy" as ConflictAction }
+    })
+
+  const processJsonFiles = async (files: File[]) => {
+    const defaultSettings = { category: "Mathematics", section: "General", difficulty: "medium" as const, visibility: "public" as VisibilityType }
+    const newEntries: JsonFileEntry[] = files.map(f => ({
+      id: generateId(), file: f, fileName: f.name,
+      status: "pending" as const, quizzes: [], settings: { ...defaultSettings }, expanded: true,
+    }))
+    setJsonEntries(prev => [...prev, ...newEntries])
+    for (const entry of newEntries) {
+      setJsonEntries(prev => prev.map(e => e.id === entry.id ? { ...e, status: "parsing" as const } : e))
+      try {
+        const text = await entry.file!.text()
+        const data = JSON.parse(text)
+        const items: any[] = Array.isArray(data) ? data : [data]
+        const quizItems = buildJsonItems(items, entry.settings)
+        if (!quizItems.length) {
+          setJsonEntries(prev => prev.map(e => e.id === entry.id ? { ...e, status: "error" as const, error: "No valid quizzes found in this file" } : e))
+        } else {
+          setJsonEntries(prev => prev.map(e => e.id === entry.id ? { ...e, status: "ready" as const, quizzes: quizItems } : e))
+        }
+      } catch {
+        setJsonEntries(prev => prev.map(e => e.id === entry.id ? { ...e, status: "error" as const, error: "Invalid JSON file" } : e))
+      }
+    }
+  }
+
+  const addPastedJsonEntry = () => {
+    try {
+      const data = JSON.parse(pasteJsonText.trim())
+      const items: any[] = Array.isArray(data) ? data : [data]
+      const quizItems = buildJsonItems(items)
+      if (!quizItems.length) { toast.error("No valid quizzes found in pasted text"); return }
+      setJsonEntries(prev => [...prev, {
+        id: generateId(), file: null, fileName: "Pasted JSON",
+        status: "ready" as const, quizzes: quizItems,
+        settings: { category: "Mathematics", section: "General", difficulty: "medium" as const, visibility: "public" as VisibilityType },
+        expanded: true,
+      }])
+      setPasteJsonText(""); setShowPasteJson(false)
+      toast.success(`Parsed ${quizItems.length} quiz${quizItems.length !== 1 ? "zes" : ""} from pasted JSON`)
+    } catch { toast.error("Invalid JSON — check formatting and try again") }
+  }
+
+  const toggleJsonQuiz = (fileId: string, idx: number) => {
+    setJsonEntries(prev => prev.map(e => {
+      if (e.id !== fileId) return e
+      const quizzes = [...e.quizzes]
+      quizzes[idx] = { ...quizzes[idx], included: !quizzes[idx].included }
+      return { ...e, quizzes }
+    }))
+  }
+
+  const setJsonConflictAction = (fileId: string, idx: number, action: ConflictAction) => {
+    setJsonEntries(prev => prev.map(e => {
+      if (e.id !== fileId) return e
+      const quizzes = [...e.quizzes]
+      quizzes[idx] = { ...quizzes[idx], conflictAction: action }
+      return { ...e, quizzes }
+    }))
+  }
+
+  const applyJsonFileSettings = (fileId: string, settings: JsonFileEntry["settings"]) => {
+    setJsonEntries(prev => prev.map(e => {
+      if (e.id !== fileId) return e
+      return {
+        ...e, settings,
+        quizzes: e.quizzes.map(item => ({
+          ...item,
+          quiz: { ...item.quiz, category: settings.category, section: settings.section, difficulty: settings.difficulty, visibility: settings.visibility }
+        }))
+      }
+    }))
+  }
+
+  const applyJsonGlobalSettings = (settings: JsonFileEntry["settings"]) => {
+    setJsonEntries(prev => prev.map(e => ({
+      ...e, settings,
+      quizzes: e.quizzes.map(item => ({
+        ...item,
+        quiz: { ...item.quiz, category: settings.category, section: settings.section, difficulty: settings.difficulty, visibility: settings.visibility }
+      }))
+    })))
+    toast.success("Global settings applied to all JSON files")
+  }
+
+  const importAllJsonQuizzes = () => {
+    const toImport: Quiz[] = []
+    const toReplace: Quiz[] = []
+    for (const entry of jsonEntries) {
+      if (entry.status !== "ready") continue
+      for (const item of entry.quizzes) {
+        if (!item.included) continue
+        if (item.conflictId) {
+          if (item.conflictAction === "skip") continue
+          if (item.conflictAction === "replace") { toReplace.push({ ...item.quiz, id: item.conflictId }); continue }
+          toImport.push({ ...item.quiz, title: `${item.quiz.title} (Copy)` })
+        } else {
+          toImport.push(item.quiz)
+        }
+      }
+    }
+    if (!toImport.length && !toReplace.length) { toast.error("No quizzes selected to import"); return }
+    const updatedQuizzes = [
+      ...quizzes.map(q => { const r = toReplace.find(rq => rq.id === q.id); return r || q }),
+      ...toImport,
+    ]
+    saveQuizzes(updatedQuizzes)
+    setShowImportDialog(false); resetImportDialog()
+    toast.success(`Imported ${toImport.length} quiz${toImport.length !== 1 ? "zes" : ""}${toReplace.length ? `, replaced ${toReplace.length}` : ""}`)
+  }
+
+  const jsonReadyCount = jsonEntries.flatMap(e => e.quizzes).filter(q => q.included).length
+  const jsonConflictCount = jsonEntries.flatMap(e => e.quizzes).filter(q => q.included && q.conflictId && q.conflictAction !== "skip").length
+
   // ── HTML Parser ────────────────────────────────────────────────────────────
 
   const parseQuizHtml = (html: string): Quiz | null => {
@@ -507,9 +692,11 @@ export function QuizManager() {
   }
 
   const resetImportDialog = () => {
-    setImportHtml(""); setUploadEntries("" as any); setParsedPreview(null)
+    setImportHtml(""); setParsedPreview(null)
     setUploadEntries([])
+    setJsonEntries([]); setPasteJsonText(""); setShowPasteJson(false); setShowJsonGlobalSettings(false)
     if (fileInputRef.current) fileInputRef.current.value = ""
+    if (jsonImportRef.current) jsonImportRef.current.value = ""
   }
 
   const toggleExpanded = (id: string) => {
@@ -1210,25 +1397,252 @@ export function QuizManager() {
 
               {/* JSON Tab */}
               <TabsContent value="json" className="space-y-4 mt-4">
-                <div className="rounded-xl border border-border p-4 sm:p-6 text-center space-y-3 bg-gradient-to-br from-muted/30 to-muted/10">
-                  <div className="mx-auto w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                    <FileUp className="h-6 w-6 text-blue-500" />
+                {/* Drop zone */}
+                <div
+                  className={`relative border-2 border-dashed rounded-xl p-4 sm:p-6 text-center transition-all cursor-pointer group ${jsonDragActive ? "border-blue-500 bg-blue-500/10" : "border-border hover:border-blue-400/60 hover:bg-muted/30"}`}
+                  onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setJsonDragActive(true) }}
+                  onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setJsonDragActive(false) }}
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); setJsonDragActive(true) }}
+                  onDrop={e => {
+                    e.preventDefault(); e.stopPropagation(); setJsonDragActive(false)
+                    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith(".json"))
+                    files.length ? processJsonFiles(files) : toast.error("Please drop JSON files only")
+                  }}
+                  onClick={() => jsonImportRef.current?.click()}
+                >
+                  <input ref={jsonImportRef} type="file" accept=".json" multiple className="hidden"
+                    onChange={e => {
+                      const files = Array.from(e.target.files || []).filter(f => f.name.endsWith(".json"))
+                      if (files.length) processJsonFiles(files)
+                      if (e.target) e.target.value = ""
+                    }} />
+                  <div className="mx-auto w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <FileUp className="h-5 w-5 text-blue-500" />
                   </div>
-                  <div>
-                    <p className="font-semibold text-sm">Import from JSON</p>
-                    <p className="text-xs text-muted-foreground mt-1">Select a JSON file exported from this system, or a compatible quiz JSON format</p>
-                  </div>
-                  <Button variant="outline" className="gap-2" onClick={() => jsonImportRef.current?.click()}>
-                    <Upload className="h-4 w-4" /> Choose JSON File
-                  </Button>
-                  <input ref={jsonImportRef} type="file" accept=".json" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) { importFromJson(f); e.target.value = "" } }} />
+                  <p className="font-semibold text-xs sm:text-sm">Drop JSON files here or click to select</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Multiple files — single quiz or array of quizzes per file</p>
                 </div>
 
-                <div className="rounded-xl border border-blue-200/60 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800/60 p-4 space-y-2">
-                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">JSON Format</p>
-                  <p className="text-xs text-muted-foreground">Accepts a single quiz object or an array of quizzes. Each quiz must have a <code className="bg-muted px-1 rounded">title</code> and <code className="bg-muted px-1 rounded">questions</code> array. Use the export button (↓) on any quiz card to get a compatible file.</p>
-                </div>
+                {/* JSON Global Settings */}
+                {jsonEntries.length > 0 && (
+                  <Collapsible open={showJsonGlobalSettings} onOpenChange={setShowJsonGlobalSettings}>
+                    <div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" className="w-full flex items-center justify-between p-3 h-auto hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <Settings2 className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium text-xs sm:text-sm">Global Settings (apply to all)</span>
+                          </div>
+                          <ChevronDown className={`h-4 w-4 transition-transform ${showJsonGlobalSettings ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="p-3 border-t border-border/50 space-y-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs">Category</Label>
+                              <Select value={jsonGs.category} onValueChange={v => setJsonGs(p => ({ ...p, category: v }))}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Difficulty</Label>
+                              <Select value={jsonGs.difficulty} onValueChange={v => setJsonGs(p => ({ ...p, difficulty: v as any }))}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>{DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Section</Label>
+                              <Select value={jsonGs.section} onValueChange={v => setJsonGs(p => ({ ...p, section: v }))}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>{SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Visibility</Label>
+                              <Select value={jsonGs.visibility} onValueChange={v => setJsonGs(p => ({ ...p, visibility: v as any }))}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="public">Public</SelectItem>
+                                  <SelectItem value="unlisted">Unlisted</SelectItem>
+                                  <SelectItem value="private">Private</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <Button size="sm" onClick={() => applyJsonGlobalSettings(jsonGs)} className="w-full h-8 text-xs bg-blue-500 hover:bg-blue-600">Apply to All Files</Button>
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                )}
+
+                {/* File entries */}
+                {jsonEntries.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">{jsonEntries.length} file{jsonEntries.length !== 1 ? "s" : ""} loaded</p>
+                      <div className="flex gap-1.5">
+                        <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">{jsonReadyCount} selected</Badge>
+                        {jsonConflictCount > 0 && <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-600">{jsonConflictCount} conflicts</Badge>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 max-h-[340px] overflow-y-auto pr-0.5">
+                      {jsonEntries.map(entry => {
+                        const includedCount = entry.quizzes.filter(q => q.included).length
+                        const conflictCount = entry.quizzes.filter(q => q.included && q.conflictId).length
+                        return (
+                          <div key={entry.id} className={`rounded-lg border overflow-hidden transition-all ${entry.status === "ready" ? "border-blue-200/70 bg-blue-50/40 dark:bg-blue-950/20 dark:border-blue-800/60" : entry.status === "error" ? "border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800" : "border-border bg-muted/30"}`}>
+                            {/* File header */}
+                            <div className="flex items-center gap-2 p-2.5 cursor-pointer select-none"
+                              onClick={() => setJsonEntries(prev => prev.map(e => e.id === entry.id ? { ...e, expanded: !e.expanded } : e))}>
+                              {entry.status === "parsing" && <Loader2 className="h-4 w-4 animate-spin text-blue-500 shrink-0" />}
+                              {entry.status === "ready" && <FileUp className="h-4 w-4 text-blue-500 shrink-0" />}
+                              {entry.status === "error" && <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-xs truncate">{entry.fileName}</p>
+                                {entry.status === "ready" && (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {entry.quizzes.length} quiz{entry.quizzes.length !== 1 ? "zes" : ""}
+                                    {conflictCount > 0 && <span className="text-amber-600 ml-1">· {conflictCount} conflict{conflictCount !== 1 ? "s" : ""}</span>}
+                                  </p>
+                                )}
+                                {entry.error && <p className="text-[10px] text-red-500">{entry.error}</p>}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {entry.status === "ready" && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 h-5 text-blue-600 border-blue-300">
+                                    {includedCount}/{entry.quizzes.length}
+                                  </Badge>
+                                )}
+                                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${entry.expanded ? "rotate-180" : ""}`} />
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-500"
+                                  onClick={e => { e.stopPropagation(); setJsonEntries(prev => prev.filter(en => en.id !== entry.id)) }}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Expanded quiz list */}
+                            {entry.expanded && entry.status === "ready" && (
+                              <div className="border-t border-border/50">
+                                {/* Per-file settings */}
+                                <div className="p-2 border-b border-border/40 bg-muted/20">
+                                  <div className="grid grid-cols-4 gap-1.5">
+                                    <Select value={entry.settings.category} onValueChange={v => applyJsonFileSettings(entry.id, { ...entry.settings, category: v })}>
+                                      <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                                      <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <Select value={entry.settings.difficulty} onValueChange={v => applyJsonFileSettings(entry.id, { ...entry.settings, difficulty: v as any })}>
+                                      <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                                      <SelectContent>{DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value} className="text-xs">{d.label}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <Select value={entry.settings.section} onValueChange={v => applyJsonFileSettings(entry.id, { ...entry.settings, section: v })}>
+                                      <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                                      <SelectContent>{SECTIONS.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <Select value={entry.settings.visibility} onValueChange={v => applyJsonFileSettings(entry.id, { ...entry.settings, visibility: v as any })}>
+                                      <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="public" className="text-xs">Public</SelectItem>
+                                        <SelectItem value="unlisted" className="text-xs">Unlisted</SelectItem>
+                                        <SelectItem value="private" className="text-xs">Private</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="divide-y divide-border/30">
+                                  {entry.quizzes.map((item, idx) => {
+                                    const qCount = item.quiz.questions.length
+                                    const mcqCount = item.quiz.questions.filter(q => q.type === "mcq").length
+                                    const tfCount = item.quiz.questions.filter(q => q.type === "truefalse").length
+                                    const msCount = item.quiz.questions.filter(q => q.type === "multiselect").length
+                                    return (
+                                      <div key={idx} className={`p-2.5 transition-colors ${!item.included ? "opacity-50" : ""}`}>
+                                        <div className="flex items-start gap-2.5">
+                                          <Checkbox
+                                            checked={item.included}
+                                            onCheckedChange={() => toggleJsonQuiz(entry.id, idx)}
+                                            className="mt-0.5 shrink-0"
+                                          />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <p className="font-medium text-xs truncate">{item.quiz.title}</p>
+                                              {item.conflictId && (
+                                                <Badge variant="outline" className="text-[9px] px-1 h-4 border-amber-400 text-amber-600 gap-0.5 shrink-0">
+                                                  <AlertCircle className="h-2.5 w-2.5" /> Conflict
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                              <span className="text-[10px] text-muted-foreground">{qCount} Q</span>
+                                              {mcqCount > 0 && <span className="text-[10px] text-blue-600">{mcqCount} MCQ</span>}
+                                              {tfCount > 0 && <span className="text-[10px] text-green-600">{tfCount} T/F</span>}
+                                              {msCount > 0 && <span className="text-[10px] text-purple-600">{msCount} Multi</span>}
+                                              <span className="text-[10px] text-muted-foreground">{Math.floor(item.quiz.timeLimit / 60)} min</span>
+                                              {item.quiz.negativeMarking && item.quiz.negativeMarking > 0 ? <span className="text-[10px] text-red-500">-{item.quiz.negativeMarking}✗</span> : null}
+                                            </div>
+                                            {/* Conflict resolution */}
+                                            {item.conflictId && item.included && (
+                                              <div className="mt-1.5 p-1.5 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/60">
+                                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mb-1 font-medium">A quiz with this title already exists:</p>
+                                                <div className="flex gap-1">
+                                                  {(["skip", "replace", "copy"] as ConflictAction[]).map(action => (
+                                                    <button key={action} onClick={() => setJsonConflictAction(entry.id, idx, action)}
+                                                      className={`text-[10px] px-2 py-0.5 rounded-md border transition-all font-medium ${item.conflictAction === action ? action === "skip" ? "bg-muted border-muted-foreground/40 text-foreground" : action === "replace" ? "bg-red-500 border-red-500 text-white" : "bg-blue-500 border-blue-500 text-white" : "border-border text-muted-foreground hover:bg-muted"}`}>
+                                                      {action === "skip" ? "Skip" : action === "replace" ? "Replace" : "Import as Copy"}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Paste JSON */}
+                <Collapsible open={showPasteJson} onOpenChange={setShowPasteJson}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
+                      <FileText className="h-3 w-3 mr-1.5" /> Or paste JSON directly <ChevronDown className="h-3 w-3 ml-auto" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2 space-y-2">
+                    <Textarea
+                      value={pasteJsonText}
+                      onChange={e => setPasteJsonText(e.target.value)}
+                      placeholder={`Paste quiz JSON here...\n{\n  "title": "My Quiz",\n  "questions": [...]\n}`}
+                      rows={5}
+                      className="font-mono text-xs"
+                    />
+                    <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={addPastedJsonEntry} disabled={!pasteJsonText.trim()}>
+                      <CheckCircle className="h-3.5 w-3.5" /> Parse & Add to List
+                    </Button>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* Format hint */}
+                {jsonEntries.length === 0 && (
+                  <div className="rounded-xl border border-blue-200/60 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800/60 p-3 space-y-1">
+                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-400">Supported JSON Format</p>
+                    <p className="text-xs text-muted-foreground">Single quiz object or an array of quizzes. Each must have <code className="bg-muted px-1 rounded">title</code> and <code className="bg-muted px-1 rounded">questions</code>. Use the ↓ export on any quiz card to get a ready-to-import file.</p>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
@@ -1242,6 +1656,12 @@ export function QuizManager() {
             ) : importTab === "html" && importHtml && parsedPreview ? (
               <Button onClick={() => { const quiz = parseQuizHtml(importHtml); if (quiz) { saveQuizzes([...quizzes, quiz]); setShowImportDialog(false); resetImportDialog(); toast.success(`Imported "${quiz.title}"`) } }} size="sm" className="w-full sm:w-auto text-xs">
                 <Upload className="h-3.5 w-3.5 mr-1.5" /> Import Quiz
+              </Button>
+            ) : importTab === "json" && jsonReadyCount > 0 ? (
+              <Button onClick={importAllJsonQuizzes} size="sm" className="w-full sm:w-auto text-xs bg-blue-500 hover:bg-blue-600">
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+                Import {jsonReadyCount} Quiz{jsonReadyCount !== 1 ? "zes" : ""}
+                {jsonConflictCount > 0 && <span className="ml-1.5 text-[10px] opacity-80">({jsonConflictCount} conflict{jsonConflictCount !== 1 ? "s" : ""})</span>}
               </Button>
             ) : (
               <Button disabled size="sm" className="w-full sm:w-auto text-xs"><Upload className="h-3.5 w-3.5 mr-1.5" /> Import</Button>
