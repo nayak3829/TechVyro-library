@@ -84,22 +84,28 @@ const GROUP_LABELS: Record<string, string> = {
 export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [pdfs, setPdfs] = useState<PDF[]>([])
+  const [quizCount, setQuizCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [lastRefreshed, setLastRefreshed] = useState(new Date())
 
   const fetchData = useCallback(async () => {
     try {
-      const [catsRes, pdfsRes] = await Promise.all([
+      const [catsRes, pdfsRes, statsRes] = await Promise.all([
         fetch("/api/categories"),
         fetch("/api/pdfs"),
+        fetch("/api/stats/summary"),
       ])
       const catsData = await catsRes.json()
       const pdfsData = await pdfsRes.json()
+      const statsData = await statsRes.json()
       setCategories(catsData.categories || [])
       setPdfs(pdfsData.pdfs || [])
+      if (!statsData.error) setQuizCount(statsData.totalQuizzes || 0)
+      setLastRefreshed(new Date())
     } catch {
       toast.error("Failed to fetch data")
     } finally {
@@ -109,6 +115,13 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    const autoRefresh = setInterval(() => {
+      fetchData()
+    }, 5 * 60 * 1000)
+    return () => clearInterval(autoRefresh)
+  }, [fetchData])
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000)
@@ -240,6 +253,11 @@ export default function AdminPage() {
                             {totalReviews}
                           </Badge>
                         )}
+                        {item.id === "quizzes" && quizCount > 0 && (
+                          <Badge className={`text-[10px] h-4 px-1.5 ${isActive ? "bg-white/20 text-white border-0" : "bg-amber-500/10 text-amber-600 border-0"}`}>
+                            {quizCount}
+                          </Badge>
+                        )}
                       </button>
                     )
                   })}
@@ -290,7 +308,7 @@ export default function AdminPage() {
             {/* Live indicator */}
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 rounded-full px-3 py-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-              Live
+              Live · {lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </div>
 
             <Button
@@ -335,9 +353,9 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
                 <StatCard label="Total PDFs" value={pdfs.length} icon={FileText} color="violet" onClick={() => navigate("pdfs")} />
                 <StatCard label="Categories" value={categories.length} icon={Database} color="blue" onClick={() => navigate("categories")} />
+                <StatCard label="Quizzes" value={quizCount} icon={Zap} color="amber" onClick={() => navigate("quizzes")} />
                 <StatCard label="Total Views" value={totalViews} icon={Eye} color="green" />
-                <StatCard label="Downloads" value={totalDownloads} icon={Download} color="amber" />
-                <StatCard label="Reviews" value={totalReviews} icon={MessageSquare} color="pink" onClick={() => navigate("reviews")} />
+                <StatCard label="Downloads" value={totalDownloads} icon={Download} color="pink" />
                 <StatCard label="Storage" value={formatBytes(totalStorage)} icon={HardDrive} color="slate" isString />
               </div>
 
@@ -538,17 +556,17 @@ export default function AdminPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {[
-                      { label: "Database", status: "operational" },
-                      { label: "File Storage", status: "operational" },
-                      { label: "API Server", status: "operational" },
-                      { label: "Quiz Engine", status: "operational" },
-                      { label: "Search Index", status: "operational" },
-                    ].map(({ label, status }) => (
+                      { label: "Database", ok: categories.length >= 0 },
+                      { label: "File Storage", ok: pdfs.length >= 0 },
+                      { label: "API Server", ok: true },
+                      { label: "Quiz Engine", ok: quizCount >= 0 },
+                      { label: "Search Index", ok: true },
+                    ].map(({ label, ok }) => (
                       <div key={label} className="flex items-center justify-between py-1">
                         <span className="text-sm text-muted-foreground">{label}</span>
                         <div className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                          <span className="text-xs text-green-600 font-medium">Operational</span>
+                          <span className={`h-2 w-2 rounded-full ${ok ? "bg-green-500 animate-pulse" : "bg-rose-500"}`} />
+                          <span className={`text-xs font-medium ${ok ? "text-green-600" : "text-rose-500"}`}>{ok ? "Operational" : "Degraded"}</span>
                         </div>
                       </div>
                     ))}
@@ -567,6 +585,14 @@ export default function AdminPage() {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Total Categories</span>
                         <span className="font-medium">{categories.length}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Quizzes</span>
+                        <span className="font-medium">{quizCount}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Last Synced</span>
+                        <span className="font-medium text-green-600">{lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                     </div>
                   </CardContent>

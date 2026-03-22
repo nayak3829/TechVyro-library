@@ -40,9 +40,10 @@ All website content is controlled via the admin panel and stored in Supabase `si
 
 Components that fetch from API:
 - `components/footer.tsx` — fetches `general_settings` for social links, contact info
-- `components/home/hero-section.tsx` — fetches `hero_settings` + `general_settings` (WhatsApp URL)
+- `components/home/hero-section.tsx` — fetches `hero_settings` + `general_settings` + `/api/stats/summary` for real PDF count, downloads, views, and recent PDF cards
 - `components/whatsapp-popup.tsx` — fetches `general_settings` for channel URL and popup toggle
 - `app/page.tsx` — fetches `general_settings` for bottom CTA WhatsApp link
+- `components/header.tsx` — fetches `/api/categories` for dynamic search suggestions; live PDF search via `/api/pdfs/search` with 300ms debounce
 
 ## Architecture
 
@@ -86,6 +87,8 @@ Components that fetch from API:
 | `/api/admin/verify` | GET | Admin | Token verify |
 | `/api/upload` | POST | Admin | PDF file upload |
 | `/api/stats` | GET | — | Dashboard stats |
+| `/api/stats/summary` | GET | — | Aggregate stats (pdfs, downloads, views, recent/popular PDFs) |
+| `/api/pdfs/search` | GET | — | Live PDF title search with `?q=` and `?limit=` params |
 
 ### Key Components
 - `app/admin/page.tsx` — Admin dashboard with tabs

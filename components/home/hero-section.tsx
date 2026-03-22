@@ -28,11 +28,40 @@ const features = [
 
 const DEFAULT_WHATSAPP = "https://whatsapp.com/channel/0029Vadk2XHLSmbX3oEVmX37"
 
-const floatingCards = [
-  { icon: FileText, label: "NDA Mathematics Notes", badge: "New", badgeColor: "bg-emerald-500", stat: "2.4k downloads", color: "from-blue-500/10 to-blue-600/5", border: "border-blue-500/20" },
-  { icon: Download, label: "Physics Revision Pack", badge: "Trending", badgeColor: "bg-rose-500", stat: "1.8k downloads", color: "from-purple-500/10 to-purple-600/5", border: "border-purple-500/20" },
-  { icon: TrendingUp, label: "English Grammar PDF", badge: "Popular", badgeColor: "bg-amber-500", stat: "3.1k downloads", color: "from-amber-500/10 to-amber-600/5", border: "border-amber-500/20" },
+const CARD_CONFIGS = [
+  { color: "from-blue-500/10 to-blue-600/5", border: "border-blue-500/20", badge: "New", badgeColor: "bg-emerald-500" },
+  { color: "from-purple-500/10 to-purple-600/5", border: "border-purple-500/20", badge: "Trending", badgeColor: "bg-rose-500" },
+  { color: "from-amber-500/10 to-amber-600/5", border: "border-amber-500/20", badge: "Popular", badgeColor: "bg-amber-500" },
 ]
+
+interface SummaryStats {
+  totalPdfs: number
+  totalDownloads: number
+  totalViews: number
+  avgRating: number
+  thisWeekDownloads: number
+  thisWeekUploads: number
+  recentPdfs: { id: string; title: string; download_count: number; view_count: number }[]
+  popularPdfs: { id: string; title: string; download_count: number; view_count: number }[]
+  latestUpload: { id: string; title: string; created_at: string } | null
+}
+
+function formatCount(n: number): string {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(0)}K`
+  return n > 0 ? `${n}` : "0"
+}
+
+function formatSince(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
 
 export function HeroSection() {
   const [taglineIndex, setTaglineIndex] = useState(0)
@@ -45,6 +74,8 @@ export function HeroSection() {
   const [heroBtnText, setHeroBtnText] = useState("Browse Library")
   const [whatsappBtnText, setWhatsappBtnText] = useState("Join Updates")
   const [whatsappUrl, setWhatsappUrl] = useState(DEFAULT_WHATSAPP)
+
+  const [liveStats, setLiveStats] = useState<SummaryStats | null>(null)
 
   useEffect(() => {
     fetch("/api/site-settings?key=hero_settings")
@@ -67,6 +98,13 @@ export function HeroSection() {
         if (data.value?.whatsappChannelUrl) setWhatsappUrl(data.value.whatsappChannelUrl)
       })
       .catch(() => {})
+
+    fetch("/api/stats/summary")
+      .then(r => r.json())
+      .then(data => {
+        if (!data.error) setLiveStats(data)
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -87,9 +125,62 @@ export function HeroSection() {
     color: STAT_COLORS[i % STAT_COLORS.length],
   }))
 
+  const miniStats = [
+    {
+      label: "PDFs",
+      value: liveStats ? (liveStats.totalPdfs > 0 ? `${liveStats.totalPdfs}+` : "—") : "...",
+      icon: FileText,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    {
+      label: "Downloads",
+      value: liveStats ? (liveStats.totalDownloads > 0 ? `${formatCount(liveStats.totalDownloads)}+` : "—") : "...",
+      icon: Download,
+      color: "text-green-500",
+      bg: "bg-green-500/10",
+    },
+    {
+      label: "Views",
+      value: liveStats ? (liveStats.totalViews > 0 ? `${formatCount(liveStats.totalViews)}+` : "—") : "...",
+      icon: Users,
+      color: "text-purple-500",
+      bg: "bg-purple-500/10",
+    },
+  ]
+
+  const floatingCards = liveStats && liveStats.recentPdfs.length > 0
+    ? liveStats.recentPdfs.map((pdf, i) => ({
+        label: pdf.title,
+        stat: `${formatCount(pdf.download_count)} downloads`,
+        ...CARD_CONFIGS[i % CARD_CONFIGS.length],
+      }))
+    : CARD_CONFIGS.map((cfg, i) => ({
+        label: ["NDA Mathematics Notes", "Physics Revision Pack", "English Grammar PDF"][i],
+        stat: ["2.4k downloads", "1.8k downloads", "3.1k downloads"][i],
+        ...cfg,
+      }))
+
+  const displayRating = liveStats && liveStats.avgRating > 0
+    ? liveStats.avgRating.toFixed(1)
+    : "4.9"
+
+  const newUploadLabel = liveStats?.latestUpload
+    ? liveStats.latestUpload.title.length > 22
+      ? liveStats.latestUpload.title.slice(0, 22) + "…"
+      : liveStats.latestUpload.title
+    : "Just now!"
+
+  const newUploadTime = liveStats?.latestUpload
+    ? formatSince(liveStats.latestUpload.created_at)
+    : "Just now"
+
+  const weekDownloadsLabel = liveStats && liveStats.thisWeekDownloads > 0
+    ? `+${formatCount(liveStats.thisWeekDownloads)} downloads`
+    : "+500 downloads"
+
   return (
     <section className="relative overflow-hidden">
-      {/* Rich layered background */}
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_60%_40%,rgba(120,80,200,0.10),transparent)]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_10%_80%,rgba(239,68,68,0.07),transparent)]" />
@@ -100,10 +191,9 @@ export function HeroSection() {
       <div className="container mx-auto px-4 pt-10 pb-10 sm:pt-16 sm:pb-14 lg:pt-24 lg:pb-20 relative">
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
 
-          {/* LEFT — Text content (always first on mobile) */}
+          {/* LEFT — Text content */}
           <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
 
-            {/* Announcement Banner */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/15 to-accent/15 border border-primary/25 text-xs font-semibold text-primary mb-4 sm:mb-6 animate-in fade-in slide-in-from-bottom-3 duration-500 backdrop-blur-sm">
               <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
               <Sparkles className="h-3 w-3" />
@@ -111,7 +201,6 @@ export function HeroSection() {
               <ArrowRight className="h-3 w-3 opacity-60 shrink-0" />
             </div>
 
-            {/* Trust Badges */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-1.5 sm:gap-2 mb-4 sm:mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
               {activeTrustStats.map((stat, index) => (
                 <div
@@ -124,7 +213,6 @@ export function HeroSection() {
               ))}
             </div>
 
-            {/* Main Heading */}
             <h1 className="text-3xl sm:text-5xl lg:text-5xl xl:text-6xl font-extrabold tracking-tight mb-3 sm:mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 leading-[1.1]">
               <span className="text-foreground">Welcome to </span>
               <span className="relative inline-block">
@@ -144,19 +232,16 @@ export function HeroSection() {
               </span>
             </h1>
 
-            {/* Animated Tagline */}
             <div className="h-7 sm:h-9 mb-3 sm:mb-5 overflow-hidden animate-in fade-in duration-700 delay-200">
               <p className={`text-lg sm:text-2xl font-bold bg-gradient-to-r from-foreground/70 to-foreground/50 bg-clip-text text-transparent transition-all duration-500 ${isAnimating ? "opacity-0 -translate-y-3" : "opacity-100 translate-y-0"}`}>
                 {taglines[taglineIndex] || ""}
               </p>
             </div>
 
-            {/* Description */}
             <p className="text-sm sm:text-base text-muted-foreground max-w-lg mb-6 sm:mb-8 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 px-1 sm:px-0">
               {description}
             </p>
 
-            {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-3 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 mb-6 sm:mb-8">
               <Button
                 size="lg"
@@ -184,7 +269,6 @@ export function HeroSection() {
               </Button>
             </div>
 
-            {/* Feature Pills */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400">
               {features.map((feature, index) => (
                 <div
@@ -198,13 +282,11 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* RIGHT — Visual panel (hidden on small mobile, shown from sm up) */}
+          {/* RIGHT — Visual panel */}
           <div className="relative hidden sm:flex items-center justify-center animate-in fade-in slide-in-from-right-8 duration-1000 delay-200 mt-4 lg:mt-0">
-            {/* Glow behind the panel */}
             <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-accent/10 to-transparent rounded-3xl blur-2xl scale-90" />
 
             <div className="relative w-full max-w-md mx-auto">
-              {/* Main visual card — tighter padding on tablet */}
               <div className="relative bg-card/70 backdrop-blur-xl border border-border/50 rounded-3xl p-4 sm:p-5 lg:p-6 shadow-2xl shadow-black/10">
                 {/* Card header */}
                 <div className="flex items-center justify-between mb-4">
@@ -223,13 +305,9 @@ export function HeroSection() {
                   </div>
                 </div>
 
-                {/* Mini stat row */}
+                {/* Mini stat row — real data */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
-                  {[
-                    { label: "PDFs", value: "500+", icon: FileText, color: "text-blue-500", bg: "bg-blue-500/10" },
-                    { label: "Downloads", value: "50K+", icon: Download, color: "text-green-500", bg: "bg-green-500/10" },
-                    { label: "Students", value: "10K+", icon: Users, color: "text-purple-500", bg: "bg-purple-500/10" },
-                  ].map((s, i) => (
+                  {miniStats.map((s, i) => (
                     <div key={i} className="flex flex-col items-center p-2.5 sm:p-3 rounded-2xl bg-muted/40 border border-border/30">
                       <div className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl ${s.bg} mb-1.5`}>
                         <s.icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${s.color}`} />
@@ -240,7 +318,7 @@ export function HeroSection() {
                   ))}
                 </div>
 
-                {/* Document cards */}
+                {/* Document cards — real recent PDFs */}
                 <div className="space-y-2">
                   {floatingCards.map((card, i) => (
                     <div
@@ -248,7 +326,7 @@ export function HeroSection() {
                       className={`flex items-center gap-2.5 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r ${card.color} border ${card.border} backdrop-blur-sm hover:scale-[1.02] transition-transform duration-300`}
                     >
                       <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-card/80 border border-border/40 shadow-sm">
-                        <card.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-foreground/70" />
+                        <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-foreground/70" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] sm:text-xs font-medium text-foreground truncate">{card.label}</p>
@@ -264,26 +342,30 @@ export function HeroSection() {
                   ))}
                 </div>
 
-                {/* Rating footer */}
+                {/* Rating footer — real avg rating */}
                 <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30 flex items-center justify-between">
                   <div className="flex items-center gap-0.5 sm:gap-1">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-400 fill-amber-400" />
                     ))}
-                    <span className="text-xs font-semibold text-foreground ml-1">4.9</span>
+                    <span className="text-xs font-semibold text-foreground ml-1">{displayRating}</span>
                   </div>
-                  <span className="text-[10px] sm:text-xs text-muted-foreground">Trusted by 10K+ students</span>
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
+                    {liveStats && liveStats.totalViews > 0
+                      ? `Trusted by ${formatCount(liveStats.totalViews)}+ readers`
+                      : "Trusted by students"}
+                  </span>
                 </div>
               </div>
 
-              {/* Floating accent chips — safely inset on tablet, positioned outside only on lg+ */}
+              {/* Floating chips — real data */}
               <div className="absolute -top-3 right-2 lg:-top-4 lg:-right-4 bg-card/90 backdrop-blur-xl border border-border/50 rounded-2xl px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-xl flex items-center gap-1.5 sm:gap-2 animate-bounce" style={{ animationDuration: "3s" }}>
                 <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 shadow shrink-0">
                   <Download className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
                 </div>
                 <div>
                   <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-none mb-0.5">New Upload</p>
-                  <p className="text-[11px] sm:text-xs font-bold text-foreground leading-none">Just now!</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-foreground leading-none">{newUploadTime}</p>
                 </div>
               </div>
 
@@ -293,19 +375,15 @@ export function HeroSection() {
                 </div>
                 <div>
                   <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-none mb-0.5">This week</p>
-                  <p className="text-[11px] sm:text-xs font-bold text-foreground leading-none">+500 downloads</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-foreground leading-none">{weekDownloadsLabel}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Mobile-only compact stats strip (shown only on xs, hidden from sm up) */}
+          {/* Mobile-only compact stats strip */}
           <div className="sm:hidden grid grid-cols-3 gap-2 -mt-2 animate-in fade-in duration-700 delay-300">
-            {[
-              { label: "PDFs", value: "500+", icon: FileText, color: "text-blue-500", bg: "bg-blue-500/10" },
-              { label: "Downloads", value: "50K+", icon: Download, color: "text-green-500", bg: "bg-green-500/10" },
-              { label: "Students", value: "10K+", icon: Users, color: "text-purple-500", bg: "bg-purple-500/10" },
-            ].map((s, i) => (
+            {miniStats.map((s, i) => (
               <div key={i} className="flex flex-col items-center p-3 rounded-2xl bg-card/70 backdrop-blur-sm border border-border/40">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${s.bg} mb-1.5`}>
                   <s.icon className={`h-4 w-4 ${s.color}`} />
