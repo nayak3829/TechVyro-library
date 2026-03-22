@@ -31,6 +31,7 @@ const sections: SettingSection[] = [
   { id: "watermark", title: "Watermark", description: "PDF watermark settings", icon: FileText, color: "blue" },
   { id: "security", title: "Security", description: "Access and protection", icon: Shield, color: "green" },
   { id: "notifications", title: "Notifications", description: "Alert preferences", icon: Bell, color: "amber" },
+  { id: "setup", title: "DB Setup", description: "Run SQL migrations", icon: Database, color: "orange" },
 ]
 
 const DEFAULT_TAGLINES = [
@@ -122,10 +123,21 @@ export function SiteSettings() {
           body: JSON.stringify({ hero_settings: heroSettings }),
         }),
       ])
-      if (!res1.ok || !res2.ok) throw new Error("Save failed")
+
+      const [data1, data2] = await Promise.all([res1.json(), res2.json()])
+
+      if (!res1.ok || !res2.ok) {
+        const errMsg = data1.error || data2.error || "Save failed"
+        if (errMsg.includes("does not exist") || errMsg.includes("42P01")) {
+          toast.error("Database table missing. Run the SQL setup script in your Supabase dashboard — see the Setup tab.", { duration: 6000 })
+        } else {
+          toast.error(`Failed to save: ${errMsg}`)
+        }
+        return
+      }
       toast.success("Settings saved successfully!")
     } catch {
-      toast.error("Failed to save settings")
+      toast.error("Failed to save settings — check your database connection.")
     } finally {
       setSaving(false)
     }
@@ -783,26 +795,202 @@ export function SiteSettings() {
         </Card>
       )}
 
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <Button 
-          onClick={handleSave} 
-          disabled={saving}
-          className="gap-2 px-6"
-        >
-          {saving ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              Save Settings
-            </>
-          )}
-        </Button>
-      </div>
+      {/* DB Setup Section */}
+      {activeSection === "setup" && (
+        <Card className="border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-orange-500" />
+              Database Setup
+            </CardTitle>
+            <CardDescription>
+              Run these SQL scripts in your Supabase SQL Editor to create all required tables.
+              Go to: <strong>Supabase Dashboard → SQL Editor → New Query</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 flex gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-600">If settings are failing to save</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The <code className="font-mono bg-muted px-1 rounded">site_settings</code> table may not exist in your Supabase database. Run the SQL below to fix it.
+                </p>
+              </div>
+            </div>
+
+            {[
+              {
+                label: "Script 1 — Core Tables (categories, pdfs)",
+                filename: "001_create_tables.sql",
+                sql: `CREATE TABLE IF NOT EXISTS categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  color TEXT DEFAULT '#8B5CF6',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS pdfs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  file_path TEXT NOT NULL,
+  file_size BIGINT,
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  download_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pdfs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY IF NOT EXISTS "Allow public read access on categories" ON categories FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Allow public read access on pdfs" ON pdfs FOR SELECT USING (true);`
+              },
+              {
+                label: "Script 2 — Site Settings (fixes save error)",
+                filename: "005_create_site_settings.sql",
+                sql: `CREATE TABLE IF NOT EXISTS site_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow public read on site_settings" ON site_settings FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow upsert on site_settings" ON site_settings FOR INSERT WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow update on site_settings" ON site_settings FOR UPDATE USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;`
+              },
+              {
+                label: "Script 3 — Reviews",
+                filename: "003_add_reviews.sql",
+                sql: `CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pdf_id UUID REFERENCES pdfs(id) ON DELETE CASCADE,
+  reviewer_name TEXT NOT NULL DEFAULT 'Anonymous',
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow public read on reviews" ON reviews FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow public insert on reviews" ON reviews FOR INSERT WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;`
+              },
+              {
+                label: "Script 4 — Quiz Tables",
+                filename: "004_create_quiz_tables.sql",
+                sql: `CREATE TABLE IF NOT EXISTS quizzes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  questions JSONB NOT NULL DEFAULT '[]',
+  time_limit INTEGER DEFAULT 30,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS quiz_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id UUID REFERENCES quizzes(id) ON DELETE CASCADE,
+  player_name TEXT NOT NULL,
+  score INTEGER NOT NULL DEFAULT 0,
+  total_questions INTEGER NOT NULL DEFAULT 0,
+  time_taken INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quiz_results ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN CREATE POLICY "Allow public read on quizzes" ON quizzes FOR SELECT USING (true); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE POLICY "Allow public read on quiz_results" ON quiz_results FOR SELECT USING (true); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE POLICY "Allow public insert on quiz_results" ON quiz_results FOR INSERT WITH CHECK (true); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`
+              },
+            ].map(({ label, filename, sql }) => (
+              <div key={filename} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{label}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1.5"
+                    onClick={() => {
+                      navigator.clipboard.writeText(sql)
+                      toast.success(`Copied ${filename}!`)
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copy SQL
+                  </Button>
+                </div>
+                <pre className="text-[11px] bg-muted/60 rounded-lg p-3 overflow-x-auto border border-border/50 text-muted-foreground leading-relaxed max-h-40 overflow-y-auto">
+                  {sql}
+                </pre>
+              </div>
+            ))}
+
+            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30 flex gap-3">
+              <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+              <div className="text-sm space-y-1">
+                <p className="font-medium text-blue-600">How to run</p>
+                <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
+                  <li>Open your Supabase project dashboard</li>
+                  <li>Go to <strong>SQL Editor</strong> in the left sidebar</li>
+                  <li>Click <strong>New Query</strong></li>
+                  <li>Paste the SQL above and click <strong>Run</strong></li>
+                  <li>Repeat for each script in order</li>
+                </ol>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Save Button — hidden on setup tab */}
+      {activeSection !== "setup" && (
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="gap-2 px-6"
+          >
+            {saving ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save Settings
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
