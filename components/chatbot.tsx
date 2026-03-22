@@ -597,13 +597,17 @@ function AdminLiveChat({ onBack }: { onBack: () => void }) {
       const data = await res.json()
 
       if (data.sessionId) {
+        // Set lastSince to NOW so first poll only fetches messages after this point
+        // (prevents student's own locally-added messages from being re-fetched from DB)
+        const sessionStartTime = new Date().toISOString()
+        setLastSince(sessionStartTime)
         setSessionId(data.sessionId)
         setStep("chat")
         setLiveMessages([{
           id: "system-1",
           sender: "admin",
           message: `✅ Chat shuru ho gaya! Admin ko Telegram notification bhej di gayi hai. Woh jald reply karenge. Session ID: #${data.sessionId}`,
-          created_at: new Date().toISOString(),
+          created_at: sessionStartTime,
         }])
         setTimeout(() => inputRef.current?.focus(), 200)
       } else {
