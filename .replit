@@ -38,3 +38,43 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+modules = ["nodejs-20", "web", "postgresql-16"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+NEXT_PUBLIC_SUPABASE_URL = "https://ggszntmesnjceytrcfhd.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_SAv-nm0GgKxnp-kxTHk_-w_x_fqY6Wf"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
