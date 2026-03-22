@@ -392,6 +392,16 @@
    PRINT STYLES
    ===================================================== */
 
+/* Chat header shimmer sweep */
+@keyframes chatShimmer {
+  0% { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(200%); }
+}
+
+.animate-chat-shimmer {
+  animation: chatShimmer 3s ease-in-out infinite;
+}
+
 @media print {
   .no-print {
     display: none !important;
