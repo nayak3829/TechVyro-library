@@ -5,7 +5,7 @@ import {
   Upload, FileText, X, CheckCircle, Loader2, AlertCircle, 
   Zap, Files, FolderPlus, Tag, Eye, Calendar, Clock, Lock, 
   Globe, Link2, FileCheck, Sparkles, ChevronDown, ChevronUp, Settings2,
-  Hash, Download, Shield, RefreshCw, Type, Replace, ArrowRight, Code, Shuffle
+  Hash, Download, Shield, RefreshCw, Type, Replace, ArrowRight, Code, Shuffle, Scissors
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -98,6 +98,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
   const [globalTagInput, setGlobalTagInput] = useState("")
   const [globalStructureLocation, setGlobalStructureLocation] = useState<{ folderId: string; categoryId: string; sectionId: string }>({ folderId: "", categoryId: "", sectionId: "" })
   const [isUploading, setIsUploading] = useState(false)
+  const [isSplitting, setIsSplitting] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
   const [showBulkTitleEditor, setShowBulkTitleEditor] = useState(false)
@@ -132,71 +133,177 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
     if (initialCategories.length > 0) setCategoriesList(initialCategories)
   }, [initialCategories])
 
-  function addFiles(files: FileList | File[]) {
+  // ── makeEntry helper ──────────────────────────────────────────────
+  function makeEntry(file: File, overrides?: Partial<FileEntry>): FileEntry {
+    const title = titleFromFilename(file.name)
+    return {
+      id: generateId(), file, title,
+      description: "",
+      categoryId: globalCategory,
+      structureLocation: { ...globalStructureLocation },
+      tags: [...globalTags],
+      visibility: globalVisibility,
+      scheduledAt: null,
+      allowDownload: true,
+      customSlug: slugify(title),
+      status: "pending",
+      progress: 0,
+      showAdvanced: false,
+      isDuplicate: false,
+      replaceExisting: false,
+      ...overrides,
+    }
+  }
+
+  // ── PDF Splitter ───────────────────────────────────────────────────
+  async function splitPdfFile(file: File): Promise<File[]> {
+    const { PDFDocument } = await import("pdf-lib")
+    const arrayBuffer = await file.arrayBuffer()
+    const sourcePdf = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true })
+    const totalPages = sourcePdf.getPageCount()
+
+    if (totalPages === 0) throw new Error("PDF has no pages")
+    if (totalPages === 1) {
+      // Single-page PDF — can't split further, return as-is even if large
+      return [file]
+    }
+
+    const TARGET = 40 * 1024 * 1024 // 40 MB target per part
+    const numParts = Math.max(2, Math.ceil(file.size / TARGET))
+    const pagesPerPart = Math.ceil(totalPages / numParts)
+    const totalPartsActual = Math.ceil(totalPages / pagesPerPart)
+    const baseName = titleFromFilename(file.name)
+    const parts: File[] = []
+
+    for (let i = 0; i < totalPages; i += pagesPerPart) {
+      const endPage = Math.min(i + pagesPerPart, totalPages)
+      const pageIndices = Array.from({ length: endPage - i }, (_, idx) => i + idx)
+      const partNum = parts.length + 1
+
+      const partDoc = await PDFDocument.create()
+      const copiedPages = await partDoc.copyPagesFrom(sourcePdf, pageIndices)
+      copiedPages.forEach(page => partDoc.addPage(page))
+
+      const partBytes = await partDoc.save()
+      const partName = `${baseName} - Part ${partNum} of ${totalPartsActual}.pdf`
+      parts.push(new File([partBytes], partName, { type: "application/pdf" }))
+    }
+
+    return parts
+  }
+
+  // ── addFiles (async — handles split) ──────────────────────────────
+  async function addFiles(files: FileList | File[]) {
     const allFiles = Array.from(files)
     const validTypes = allFiles.filter((f) =>
       f.type === "application/pdf" || isHtmlFile(f)
     )
     if (validTypes.length === 0) { toast.error("Only PDF or HTML files are allowed"); return }
 
-    const oversizedFiles = validTypes.filter(f => f.size > MAX_FILE_SIZE)
-    const validFiles = validTypes.filter(f => f.size <= MAX_FILE_SIZE)
+    const normalFiles = validTypes.filter(f => f.size <= MAX_FILE_SIZE)
+    const oversizedPdfs = validTypes.filter(f => f.size > MAX_FILE_SIZE && f.type === "application/pdf")
+    const oversizedOthers = validTypes.filter(f => f.size > MAX_FILE_SIZE && !f.type.includes("pdf"))
 
-    if (oversizedFiles.length > 0) {
-      toast.error(`Files exceeding 50MB limit: ${oversizedFiles.map(f => f.name).join(", ")}`, {
-        description: "Please compress or split these files before uploading.",
-        duration: 5000,
-      })
+    if (oversizedOthers.length > 0) {
+      toast.error(`Files exceed 50MB and can't be split: ${oversizedOthers.map(f => f.name).join(", ")}`)
     }
-    if (validFiles.length === 0) return
 
-    const newEntries: FileEntry[] = validFiles.map((file) => {
-      const title = titleFromFilename(file.name)
-      return {
-        id: generateId(), file, title,
-        description: "",
-        categoryId: globalCategory,
-        structureLocation: { ...globalStructureLocation },
-        tags: [...globalTags],
-        visibility: globalVisibility,
-        scheduledAt: null,
-        allowDownload: true,
-        customSlug: slugify(title),
-        status: "pending",
-        progress: 0,
-        showAdvanced: false,
-        isDuplicate: false,
-        replaceExisting: false,
+    // Immediately add normal-size files
+    if (normalFiles.length > 0) {
+      setEntries(prev => [...prev, ...normalFiles.map(f => makeEntry(f))])
+    }
+
+    // Auto-split oversized PDFs
+    if (oversizedPdfs.length > 0) {
+      setIsSplitting(true)
+      const toastId = toast.loading(
+        oversizedPdfs.length === 1
+          ? `Splitting "${titleFromFilename(oversizedPdfs[0].name)}" into parts…`
+          : `Splitting ${oversizedPdfs.length} large files into parts…`
+      )
+      try {
+        const splitEntries: FileEntry[] = []
+        for (const bigFile of oversizedPdfs) {
+          const parts = await splitPdfFile(bigFile)
+          splitEntries.push(...parts.map(p => makeEntry(p)))
+        }
+        setEntries(prev => [...prev, ...splitEntries])
+        toast.dismiss(toastId)
+        if (oversizedPdfs.length === 1) {
+          toast.success(
+            splitEntries.length > 1
+              ? `"${titleFromFilename(oversizedPdfs[0].name)}" split into ${splitEntries.length} parts — ready to upload`
+              : `"${titleFromFilename(oversizedPdfs[0].name)}" added (single page, kept as-is)`
+          )
+        } else {
+          toast.success(`${oversizedPdfs.length} files split into ${splitEntries.length} parts total`)
+        }
+      } catch {
+        toast.dismiss(toastId)
+        toast.error("Failed to split PDF — file may be encrypted or corrupted", {
+          description: "Try compressing or decrypting it first.",
+        })
+      } finally {
+        setIsSplitting(false)
       }
-    })
-    setEntries((prev) => [...prev, ...newEntries])
-    if (validFiles.length > 0 && oversizedFiles.length > 0) {
-      toast.info(`Added ${validFiles.length} file(s). ${oversizedFiles.length} file(s) skipped (over 50MB).`)
     }
   }
 
-  function replaceEntryFile(entryId: string, newFile: File) {
-    if (newFile.size > MAX_FILE_SIZE) {
-      toast.error(`File too large (max 50MB): ${newFile.name}`)
-      return
-    }
+  async function replaceEntryFile(entryId: string, newFile: File) {
     if (newFile.type !== "application/pdf" && !isHtmlFile(newFile)) {
       toast.error("Only PDF or HTML files are allowed")
       return
     }
-    const newTitle = titleFromFilename(newFile.name)
-    updateEntry(entryId, {
-      file: newFile,
-      title: newTitle,
-      customSlug: slugify(newTitle),
-      status: "pending",
-      error: undefined,
-      isDuplicate: false,
-      progress: 0,
-      speedKBps: 0,
-      etaSecs: 0,
-    })
-    toast.success(`File replaced: ${newFile.name}`)
+
+    // If file is within size limit — replace in place
+    if (newFile.size <= MAX_FILE_SIZE) {
+      const newTitle = titleFromFilename(newFile.name)
+      updateEntry(entryId, {
+        file: newFile,
+        title: newTitle,
+        customSlug: slugify(newTitle),
+        status: "pending",
+        error: undefined,
+        isDuplicate: false,
+        progress: 0,
+        speedKBps: 0,
+        etaSecs: 0,
+      })
+      toast.success(`File replaced: ${newFile.name}`)
+      return
+    }
+
+    // Oversized PDF — split into parts, remove current entry, add all parts
+    if (newFile.type === "application/pdf") {
+      setIsSplitting(true)
+      const toastId = toast.loading(`Splitting "${titleFromFilename(newFile.name)}" into parts…`)
+      try {
+        const parts = await splitPdfFile(newFile)
+        // Remove the current entry and add all parts
+        setEntries(prev => {
+          const without = prev.filter(e => e.id !== entryId)
+          const insertIdx = prev.findIndex(e => e.id === entryId)
+          const newParts = parts.map(p => makeEntry(p))
+          if (insertIdx === -1) return [...without, ...newParts]
+          return [...without.slice(0, insertIdx), ...newParts, ...without.slice(insertIdx)]
+        })
+        toast.dismiss(toastId)
+        toast.success(
+          parts.length > 1
+            ? `Replaced with ${parts.length} parts — ready to upload`
+            : `File replaced (kept as single part)`
+        )
+      } catch {
+        toast.dismiss(toastId)
+        toast.error("Failed to split PDF — file may be encrypted or corrupted")
+      } finally {
+        setIsSplitting(false)
+      }
+      return
+    }
+
+    // Oversized HTML or other — reject
+    toast.error(`File exceeds 50MB limit and cannot be split: ${newFile.name}`)
   }
 
   function handleReplaceFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -461,6 +568,20 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
 
   return (
     <div className="space-y-5">
+      {/* Splitting Banner */}
+      {isSplitting && (
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-blue-400/50 bg-blue-500/5 animate-pulse">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
+            <Scissors className="h-4 w-4 text-blue-500" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-700 dark:text-blue-400">Splitting large PDF into parts…</p>
+            <p className="text-xs text-muted-foreground">This may take a moment. Parts will appear in the queue automatically.</p>
+          </div>
+          <Loader2 className="h-4 w-4 text-blue-500 animate-spin shrink-0" />
+        </div>
+      )}
+
       {/* Drop Zone */}
       <div
         className={`relative border-2 border-dashed rounded-xl sm:rounded-2xl p-4 sm:p-10 text-center transition-all duration-300 cursor-pointer group ${
@@ -482,13 +603,16 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
             <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
           </div>
           <p className="font-semibold text-sm sm:text-lg text-foreground">Drop PDF or HTML files here or click to select</p>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">Multiple files supported (max 50MB each)</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">Files over 50MB are auto-split into parts</p>
           <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-4">
             <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-primary bg-primary/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
               <Zap className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Fast
             </span>
             <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-green-600 bg-green-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
               <Files className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Batch
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-blue-600 bg-blue-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
+              <Scissors className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Auto-Split
             </span>
             <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-blue-600 bg-blue-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
               <Tag className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Tags
