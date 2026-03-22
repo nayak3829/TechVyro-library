@@ -2,6 +2,17 @@
 
 A Next.js 16 PDF library and quiz platform with admin dashboard, hosted on Replit with Supabase backend.
 
+## Design System (Advanced Level)
+All public pages follow a consistent premium design language:
+- Gradient hero banners with grid texture overlay and blur orbs
+- Color-coded category/subject accents pulled from database
+- `no-scrollbar` utility for horizontal scroll containers
+- `rounded-2xl`/`rounded-3xl` card shapes with glassmorphism borders
+- Top color-accent bars on cards (1.5px gradient strips)
+- Conic-gradient score rings on quiz results
+- Podium visualization on leaderboard (gold/silver/bronze)
+- Mobile-first: full-width CTAs, horizontal-scrollable filter chips
+
 ## Tech Stack
 - **Framework**: Next.js 16.1.6 (App Router, Turbopack)
 - **Package Manager**: pnpm

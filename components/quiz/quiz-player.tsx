@@ -474,127 +474,123 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
   // Start Screen
   if (!started) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5"}`}>
-        <Card className={`max-w-xl w-full p-6 sm:p-8 text-center ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
-          <div className="mb-6">
-            <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold">
-              <span className="text-red-500">Tech</span>
-              <span className={darkMode ? "text-white" : "text-foreground"}>Vyro</span>
-            </Link>
-            <p className="text-sm text-muted-foreground mt-1">Quiz Platform</p>
-          </div>
-          
-          <h1 className={`text-xl sm:text-2xl font-bold mb-6 ${darkMode ? "text-white" : "text-foreground"}`}>
-            {title}
-          </h1>
-          
-          {/* Name Input Section - Show first */}
-          {!nameEntered ? (
-            <div className={`p-4 sm:p-6 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-primary/5 border border-primary/20"}`}>
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Trophy className="h-6 w-6 text-primary" />
-                <h2 className="text-lg font-semibold">Enter Your Name</h2>
-              </div>
-              <p className={`text-sm mb-4 ${darkMode ? "text-gray-300" : "text-muted-foreground"}`}>
-                Your name will appear on the leaderboard after completing the quiz
-              </p>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter your full name"
-                  className={`w-full px-4 py-3 rounded-xl border text-center text-lg font-medium ${
-                    darkMode 
-                      ? "bg-gray-600 border-gray-500 text-white placeholder:text-gray-400" 
-                      : "bg-background border-border focus:border-primary"
-                  } focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all`}
-                  onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
-                  autoFocus
-                />
-                <Button 
-                  size="lg" 
-                  className="w-full text-lg py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-                  onClick={handleNameSubmit}
-                  disabled={!playerName.trim()}
-                >
-                  Continue
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Show entered name */}
-              <div className={`flex items-center justify-center gap-2 mb-4 p-3 rounded-lg ${darkMode ? "bg-green-900/30" : "bg-green-50 border border-green-200"}`}>
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span className={`font-medium ${darkMode ? "text-green-400" : "text-green-700"}`}>
-                  Welcome, {playerName}!
-                </span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 px-2 text-xs"
-                  onClick={() => setNameEntered(false)}
-                >
-                  Edit
-                </Button>
-              </div>
-              
-              {/* Test Instructions */}
-              <div className={`p-4 sm:p-6 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
-                <h2 className="text-lg font-semibold text-primary mb-4">Test Instructions</h2>
-                <div className="space-y-3 text-left text-sm sm:text-base">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-primary shrink-0" />
-                    <span>Total Questions: {questions.length}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-5 w-5 text-primary shrink-0" />
-                    <span>Time Limit: {Math.floor(timeLimit / 60)} minutes</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                    <span>+1 for correct answer</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <XCircle className="h-5 w-5 text-red-500 shrink-0" />
-                    <span>-0.25 for wrong answer (negative marking)</span>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-border text-xs sm:text-sm text-muted-foreground">
-                  <p>Keyboard: Arrow keys to navigate, 1-5 to select, M to mark for review</p>
-                </div>
-              </div>
+      <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-primary/15 via-accent/8 to-background"}`}>
+        {/* Decorative orbs */}
+        <div className="absolute -top-32 -right-32 h-80 w-80 rounded-full blur-3xl opacity-20 bg-primary" />
+        <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full blur-3xl opacity-15 bg-accent" />
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  size="lg" 
-                  className="flex-1 text-lg py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-                  onClick={handleStart}
-                >
-                  Start Test
-                </Button>
-                <Button variant="outline" size="lg" asChild className="py-6">
+        <div className={`relative max-w-xl w-full rounded-3xl border shadow-2xl overflow-hidden ${darkMode ? "bg-gray-800 border-gray-700" : "bg-card/95 backdrop-blur-sm border-border/60"}`}>
+          {/* Top accent bar */}
+          <div className="h-1.5 w-full bg-gradient-to-r from-primary via-accent to-primary" />
+
+          <div className="p-6 sm:p-8 text-center">
+            {/* Brand */}
+            <div className="mb-5">
+              <Link href="/" className="inline-flex items-center gap-1 text-2xl font-extrabold">
+                <span className="text-primary">Tech</span>
+                <span className={darkMode ? "text-white" : "text-foreground"}>Vyro</span>
+              </Link>
+              <p className="text-xs text-muted-foreground mt-0.5">Quiz Platform</p>
+            </div>
+
+            <h1 className={`text-lg sm:text-2xl font-extrabold mb-6 leading-snug ${darkMode ? "text-white" : "text-foreground"}`}>
+              {title}
+            </h1>
+
+            {/* Name Input Section */}
+            {!nameEntered ? (
+              <div className={`p-5 rounded-2xl mb-5 ${darkMode ? "bg-gray-700/80 border border-gray-600" : "bg-primary/5 border border-primary/20"}`}>
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center">
+                    <Trophy className="h-5 w-5 text-primary" />
+                  </div>
+                  <h2 className="text-base font-bold">Enter Your Name</h2>
+                </div>
+                <p className={`text-xs mb-4 ${darkMode ? "text-gray-300" : "text-muted-foreground"}`}>
+                  Your name will appear on the leaderboard after completing this quiz
+                </p>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className={`w-full px-4 py-3 rounded-xl border text-center text-base font-semibold ${
+                      darkMode
+                        ? "bg-gray-600 border-gray-500 text-white placeholder:text-gray-400"
+                        : "bg-background border-border focus:border-primary"
+                    } focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all`}
+                    onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
+                    autoFocus
+                  />
+                  <Button
+                    size="lg"
+                    className="w-full font-bold py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg shadow-primary/20"
+                    onClick={handleNameSubmit}
+                    disabled={!playerName.trim()}
+                  >
+                    Continue →
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Welcome pill */}
+                <div className={`inline-flex items-center justify-center gap-2 mb-5 px-4 py-2 rounded-full text-sm ${darkMode ? "bg-green-900/40 text-green-400 border border-green-800" : "bg-green-50 text-green-700 border border-green-200"}`}>
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-semibold">Welcome, {playerName}!</span>
+                  <button onClick={() => setNameEntered(false)} className="text-xs opacity-60 hover:opacity-100 underline transition-opacity">Edit</button>
+                </div>
+
+                {/* Quick info chips */}
+                <div className="grid grid-cols-2 gap-2.5 mb-5">
+                  {[
+                    { icon: <FileText className="h-4 w-4 text-primary" />, label: `${questions.length} Questions`, bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-primary/5 border-primary/15" },
+                    { icon: <Clock className="h-4 w-4 text-accent" />, label: `${Math.floor(timeLimit / 60)} Minutes`, bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-accent/5 border-accent/15" },
+                    { icon: <CheckCircle className="h-4 w-4 text-green-500" />, label: "+1 Correct", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-green-500/5 border-green-500/15" },
+                    { icon: <XCircle className="h-4 w-4 text-red-500" />, label: "−0.25 Wrong", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-red-500/5 border-red-500/15" },
+                  ].map((item, i) => (
+                    <div key={i} className={`flex items-center gap-2.5 p-3 rounded-xl border text-left ${item.bg}`}>
+                      {item.icon}
+                      <span className={`text-xs font-semibold ${darkMode ? "text-gray-200" : "text-foreground"}`}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground mb-5">
+                  Tip: Use arrow keys to navigate · 1–5 to select · M to mark for review
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    size="lg"
+                    className="flex-1 font-bold py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg shadow-primary/20"
+                    onClick={handleStart}
+                  >
+                    Start Test →
+                  </Button>
+                  <Button variant="outline" size="lg" asChild className="py-6">
+                    <Link href="/quiz">
+                      <Home className="h-4 w-4 mr-2" />
+                      All Quizzes
+                    </Link>
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {!nameEntered && (
+              <div className="mt-4">
+                <Button variant="ghost" size="sm" asChild className="text-muted-foreground">
                   <Link href="/quiz">
                     <Home className="h-4 w-4 mr-2" />
-                    All Quizzes
+                    Back to All Quizzes
                   </Link>
                 </Button>
               </div>
-            </>
-          )}
-          
-          {!nameEntered && (
-            <div className="mt-4">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/quiz">
-                  <Home className="h-4 w-4 mr-2" />
-                  Back to All Quizzes
-                </Link>
-              </Button>
-            </div>
-          )}
-        </Card>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
@@ -605,136 +601,132 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
     const accuracy = answeredCount > 0 ? ((correct / answeredCount) * 100).toFixed(1) : "0"
     const totalTime = timeLimit - timeRemaining
     const percentage = ((correct / questions.length) * 100).toFixed(0)
+    const pct = parseFloat(percentage)
+    const grade = pct >= 80 ? "Excellent!" : pct >= 60 ? "Good Job!" : pct >= 40 ? "Keep Practicing" : "Needs Improvement"
+    const gradeColor = pct >= 70 ? "text-green-500" : pct >= 40 ? "text-amber-500" : "text-red-500"
+    const ringColor = pct >= 70 ? "#22c55e" : pct >= 40 ? "#f59e0b" : "#ef4444"
 
     return (
-      <div className={`min-h-screen p-4 ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-primary/10 to-accent/10"}`}>
-        <Card className={`max-w-2xl mx-auto p-6 sm:p-8 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
-          <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold mb-4">
-              <span className="text-red-500">Tech</span>
-              <span className={darkMode ? "text-white" : "text-foreground"}>Vyro</span>
-            </Link>
-            <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : ""}`}>Performance Summary</h2>
-            
-            {/* Score Circle */}
-            <div className="my-6">
-              <div className={`inline-flex items-center justify-center w-32 h-32 rounded-full border-4 ${
-                parseFloat(percentage) >= 70 ? "border-green-500" : 
-                parseFloat(percentage) >= 40 ? "border-amber-500" : "border-red-500"
-              }`}>
-                <div className="text-center">
-                  <div className="text-3xl font-bold">{percentage}%</div>
-                  <div className="text-xs text-muted-foreground">Score</div>
+      <div className={`min-h-screen p-4 relative overflow-hidden ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-primary/10 via-accent/5 to-background"}`}>
+        <div className="absolute -top-20 -right-20 h-60 w-60 rounded-full blur-3xl opacity-15" style={{ backgroundColor: ringColor }} />
+        <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full blur-3xl opacity-10 bg-primary" />
+
+        <div className={`relative max-w-2xl mx-auto rounded-3xl border shadow-2xl overflow-hidden ${darkMode ? "bg-gray-800 border-gray-700" : "bg-card border-border/60"}`}>
+          {/* Top bar */}
+          <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${ringColor}, ${ringColor}88)` }} />
+
+          <div className="p-5 sm:p-8">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <Link href="/" className="inline-flex items-center gap-1 text-xl font-extrabold mb-3">
+                <span className="text-primary">Tech</span>
+                <span className={darkMode ? "text-white" : "text-foreground"}>Vyro</span>
+              </Link>
+              <h2 className={`text-xl sm:text-2xl font-extrabold mb-1 ${darkMode ? "text-white" : "text-foreground"}`}>Performance Summary</h2>
+              <p className="text-sm text-muted-foreground truncate">{title}</p>
+            </div>
+
+            {/* Score ring + grade */}
+            <div className="flex flex-col items-center mb-6">
+              <div
+                className="relative flex items-center justify-center rounded-full"
+                style={{ width: 140, height: 140, background: `conic-gradient(${ringColor} ${pct * 3.6}deg, transparent 0deg)` }}
+              >
+                <div className={`absolute inset-2 rounded-full flex flex-col items-center justify-center ${darkMode ? "bg-gray-800" : "bg-card"}`}>
+                  <span className={`text-3xl font-extrabold ${gradeColor}`}>{percentage}%</span>
+                  <span className="text-[10px] text-muted-foreground">Score</span>
                 </div>
               </div>
+              <span className={`mt-2 text-base font-bold ${gradeColor}`}>{grade}</span>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
-            <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-primary/10"}`}>
-              <div className="text-2xl sm:text-3xl font-bold text-primary">{score.toFixed(1)}</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">Total Score</div>
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+              {[
+                { label: "Total Score", value: score.toFixed(1), color: "text-primary", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-primary/8 border-primary/20" },
+                { label: "Correct", value: correct, color: "text-green-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-green-500/8 border-green-500/20" },
+                { label: "Wrong", value: wrong, color: "text-red-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-red-500/8 border-red-500/20" },
+                { label: "Skipped", value: skipped, color: "text-amber-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-amber-500/8 border-amber-500/20" },
+              ].map(s => (
+                <div key={s.label} className={`p-3 rounded-2xl border text-center ${s.bg}`}>
+                  <div className={`text-2xl sm:text-3xl font-extrabold ${s.color}`}>{s.value}</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{s.label}</div>
+                </div>
+              ))}
             </div>
-            <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-green-500/10"}`}>
-              <div className="text-2xl sm:text-3xl font-bold text-green-500">{correct}</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">Correct</div>
-            </div>
-            <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-red-500/10"}`}>
-              <div className="text-2xl sm:text-3xl font-bold text-red-500">{wrong}</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">Wrong</div>
-            </div>
-            <div className={`p-4 rounded-xl text-center ${darkMode ? "bg-gray-700" : "bg-amber-500/10"}`}>
-              <div className="text-2xl sm:text-3xl font-bold text-amber-500">{skipped}</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">Skipped</div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
-              <div className="text-lg font-semibold">{accuracy}%</div>
-              <div className="text-sm text-muted-foreground">Accuracy</div>
-            </div>
-            <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
-              <div className="text-lg font-semibold">{formatTime(totalTime)}</div>
-              <div className="text-sm text-muted-foreground">Time Taken</div>
-            </div>
-          </div>
-
-          {/* Leaderboard Status */}
-          <div className={`p-4 rounded-xl mb-6 ${darkMode ? "bg-green-900/30" : "bg-green-50 border border-green-200"}`}>
-            <div className="flex items-center gap-2 text-green-600">
-              <Trophy className="h-5 w-5" />
-              <span className="font-medium">Score saved for: {playerName}</span>
-            </div>
-          </div>
-
-          {/* Mini Leaderboard */}
-          {topLeaderboard.length > 0 && (
-            <div className={`p-4 rounded-xl mb-6 ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <Trophy className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">Top Performers</h3>
+            {/* Accuracy + time */}
+            <div className="grid grid-cols-2 gap-2.5 mb-5">
+              <div className={`p-3 rounded-2xl border text-center ${darkMode ? "bg-gray-700 border-gray-600" : "bg-muted/40 border-border/50"}`}>
+                <div className={`text-lg font-bold ${darkMode ? "text-white" : "text-foreground"}`}>{accuracy}%</div>
+                <div className="text-xs text-muted-foreground">Accuracy</div>
               </div>
-              <div className="space-y-2">
-                {topLeaderboard.map((entry, index) => (
-                  <div 
-                    key={entry.id}
-                    className={`flex items-center gap-3 p-2 rounded-lg ${
-                      index === 0 ? "bg-yellow-500/20" :
-                      index === 1 ? "bg-gray-400/20" :
-                      index === 2 ? "bg-amber-700/20" :
-                      darkMode ? "bg-gray-600/50" : "bg-background/50"
-                    }`}
-                  >
-                    <span className={`w-6 text-center font-bold text-sm ${
-                      index === 0 ? "text-yellow-500" :
-                      index === 1 ? "text-gray-400" :
-                      index === 2 ? "text-amber-700" :
-                      "text-muted-foreground"
-                    }`}>
-                      {index + 1}
-                    </span>
-                    <span className="flex-1 text-sm truncate">{entry.name}</span>
-                    <span className={`font-bold text-sm ${
-                      entry.percentage >= 70 ? "text-green-500" :
-                      entry.percentage >= 40 ? "text-amber-500" : "text-red-500"
-                    }`}>
-                      {entry.percentage}%
-                    </span>
-                  </div>
-                ))}
+              <div className={`p-3 rounded-2xl border text-center ${darkMode ? "bg-gray-700 border-gray-600" : "bg-muted/40 border-border/50"}`}>
+                <div className={`text-lg font-bold ${darkMode ? "text-white" : "text-foreground"}`}>{formatTime(totalTime)}</div>
+                <div className="text-xs text-muted-foreground">Time Taken</div>
               </div>
             </div>
-          )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={handleReview}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              Review Answers
-            </Button>
-            <Button 
-              className="flex-1"
-              onClick={handleRestart}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Restart Quiz
-            </Button>
+            {/* Saved confirmation */}
+            <div className={`flex items-center gap-2 p-3 rounded-xl mb-5 ${darkMode ? "bg-green-900/30 border border-green-800" : "bg-green-50 border border-green-200"}`}>
+              <Trophy className="h-4 w-4 text-green-500 shrink-0" />
+              <span className={`text-xs font-semibold ${darkMode ? "text-green-400" : "text-green-700"}`}>
+                Score saved to leaderboard for: {playerName}
+              </span>
+            </div>
+
+            {/* Mini Leaderboard */}
+            {topLeaderboard.length > 0 && (
+              <div className={`p-4 rounded-2xl border mb-5 ${darkMode ? "bg-gray-700 border-gray-600" : "bg-muted/30 border-border/50"}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Trophy className="h-4 w-4 text-amber-500" />
+                  <h3 className={`text-sm font-bold ${darkMode ? "text-white" : "text-foreground"}`}>Top Performers</h3>
+                </div>
+                <div className="space-y-1.5">
+                  {topLeaderboard.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs ${
+                        index === 0 ? "bg-amber-500/15" :
+                        index === 1 ? "bg-gray-400/15" :
+                        index === 2 ? "bg-amber-700/15" :
+                        darkMode ? "bg-gray-600/40" : "bg-background/60"
+                      }`}
+                    >
+                      <span className={`font-extrabold w-5 text-center ${
+                        index === 0 ? "text-amber-500" :
+                        index === 1 ? "text-gray-400" :
+                        index === 2 ? "text-amber-700" : "text-muted-foreground"
+                      }`}>{index + 1}</span>
+                      <span className={`flex-1 truncate font-medium ${darkMode ? "text-gray-200" : "text-foreground"}`}>{entry.name}</span>
+                      <span className={`font-bold ${
+                        entry.percentage >= 70 ? "text-green-500" :
+                        entry.percentage >= 40 ? "text-amber-500" : "text-red-500"
+                      }`}>{entry.percentage}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button variant="outline" className="flex-1" onClick={handleReview}>
+                <Eye className="h-4 w-4 mr-2" />
+                Review Answers
+              </Button>
+              <Button className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90" onClick={handleRestart}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+
+            <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
+              <Link href="/quiz" className="hover:text-primary transition-colors">More Quizzes</Link>
+              <span>•</span>
+              <Link href="/quiz/leaderboard" className="hover:text-primary transition-colors">View Leaderboard</Link>
+            </div>
           </div>
-          
-          <div className="mt-4 flex items-center justify-center gap-4 text-sm">
-            <Link href="/quiz" className="text-primary hover:underline">
-              More Quizzes
-            </Link>
-            <span className="text-muted-foreground">|</span>
-            <Link href="/quiz/leaderboard" className="text-primary hover:underline">
-              View Leaderboard
-            </Link>
-          </div>
-        </Card>
+        </div>
       </div>
     )
   }
