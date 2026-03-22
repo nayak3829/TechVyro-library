@@ -159,6 +159,7 @@ export function QuizManager() {
       difficulty: "easy" | "medium" | "hard"
       visibility: VisibilityType
       tags: string[]
+      structureLocation: { folderId: string; categoryId: string; sectionId: string }
     }
   }[]>([])
   const [dragActive, setDragActive] = useState(false)
@@ -167,14 +168,19 @@ export function QuizManager() {
     section: "General",
     difficulty: "medium" as "easy" | "medium" | "hard",
     visibility: "public" as VisibilityType,
-    tags: [] as string[]
+    tags: [] as string[],
+    structureLocation: { folderId: "", categoryId: "", sectionId: "" }
   })
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
   
   // Bulk selection state
   const [selectedQuizzes, setSelectedQuizzes] = useState<Set<string>>(new Set())
   const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false)
-  const [bulkMoveTarget, setBulkMoveTarget] = useState({ category: "", section: "" })
+  const [bulkMoveTarget, setBulkMoveTarget] = useState({ 
+    category: "", 
+    section: "",
+    structureLocation: { folderId: "", categoryId: "", sectionId: "" }
+  })
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -289,17 +295,31 @@ export function QuizManager() {
   }
 
   const handleBulkMove = () => {
-    if (selectedQuizzes.size === 0 || !bulkMoveTarget.category) return
+    if (selectedQuizzes.size === 0) return
     
-    saveQuizzes(quizzes.map(q => 
-      selectedQuizzes.has(q.id) 
-        ? { ...q, category: bulkMoveTarget.category, section: bulkMoveTarget.section || q.section } 
+    // Allow moving to category/section OR structure location
+    const hasStructureLocation = bulkMoveTarget.structureLocation?.sectionId
+    if (!bulkMoveTarget.category && !hasStructureLocation) {
+      toast.error("Please select a category or structure location")
+      return
+    }
+    
+    const updated = quizzes.map(q => 
+      selectedQuizzes.has(q.id)
+        ? { 
+            ...q, 
+            ...(bulkMoveTarget.category && { category: bulkMoveTarget.category }),
+            ...(bulkMoveTarget.section && { section: bulkMoveTarget.section }),
+            ...(hasStructureLocation && { structureLocation: bulkMoveTarget.structureLocation })
+          }
         : q
-    ))
+    )
+    saveQuizzes(updated)
+    const count = selectedQuizzes.size
     setSelectedQuizzes(new Set())
     setShowBulkMoveDialog(false)
-    setBulkMoveTarget({ category: "", section: "" })
-    toast.success(`Moved ${selectedQuizzes.size} quizzes to ${bulkMoveTarget.category}`)
+    setBulkMoveTarget({ category: "", section: "", structureLocation: { folderId: "", categoryId: "", sectionId: "" } })
+    toast.success(`Moved ${count} quizzes`)
   }
 
   const handleBulkDuplicate = () => {
@@ -1450,6 +1470,21 @@ export function QuizManager() {
                           </Select>
                         </div>
                       </div>
+                      
+                      {/* Structure Location for all files */}
+                      <div>
+                        <Label className="text-[10px] sm:text-xs flex items-center gap-1 mb-1">
+                          <FolderOpen className="h-3 w-3 text-muted-foreground" />
+                          Content Location
+                        </Label>
+                        <StructureSelector
+                          value={globalSettings.structureLocation}
+                          onChange={(location) => setGlobalSettings(p => ({ ...p, structureLocation: location }))}
+                          placeholder="Select location for all quizzes"
+                          className="w-full text-xs"
+                        />
+                      </div>
+                      
                       <Button size="sm" onClick={applyGlobalSettings} className="w-full h-8 text-xs">
                         Apply to All Files
                       </Button>
@@ -1546,38 +1581,51 @@ export function QuizManager() {
                       </div>
                       
                       {entry.status === "ready" && (
-                        <div className="grid grid-cols-2 gap-1.5 mt-2">
-                          <Select 
-                            value={entry.settings.category} 
-                            onValueChange={v => updateEntrySettings(entry.id, "category", v)}
-                          >
-                            <SelectTrigger className="h-6 sm:h-7 text-[10px] sm:text-xs">
-                              <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Mathematics">Mathematics</SelectItem>
-                              <SelectItem value="Physics">Physics</SelectItem>
-                              <SelectItem value="Chemistry">Chemistry</SelectItem>
-                              <SelectItem value="Biology">Biology</SelectItem>
-                              <SelectItem value="English">English</SelectItem>
-                              <SelectItem value="General">General</SelectItem>
-                              <SelectItem value="NDA">NDA</SelectItem>
-                              <SelectItem value="SSC">SSC</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Select 
-                            value={entry.settings.difficulty} 
-                            onValueChange={v => updateEntrySettings(entry.id, "difficulty", v)}
-                          >
-                            <SelectTrigger className="h-6 sm:h-7 text-[10px] sm:text-xs">
-                              <SelectValue placeholder="Difficulty" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DIFFICULTIES.map(d => (
-                                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        <div className="space-y-1.5 mt-2">
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <Select 
+                              value={entry.settings.category} 
+                              onValueChange={v => updateEntrySettings(entry.id, "category", v)}
+                            >
+                              <SelectTrigger className="h-6 sm:h-7 text-[10px] sm:text-xs">
+                                <SelectValue placeholder="Category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Mathematics">Mathematics</SelectItem>
+                                <SelectItem value="Physics">Physics</SelectItem>
+                                <SelectItem value="Chemistry">Chemistry</SelectItem>
+                                <SelectItem value="Biology">Biology</SelectItem>
+                                <SelectItem value="English">English</SelectItem>
+                                <SelectItem value="General">General</SelectItem>
+                                <SelectItem value="NDA">NDA</SelectItem>
+                                <SelectItem value="SSC">SSC</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select 
+                              value={entry.settings.difficulty} 
+                              onValueChange={v => updateEntrySettings(entry.id, "difficulty", v)}
+                            >
+                              <SelectTrigger className="h-6 sm:h-7 text-[10px] sm:text-xs">
+                                <SelectValue placeholder="Difficulty" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {DIFFICULTIES.map(d => (
+                                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <StructureSelector
+                            value={entry.settings.structureLocation}
+                            onChange={(location) => setUploadEntries(prev => 
+                              prev.map(e => e.id === entry.id 
+                                ? { ...e, settings: { ...e.settings, structureLocation: location } } 
+                                : e
+                              )
+                            )}
+                            placeholder="Select content location"
+                            className="w-full text-[10px]"
+                          />
                         </div>
                       )}
                     </div>
@@ -1743,50 +1791,82 @@ export function QuizManager() {
 
       {/* Bulk Move Dialog */}
       <Dialog open={showBulkMoveDialog} onOpenChange={setShowBulkMoveDialog}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-sm sm:text-base">
+            <DialogTitle className="text-sm sm:text-base flex items-center gap-2">
+              <MoveRight className="h-4 w-4 text-primary" />
               Move {selectedQuizzes.size} Quizzes
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Structure Location */}
             <div>
-              <Label className="text-xs">Category</Label>
-              <Select value={bulkMoveTarget.category} onValueChange={v => setBulkMoveTarget(p => ({ ...p, category: v }))}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mathematics">Mathematics</SelectItem>
-                  <SelectItem value="Physics">Physics</SelectItem>
-                  <SelectItem value="Chemistry">Chemistry</SelectItem>
-                  <SelectItem value="Biology">Biology</SelectItem>
-                  <SelectItem value="English">English</SelectItem>
-                  <SelectItem value="General">General</SelectItem>
-                  <SelectItem value="NDA">NDA</SelectItem>
-                  <SelectItem value="SSC">SSC</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+                <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                Content Structure Location
+              </Label>
+              <StructureSelector
+                value={bulkMoveTarget.structureLocation}
+                onChange={(location) => setBulkMoveTarget(p => ({ ...p, structureLocation: location }))}
+                placeholder="Select folder/category/section"
+                className="w-full"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Move quizzes to a specific content structure</p>
             </div>
-            <div>
-              <Label className="text-xs">Section (optional)</Label>
-              <Select value={bulkMoveTarget.section} onValueChange={v => setBulkMoveTarget(p => ({ ...p, section: v }))}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Keep existing" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SECTIONS.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/50" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-background px-2 text-muted-foreground">OR use legacy categories</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Category</Label>
+                <Select value={bulkMoveTarget.category} onValueChange={v => setBulkMoveTarget(p => ({ ...p, category: v }))}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mathematics">Mathematics</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
+                    <SelectItem value="Chemistry">Chemistry</SelectItem>
+                    <SelectItem value="Biology">Biology</SelectItem>
+                    <SelectItem value="English">English</SelectItem>
+                    <SelectItem value="General">General</SelectItem>
+                    <SelectItem value="NDA">NDA</SelectItem>
+                    <SelectItem value="SSC">SSC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Section</Label>
+                <Select value={bulkMoveTarget.section} onValueChange={v => setBulkMoveTarget(p => ({ ...p, section: v }))}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Keep existing" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBulkMoveDialog(false)} size="sm">
               Cancel
             </Button>
-            <Button onClick={handleBulkMove} disabled={!bulkMoveTarget.category} size="sm">
+            <Button 
+              onClick={handleBulkMove} 
+              disabled={!bulkMoveTarget.category && !bulkMoveTarget.structureLocation?.sectionId} 
+              size="sm"
+            >
+              <MoveRight className="h-3.5 w-3.5 mr-1.5" />
               Move Quizzes
             </Button>
           </DialogFooter>

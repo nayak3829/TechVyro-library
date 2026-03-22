@@ -82,6 +82,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
   const [globalVisibility, setGlobalVisibility] = useState<VisibilityType>("public")
   const [globalTags, setGlobalTags] = useState<string[]>([])
   const [globalTagInput, setGlobalTagInput] = useState("")
+  const [globalStructureLocation, setGlobalStructureLocation] = useState<{ folderId: string; categoryId: string; sectionId: string }>({ folderId: "", categoryId: "", sectionId: "" })
   const [isUploading, setIsUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
@@ -118,7 +119,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         title,
         description: "",
         categoryId: globalCategory,
-        structureLocation: { folderId: "", categoryId: "", sectionId: "" },
+        structureLocation: { ...globalStructureLocation },
         tags: [...globalTags],
         visibility: globalVisibility,
         scheduledAt: null,
@@ -173,6 +174,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         categoryId: globalCategory || e.categoryId,
         visibility: globalVisibility,
         tags: [...new Set([...e.tags, ...globalTags])],
+        structureLocation: globalStructureLocation.sectionId ? { ...globalStructureLocation } : e.structureLocation,
       } : e))
     )
     toast.success("Global settings applied to all pending files")
@@ -472,6 +474,21 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Content Structure Location */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                    Content Location
+                  </Label>
+                  <StructureSelector
+                    value={globalStructureLocation}
+                    onChange={setGlobalStructureLocation}
+                    placeholder="Select folder/category/section"
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">All new PDFs will be added to this location</p>
                 </div>
 
                 {/* Tags Input */}
