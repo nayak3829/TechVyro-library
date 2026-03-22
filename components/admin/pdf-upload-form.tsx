@@ -42,12 +42,14 @@ interface FileEntry {
   scheduledAt: string | null
   allowDownload: boolean
   customSlug: string
-  status: "pending" | "uploading" | "done" | "error"
+  status: "pending" | "checking" | "uploading" | "done" | "error"
   progress: number
   error?: string
   showAdvanced: boolean
   isDuplicate?: boolean
   replaceExisting?: boolean
+  speedKBps?: number   // upload speed in KB/s
+  etaSecs?: number     // estimated seconds remaining
 }
 
 interface PDFUploadFormProps {
@@ -235,12 +237,32 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
 
   // ── Upload Logic ────────────────────────────────────────────────
   const uploadEntry = useCallback(async (entry: FileEntry): Promise<boolean> => {
-    updateEntry(entry.id, { status: "uploading", progress: 0, isDuplicate: false })
-    try {
-      const token = sessionStorage.getItem("admin_token")
-      const title = entry.title.trim() || titleFromFilename(entry.file.name)
+    const token = sessionStorage.getItem("admin_token")
+    const title = entry.title.trim() || titleFromFilename(entry.file.name)
 
-      updateEntry(entry.id, { progress: 10 })
+    try {
+      // Step 0: Pre-check for duplicate title (unless replace is already set)
+      if (!entry.replaceExisting) {
+        updateEntry(entry.id, { status: "checking", progress: 5, isDuplicate: false })
+        try {
+          const checkRes = await fetch(`/api/pdfs/check-title?title=${encodeURIComponent(title)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          const checkData = await checkRes.json().catch(() => ({}))
+          if (checkData.exists) {
+            updateEntry(entry.id, {
+              status: "error", progress: 0,
+              error: "A PDF with this title already exists",
+              isDuplicate: true,
+            })
+            return false
+          }
+        } catch { /* If check fails, proceed anyway */ }
+      }
+
+      updateEntry(entry.id, { status: "uploading", progress: 10, isDuplicate: false })
+
+      // Step 1: Get signed upload URL
       const urlRes = await fetch("/api/pdfs/get-upload-url", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -253,12 +275,27 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
       const { signedUrl, filePath } = await urlRes.json()
       updateEntry(entry.id, { progress: 20 })
 
+      // Step 2: Upload to storage with speed/ETA tracking
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
+        const uploadStart = Date.now()
+        let lastLoaded = 0
+        let lastTime = uploadStart
+
         xhr.upload.addEventListener("progress", (ev) => {
-          if (ev.lengthComputable)
-            updateEntry(entry.id, { progress: 20 + Math.round((ev.loaded / ev.total) * 60) })
+          if (!ev.lengthComputable) return
+          const now = Date.now()
+          const elapsed = (now - lastTime) / 1000
+          const loadedDelta = ev.loaded - lastLoaded
+          const speedKBps = elapsed > 0 ? Math.round(loadedDelta / elapsed / 1024) : 0
+          const remaining = ev.total - ev.loaded
+          const etaSecs = speedKBps > 0 ? Math.round(remaining / (speedKBps * 1024)) : 0
+          lastLoaded = ev.loaded
+          lastTime = now
+          const prog = 20 + Math.round((ev.loaded / ev.total) * 60)
+          updateEntry(entry.id, { progress: prog, speedKBps, etaSecs })
         })
+
         xhr.addEventListener("load", () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Failed to upload file to storage")))
         xhr.addEventListener("error", () => reject(new Error("Network error during upload")))
         xhr.addEventListener("abort", () => reject(new Error("Upload was cancelled")))
@@ -267,8 +304,9 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         xhr.send(entry.file)
       })
 
-      updateEntry(entry.id, { progress: 85 })
+      updateEntry(entry.id, { progress: 85, speedKBps: 0, etaSecs: 0 })
 
+      // Step 3: Save metadata
       const metaRes = await fetch("/api/pdfs/save-metadata", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -285,10 +323,8 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
       if (!metaRes.ok) {
         const metaData = await metaRes.json().catch(() => ({}))
         if (metaData.duplicate) {
-          // Duplicate detected — let user decide to replace
           updateEntry(entry.id, {
-            status: "error",
-            progress: 0,
+            status: "error", progress: 0,
             error: "A PDF with this title already exists",
             isDuplicate: true,
           })
@@ -297,7 +333,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
         throw new Error(metaData.error || "Failed to save PDF metadata")
       }
 
-      updateEntry(entry.id, { status: "done", progress: 100 })
+      updateEntry(entry.id, { status: "done", progress: 100, speedKBps: 0, etaSecs: 0 })
       return true
     } catch (err) {
       let errorMsg = "Upload failed"
@@ -308,7 +344,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
           errorMsg = err.message
         }
       }
-      updateEntry(entry.id, { status: "error", progress: 0, error: errorMsg, isDuplicate: false })
+      updateEntry(entry.id, { status: "error", progress: 0, error: errorMsg, isDuplicate: false, speedKBps: 0, etaSecs: 0 })
       return false
     }
   }, [])
@@ -622,7 +658,22 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
 
       {/* File List */}
       {entries.length > 0 && (
-        <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+        <div className="space-y-3">
+          {/* List header with Clear done */}
+          <div className="flex items-center justify-between px-0.5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{entries.filter(e=>e.status==="pending").length} pending</span>
+              {entries.filter(e=>e.status==="done").length > 0 && <span className="text-green-600">{entries.filter(e=>e.status==="done").length} done</span>}
+              {entries.filter(e=>e.status==="error").length > 0 && <span className="text-destructive">{entries.filter(e=>e.status==="error").length} failed</span>}
+            </div>
+            {entries.some(e=>e.status==="done") && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground px-2 gap-1.5"
+                onClick={() => setEntries(prev => prev.filter(e => e.status !== "done"))}>
+                <X className="h-3 w-3" /> Clear done
+              </Button>
+            )}
+          </div>
+          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
           {entries.map((entry) => (
             <div
               key={entry.id}
@@ -633,7 +684,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                   ? entry.isDuplicate
                     ? "border-amber-400/60 bg-amber-500/5"
                     : "border-destructive/50 bg-destructive/5"
-                  : entry.status === "uploading"
+                  : entry.status === "uploading" || entry.status === "checking"
                   ? "border-primary/50 bg-primary/5"
                   : "border-border hover:border-primary/30"
               }`}
@@ -642,7 +693,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
               <div className="flex items-center gap-3 p-3.5">
                 {/* Status Icon */}
                 <div className="shrink-0">
-                  {entry.status === "uploading" && (
+                  {(entry.status === "uploading" || entry.status === "checking") && (
                     <div className="relative">
                       <div className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
                       <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
@@ -676,7 +727,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                     value={entry.title}
                     onChange={(e) => updateEntry(entry.id, { title: e.target.value, customSlug: slugify(e.target.value) })}
                     placeholder="PDF title"
-                    disabled={entry.status !== "pending"}
+                    disabled={entry.status !== "pending" && entry.status !== "error"}
                     className="h-9 text-sm font-medium"
                   />
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -704,9 +755,20 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                         <Clock className="h-2.5 w-2.5" /> Scheduled
                       </Badge>
                     )}
+                    {entry.status === "checking" && (
+                      <span className="text-xs text-muted-foreground animate-pulse">Checking for duplicates…</span>
+                    )}
                     {entry.status === "uploading" && (
                       <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
                         {entry.progress}%
+                      </span>
+                    )}
+                    {entry.status === "uploading" && (entry.speedKBps || 0) > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {(entry.speedKBps || 0) >= 1024
+                          ? `${((entry.speedKBps || 0) / 1024).toFixed(1)} MB/s`
+                          : `${entry.speedKBps} KB/s`}
+                        {(entry.etaSecs || 0) > 0 && ` · ${entry.etaSecs}s left`}
                       </span>
                     )}
                   </div>
@@ -734,13 +796,25 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
                     </div>
                   )}
 
-                  {/* Generic error (non-duplicate) */}
+                  {/* Generic error (non-duplicate) with Retry button */}
                   {entry.status === "error" && !entry.isDuplicate && entry.error && (
-                    <span className="block mt-1 text-xs text-destructive">{entry.error}</span>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-destructive">{entry.error}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[11px] px-2 gap-1"
+                        onClick={() => {
+                          updateEntry(entry.id, { status: "pending", error: undefined })
+                        }}
+                      >
+                        <RefreshCw className="h-3 w-3" /> Retry
+                      </Button>
+                    </div>
                   )}
 
-                  {entry.status === "uploading" && (
-                    <Progress value={entry.progress} className="h-2 mt-2" />
+                  {(entry.status === "uploading" || entry.status === "checking") && (
+                    <Progress value={entry.status === "checking" ? 5 : entry.progress} className="h-2 mt-2" />
                   )}
                 </div>
 
@@ -876,6 +950,7 @@ export function PDFUploadForm({ categories, onSuccess }: PDFUploadFormProps) {
               )}
             </div>
           ))}
+          </div>
         </div>
       )}
 
