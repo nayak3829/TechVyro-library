@@ -1,29 +1,11 @@
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
+import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 
 export async function POST(request: Request) {
   try {
-    // Verify admin token
-    const authHeader = request.headers.get("Authorization")
-    const token = authHeader?.replace("Bearer ", "")
-    
-    if (!token) {
+    if (!verifyAdminToken(extractToken(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const adminPassword = process.env.ADMIN_PASSWORD
-    if (!adminPassword) {
-      return NextResponse.json({ error: "Admin not configured" }, { status: 500 })
-    }
-
-    try {
-      const decoded = Buffer.from(token, "base64").toString("utf-8")
-      const [storedPassword] = decoded.split(":")
-      if (storedPassword !== adminPassword) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      }
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
     if (!isAdminConfigured()) {

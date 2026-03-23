@@ -1,20 +1,6 @@
-import { createAdminClient } from "@/lib/supabase/admin"
+import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 import { NextResponse } from "next/server"
 
-function verifyToken(request: Request): boolean {
-  const authHeader = request.headers.get("Authorization")
-  const token = authHeader?.replace("Bearer ", "")
-  if (!token) return false
-  const adminPassword = process.env.ADMIN_PASSWORD
-  if (!adminPassword) return false
-  try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8")
-    const [storedPassword] = decoded.split(":")
-    return storedPassword === adminPassword
-  } catch {
-    return false
-  }
-}
 
 export async function POST(request: Request) {
   try {

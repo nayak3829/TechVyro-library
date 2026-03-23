@@ -1,18 +1,6 @@
 import { NextResponse } from "next/server"
+import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 
-function verifyAdminToken(token: string | null): boolean {
-  if (!token) return false
-  const adminPassword = process.env.ADMIN_PASSWORD
-  if (!adminPassword) return false
-  try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8")
-    const [storedPassword, timestamp] = decoded.split(":")
-    const tokenAge = Date.now() - parseInt(timestamp, 10)
-    return storedPassword === adminPassword && tokenAge < 24 * 60 * 60 * 1000
-  } catch {
-    return false
-  }
-}
 
 export async function POST(request: Request) {
   const token = request.headers.get("Authorization")?.replace("Bearer ", "") || null

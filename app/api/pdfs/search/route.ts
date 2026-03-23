@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const q = searchParams.get("q")?.trim() || ""
+  const q = (searchParams.get("q")?.trim() || "").slice(0, 200)
   const limit = Math.min(parseInt(searchParams.get("limit") || "8", 10), 20)
 
   if (!q) return NextResponse.json({ pdfs: [] })

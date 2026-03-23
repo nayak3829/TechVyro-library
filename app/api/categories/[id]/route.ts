@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin"
+import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 import { NextResponse } from "next/server"
 
 interface RouteProps {
@@ -6,23 +6,6 @@ interface RouteProps {
 }
 
 // Helper to verify admin token
-function verifyAdminToken(request: Request): boolean {
-  const authHeader = request.headers.get("Authorization")
-  const token = authHeader?.replace("Bearer ", "")
-  
-  if (!token) return false
-
-  const adminPassword = process.env.ADMIN_PASSWORD
-  if (!adminPassword) return false
-
-  try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8")
-    const [storedPassword] = decoded.split(":")
-    return storedPassword === adminPassword
-  } catch {
-    return false
-  }
-}
 
 // Update category (rename, change color)
 export async function PATCH(request: Request, { params }: RouteProps) {

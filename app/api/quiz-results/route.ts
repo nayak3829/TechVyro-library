@@ -1,22 +1,9 @@
 import { NextResponse } from "next/server"
+import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendTelegramMessage } from "@/lib/telegram"
 
-function verifyAdminToken(token: string | null): boolean {
-  if (!token) return false
-  const adminPassword = process.env.ADMIN_PASSWORD
-  if (!adminPassword) return false
-  try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8")
-    const [storedPassword, timestamp] = decoded.split(":")
-    const tokenAge = Date.now() - parseInt(timestamp, 10)
-    const maxAge = 24 * 60 * 60 * 1000
-    return storedPassword === adminPassword && tokenAge < maxAge
-  } catch {
-    return false
-  }
-}
 
 function formatTime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`

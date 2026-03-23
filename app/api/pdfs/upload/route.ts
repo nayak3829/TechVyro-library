@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
+import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 
 // Allow large file uploads (no size limit from Next.js side)
 export const maxDuration = 300 // 5 minutes for large uploads
@@ -7,27 +8,8 @@ export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   try {
-    // Verify admin token
-    const authHeader = request.headers.get("Authorization")
-    const token = authHeader?.replace("Bearer ", "")
-    
-    if (!token) {
+    if (!verifyAdminToken(extractToken(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const adminPassword = process.env.ADMIN_PASSWORD
-    if (!adminPassword) {
-      return NextResponse.json({ error: "Admin not configured" }, { status: 500 })
-    }
-
-    try {
-      const decoded = Buffer.from(token, "base64").toString("utf-8")
-      const [storedPassword] = decoded.split(":")
-      if (storedPassword !== adminPassword) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      }
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
     const formData = await request.formData()
@@ -44,9 +26,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 })
     }
 
-    // Check file type
-    if (file.type !== "application/pdf") {
+    // Check file type (both MIME type and extension)
+    const fileExt = file.name.split(".").pop()?.toLowerCase()
+    if (file.type !== "application/pdf" || fileExt !== "pdf") {
       return NextResponse.json({ error: "Only PDF files are allowed" }, { status: 400 })
+    }
+
+    // Limit title and description length
+    if (title.trim().length > 300) {
+      return NextResponse.json({ error: "Title is too long (max 300 characters)" }, { status: 400 })
     }
 
     const supabase = createAdminClient()
