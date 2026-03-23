@@ -3,15 +3,15 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, FileText, Zap, Trophy, Settings } from "lucide-react"
+import { Home, BookOpen, Zap, Trophy, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { icon: Home,      label: "Home",        href: "/" },
-  { icon: FileText,  label: "Library",     href: "/#content" },
-  { icon: Zap,       label: "Quiz",        href: "/quiz" },
-  { icon: Trophy,    label: "Leaderboard", href: "/quiz/leaderboard" },
-  { icon: Settings,  label: "Admin",       href: "/admin" },
+  { icon: Home,     label: "Home",        href: "/" },
+  { icon: BookOpen, label: "Browse",      href: "/browse" },
+  { icon: Zap,      label: "Quiz",        href: "/quiz" },
+  { icon: Trophy,   label: "Leaderboard", href: "/quiz/leaderboard" },
+  { icon: User,     label: "Profile",     href: "/profile" },
 ]
 
 export function MobileNav() {
@@ -24,7 +24,6 @@ export function MobileNav() {
     setMounted(true)
   }, [])
 
-  // Smart scroll hide/show
   useEffect(() => {
     if (!mounted) return
     let ticking = false
@@ -50,7 +49,6 @@ export function MobileNav() {
 
   const getIsActive = (href: string) => {
     if (href === "/") return pathname === "/"
-    if (href === "/#content") return pathname === "/"
     return pathname.startsWith(href)
   }
 
@@ -72,18 +70,11 @@ export function MobileNav() {
         {navItems.map((item) => {
           const isActive = getIsActive(item.href)
           const Icon = item.icon
-          const isLibrary = item.href === "/#content"
 
           return (
             <Link
               key={item.label}
               href={item.href}
-              onClick={isLibrary ? (e) => {
-                if (pathname === "/") {
-                  e.preventDefault()
-                  document.getElementById("content")?.scrollIntoView({ behavior: "smooth" })
-                }
-              } : undefined}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all duration-200",
                 "min-w-[56px] min-h-[50px] px-2 py-1.5",
