@@ -288,7 +288,7 @@ export function HeroSection() {
           </div>
 
           {/* ── RIGHT — Visual Panel ── */}
-          <div className="relative hidden md:flex items-center justify-center mt-4 lg:mt-0">
+          <div className="relative flex items-center justify-center mt-6 md:mt-4 lg:mt-0">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/8 to-transparent rounded-3xl blur-3xl scale-95 pointer-events-none" />
 
             <div className="relative w-full max-w-[420px] mx-auto">
@@ -375,7 +375,7 @@ export function HeroSection() {
               </div>
 
               {/* Floating chip — upload */}
-              <div className="absolute -top-4 -right-4 bg-card/95 backdrop-blur-xl border border-border/60 rounded-xl px-3 py-2 shadow-xl flex items-center gap-2 ring-1 ring-white/5" style={{ animation: "float1 4s ease-in-out infinite" }}>
+              <div className="absolute -top-4 -right-4 bg-card/95 backdrop-blur-xl border border-border/60 rounded-xl px-3 py-2 shadow-xl hidden sm:flex items-center gap-2 ring-1 ring-white/5" style={{ animation: "float1 4s ease-in-out infinite" }}>
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 shadow shrink-0">
                   <Download className="h-3.5 w-3.5 text-white" />
                 </div>
@@ -386,7 +386,7 @@ export function HeroSection() {
               </div>
 
               {/* Floating chip — downloads */}
-              <div className="absolute -bottom-4 -left-4 bg-card/95 backdrop-blur-xl border border-border/60 rounded-xl px-3 py-2 shadow-xl flex items-center gap-2 ring-1 ring-white/5" style={{ animation: "float2 5s ease-in-out infinite" }}>
+              <div className="absolute -bottom-4 -left-4 bg-card/95 backdrop-blur-xl border border-border/60 rounded-xl px-3 py-2 shadow-xl hidden sm:flex items-center gap-2 ring-1 ring-white/5" style={{ animation: "float2 5s ease-in-out infinite" }}>
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow shrink-0">
                   <TrendingUp className="h-3.5 w-3.5 text-white" />
                 </div>
@@ -398,22 +398,6 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Mobile stats strip */}
-          <div className="md:hidden grid grid-cols-3 gap-2 -mt-4">
-            {miniStats.map((s, i) => (
-              <div key={i} className="flex flex-col items-center p-3 rounded-2xl bg-card/80 border border-border/50">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${s.bg} mb-1.5`}>
-                  <s.icon className={`h-4 w-4 ${s.color}`} />
-                </div>
-                {!liveStats ? (
-                  <div className="h-5 w-12 rounded-md bg-muted animate-pulse mb-0.5" />
-                ) : (
-                  <p className="text-base font-bold text-foreground">{s.value}</p>
-                )}
-                <p className="text-[10px] text-muted-foreground">{s.label}</p>
-              </div>
-            ))}
-          </div>
 
         </div>
       </div>
