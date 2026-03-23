@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (!isAdminConfigured()) return NextResponse.json({ error: "Database not configured" }, { status: 503 })
 
     const body = await request.json()
-    const { title, description, filePath, fileSize, categoryId, replace } = body
+    const { title, description, filePath, fileSize, categoryId, structureLocation, replace, tags, visibility, scheduledAt, allowDownload, customSlug } = body
 
     if (!title?.trim()) return NextResponse.json({ error: "Title is required" }, { status: 400 })
     if (!filePath) return NextResponse.json({ error: "File path is required" }, { status: 400 })
@@ -43,18 +43,33 @@ export async function POST(request: Request) {
         await supabase.storage.from("pdfs").remove([existingPdf.file_path]).catch(() => {})
       }
 
-      const { data: updatedPdf, error: updateError } = await supabase
+      const structLocValue = structureLocation?.folderId ? structureLocation : null
+      let { data: updatedPdf, error: updateError } = await supabase
         .from("pdfs")
         .update({
           description: description?.trim() || null,
           file_path: filePath,
           file_size: fileSize || null,
           category_id: categoryId || null,
+          structure_location: structLocValue,
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingPdf.id)
         .select()
         .single()
+
+      // Fallback: if structure_location column doesn't exist, retry without it
+      if (updateError?.message?.includes("structure_location")) {
+        const result = await supabase.from("pdfs").update({
+          description: description?.trim() || null,
+          file_path: filePath,
+          file_size: fileSize || null,
+          category_id: categoryId || null,
+          updated_at: new Date().toISOString(),
+        }).eq("id", existingPdf.id).select().single()
+        updatedPdf = result.data
+        updateError = result.error
+      }
 
       if (updateError) {
         console.error("[save-metadata] Replace update error:", updateError)
@@ -66,7 +81,8 @@ export async function POST(request: Request) {
     }
 
     // New PDF — insert
-    const { data: pdf, error: dbError } = await supabase
+    const structLocValue = structureLocation?.folderId ? structureLocation : null
+    let { data: pdf, error: dbError } = await supabase
       .from("pdfs")
       .insert({
         title: title.trim(),
@@ -74,10 +90,25 @@ export async function POST(request: Request) {
         file_path: filePath,
         file_size: fileSize || null,
         category_id: categoryId || null,
+        structure_location: structLocValue,
         view_count: 0,
       })
       .select()
       .single()
+
+    // Fallback: if structure_location column doesn't exist, retry without it
+    if (dbError?.message?.includes("structure_location")) {
+      const result = await supabase.from("pdfs").insert({
+        title: title.trim(),
+        description: description?.trim() || null,
+        file_path: filePath,
+        file_size: fileSize || null,
+        category_id: categoryId || null,
+        view_count: 0,
+      }).select().single()
+      pdf = result.data
+      dbError = result.error
+    }
 
     if (dbError) {
       console.error("[save-metadata] Database insert error:", dbError)

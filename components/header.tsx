@@ -474,15 +474,29 @@ export function Header() {
 
                   <div className="h-px bg-border/50 mb-3" />
                   <Link
-                    href="/#content"
+                    href="/browse"
                     onClick={() => setBrowseOpen(false)}
-                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 hover:border-primary/40 transition-all group"
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 hover:border-primary/40 transition-all group mb-2"
                   >
                     <div className="flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-semibold text-primary">View Full Library</span>
+                      <LayoutGrid className="h-4 w-4 text-primary" />
+                      <div>
+                        <span className="text-sm font-semibold text-primary block">Browse by Subject</span>
+                        <span className="text-[11px] text-muted-foreground">Content structure navigation</span>
+                      </div>
                     </div>
                     <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                  <Link
+                    href="/#content"
+                    onClick={() => setBrowseOpen(false)}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-muted/40 border border-border/40 hover:border-border/60 transition-all group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">View Full Library</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
                   </Link>
                 </div>
               </div>

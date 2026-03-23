@@ -10,7 +10,7 @@ import { QuizHistorySection } from "@/components/quiz-history-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { QuizContentStructure, type StructureFilter } from "@/components/quiz/quiz-content-structure"
+import { ContentStructureNav, type ContentStructureFilter } from "@/components/content-structure-nav"
 import { 
   Clock, FileText, Play, BookOpen, ArrowRight, Search, 
   Trophy, X, Zap, Target, Flame, ChevronRight,
@@ -70,7 +70,7 @@ export default function QuizzesPage() {
   const [search, setSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("All")
   const [sortBy, setSortBy] = useState("newest")
-  const [structureFilter, setStructureFilter] = useState<StructureFilter>({
+  const [structureFilter, setStructureFilter] = useState<ContentStructureFilter>({
     folderId: null, categoryId: null, sectionId: null
   })
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -207,14 +207,15 @@ export default function QuizzesPage() {
           {/* Left: Content Structure Sidebar */}
           {!loading && quizzes.length > 0 && (
             <div className="w-64 shrink-0">
-              <QuizContentStructure
-                quizzes={quizzes}
+              <ContentStructureNav
                 filter={structureFilter}
                 onFilterChange={(f) => {
                   setStructureFilter(f)
                   setSelectedCategory("All")
                   setSearch("")
                 }}
+                showType="quizzes"
+                autoRefreshMs={120_000}
               />
             </div>
           )}

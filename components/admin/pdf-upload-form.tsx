@@ -625,6 +625,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
         body: JSON.stringify({
           title, description: entry.description, filePath,
           fileSize: entry.file.size, categoryId: entry.categoryId || null,
+          structureLocation: entry.structureLocation?.folderId ? entry.structureLocation : null,
           tags: entry.tags, visibility: entry.visibility,
           scheduledAt: entry.scheduledAt, allowDownload: entry.allowDownload,
           customSlug: entry.customSlug || slugify(title),
