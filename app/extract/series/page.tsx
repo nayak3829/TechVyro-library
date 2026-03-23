@@ -67,8 +67,14 @@ function SeriesContent() {
         return
       }
 
-      setSubjects(data.subjects || [])
+      const subs = data.subjects || []
+      setSubjects(subs)
       setTests(data.tests || [])
+      // Auto-expand first subject so tests are immediately visible
+      if (subs.length > 0) {
+        const firstId = String(subs[0].id || 0)
+        setExpanded({ [firstId]: true })
+      }
     } catch {
       setError("Network error. Please try again.")
     } finally {

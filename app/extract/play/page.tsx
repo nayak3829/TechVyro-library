@@ -30,14 +30,22 @@ function PlayContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    if (authLoading) return
+  const isSample = apiBase.startsWith("sample:")
 
+  useEffect(() => {
     if (!testId || !apiBase) {
       router.replace("/extract")
       return
     }
 
+    // Sample tests are free — skip auth check entirely
+    if (isSample) {
+      fetchQuestions()
+      return
+    }
+
+    // Live tests need auth
+    if (authLoading) return
     if (!user) {
       const currentUrl = `/extract/play?${searchParams.toString()}`
       router.replace(`/login?redirect=${encodeURIComponent(currentUrl)}`)
@@ -73,7 +81,7 @@ function PlayContent() {
     }
   }
 
-  if (authLoading || (!user && !error)) {
+  if (!isSample && (authLoading || (!user && !error))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
