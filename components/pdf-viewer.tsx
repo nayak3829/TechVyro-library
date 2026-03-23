@@ -136,10 +136,10 @@ export function PDFViewer({ pdf, relatedPDFs = [] }: PDFViewerProps) {
       let updated: string[]
       if (isBookmarked) {
         updated = bookmarks.filter(id => id !== pdf.id)
-        toast.success("Bookmark hataya gaya")
+        toast.success("Bookmark removed")
       } else {
         updated = [...bookmarks, pdf.id]
-        toast.success("Bookmark save ho gaya!")
+        toast.success("Bookmark saved!")
       }
       localStorage.setItem(BOOKMARK_KEY, JSON.stringify(updated))
       setIsBookmarked(!isBookmarked)
@@ -316,7 +316,7 @@ export function PDFViewer({ pdf, relatedPDFs = [] }: PDFViewerProps) {
                   size="icon"
                   onClick={toggleBookmark}
                   className={`hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors ${isBookmarked ? "border-amber-500/60 bg-amber-500/10 text-amber-500" : ""}`}
-                  title={isBookmarked ? "Bookmark hatao" : "Bookmark karo"}
+                  title={isBookmarked ? "Remove bookmark" : "Save bookmark"}
                 >
                   {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-amber-500" /> : <Bookmark className="h-4 w-4" />}
                 </Button>

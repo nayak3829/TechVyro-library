@@ -41,10 +41,10 @@ function timeAgo(dateStr: string) {
   const mins = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  if (mins < 1) return "Abhi"
-  if (mins < 60) return `${mins} min pehle`
-  if (hours < 24) return `${hours}h pehle`
-  return `${days}d pehle`
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins} min ago`
+  if (hours < 24) return `${hours}h ago`
+  return `${days}d ago`
 }
 
 function getMedalColor(pct: number) {
@@ -90,7 +90,7 @@ export function QuizHistorySection() {
             <History className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-foreground">Pichle Results</h3>
+            <h3 className="text-sm font-bold text-foreground">Previous Results</h3>
             <p className="text-[10px] text-muted-foreground">{history.length} attempts</p>
           </div>
         </div>
@@ -170,7 +170,7 @@ export function QuizHistorySection() {
           onClick={() => setExpanded(!expanded)}
           className="w-full mt-3 text-xs text-muted-foreground hover:text-primary h-8"
         >
-          {expanded ? "Kam Dikhao" : `Aur ${history.length - 5} results dekhо`}
+          {expanded ? "Show Less" : `View ${history.length - 5} more results`}
         </Button>
       )}
     </div>

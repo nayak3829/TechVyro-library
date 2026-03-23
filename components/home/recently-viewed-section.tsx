@@ -55,10 +55,10 @@ export function RecentlyViewedSection() {
     const mins = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
-    if (mins < 1) return "Abhi"
-    if (mins < 60) return `${mins} min pehle`
-    if (hours < 24) return `${hours} ghante pehle`
-    return `${days} din pehle`
+    if (mins < 1) return "Just now"
+    if (mins < 60) return `${mins} min ago`
+    if (hours < 24) return `${hours}h ago`
+    return `${days}d ago`
   }
 
   return (
@@ -71,7 +71,7 @@ export function RecentlyViewedSection() {
             </div>
             <div>
               <h2 className="text-base font-bold text-foreground">Recently Viewed</h2>
-              <p className="text-[10px] text-muted-foreground">Jahan se chhoda tha, wahan se shuru karo</p>
+              <p className="text-[10px] text-muted-foreground">Continue where you left off</p>
             </div>
           </div>
           <Button
@@ -80,7 +80,7 @@ export function RecentlyViewedSection() {
             onClick={clearAll}
             className="text-xs text-muted-foreground hover:text-destructive h-7 px-2"
           >
-            Sab Clear karo
+            Clear All
           </Button>
         </div>
 
