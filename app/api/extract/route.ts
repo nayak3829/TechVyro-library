@@ -1,22 +1,15 @@
 import { NextResponse } from "next/server"
 import { getAllSampleSeries, getSampleSeriesForCategory, mapUrlToCategory } from "@/lib/sample-tests"
 
-function buildApiUrl(websiteUrl: string): string {
-  try {
-    const url = new URL(websiteUrl.startsWith("http") ? websiteUrl : `https://${websiteUrl}`)
-    const host = url.hostname.replace(/^www\./, "")
-    return `https://api.${host}`
-  } catch {
-    return ""
-  }
+function deriveWebUrl(apiUrl: string): string {
+  // classx.co.in / appx.co.in: https://NAMEapi.classx.co.in → https://NAME.classx.co.in
+  const classxMatch = apiUrl.match(/^(https?:\/\/)(\w+?)api\.(classx|appx)\.co\.in(.*)$/)
+  if (classxMatch) return `${classxMatch[1]}${classxMatch[2]}.${classxMatch[3]}.co.in${classxMatch[4]}`
+  // Generic: https://api.NAME.com → https://NAME.com
+  return apiUrl.replace(/^(https?:\/\/)api\./, "$1")
 }
 
-function buildWebUrl(input: string): string {
-  if (input.startsWith("http")) return input
-  return `https://${input.replace(/^www\./, "")}`
-}
-
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 15000) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 3000) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), timeout)
   try {
@@ -29,35 +22,11 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout 
   }
 }
 
-// Fetch via proxy to bypass Cloudflare/IP blocks
-async function proxyFetch(targetUrl: string): Promise<{ text: string; ok: boolean } | null> {
-  const proxies = [
-    `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-    `https://cors-anywhere.herokuapp.com/${targetUrl}`,
-  ]
-
-  for (const proxyUrl of proxies) {
-    try {
-      const res = await fetchWithTimeout(proxyUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          Accept: "*/*",
-          "X-Requested-With": "XMLHttpRequest",
-        }
-      }, 12000)
-
-      if (!res.ok) continue
-
-      const data = await res.json().catch(() => null)
-      if (data?.contents) return { text: data.contents, ok: true }
-
-      // Some proxies return plain text
-      const text = await res.text().catch(() => "")
-      if (text && text.length > 100) return { text, ok: true }
-    } catch {}
-  }
-  return null
+const HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  Accept: "application/json, text/html, */*",
+  "Accept-Language": "en-IN,en;q=0.9,hi;q=0.8",
+  "Cache-Control": "no-cache",
 }
 
 function extractNextData(html: string): Record<string, unknown> | null {
@@ -78,55 +47,66 @@ function findTestSeries(data: unknown, depth = 0): unknown[] {
     if (typeof first === "object" && first !== null) {
       if ("title" in first || "name" in first || "slug" in first) return data as unknown[]
     }
-    for (const item of data) {
-      const found = findTestSeries(item, depth + 1)
-      if (found.length > 0) return found
-    }
   }
 
   if (typeof data === "object" && data !== null) {
-    const keys = ["testSeries", "test_series", "courses", "series", "data", "items", "results", "list", "content", "tests"]
+    const obj = data as Record<string, unknown>
+    const keys = ["testSeries", "test_series", "series", "courses", "data", "results", "items", "pageProps"]
     for (const key of keys) {
-      const val = (data as Record<string, unknown>)[key]
-      if (Array.isArray(val) && val.length > 0) {
-        const found = findTestSeries(val, depth + 1)
-        if (found.length > 0) return found
+      if (key in obj) {
+        const result = findTestSeries(obj[key], depth + 1)
+        if (result.length > 0) return result
       }
     }
-    for (const val of Object.values(data as object)) {
+    for (const val of Object.values(obj)) {
       if (typeof val === "object" && val !== null) {
-        const found = findTestSeries(val, depth + 1)
-        if (found.length > 0) return found
+        const result = findTestSeries(val, depth + 1)
+        if (result.length > 0) return result
       }
     }
   }
-  return []
-}
 
-const DIRECT_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  Accept: "application/json, text/html, */*",
-  "Accept-Language": "en-US,en;q=0.9",
+  return []
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const inputUrl = searchParams.get("url")?.trim()
+  // Direct API URL from appx.json database
+  const directApiUrl = searchParams.get("apiUrl")?.trim()
 
-  if (!inputUrl) {
-    return NextResponse.json({ error: "URL required" }, { status: 400 })
+  if (!inputUrl && !directApiUrl) {
+    return NextResponse.json({ error: "url or apiUrl required" }, { status: 400 })
   }
 
-  const webUrl = buildWebUrl(inputUrl)
-  const apiUrl = buildApiUrl(webUrl)
-  const errors: string[] = []
+  // Determine the API and web base URLs
+  let apiUrl: string
+  let webUrl: string
 
-  console.log(`[Extract] Starting extraction for: ${webUrl}`)
+  if (directApiUrl) {
+    // Direct API URL from appx.json — most reliable path
+    apiUrl = directApiUrl.replace(/\/$/, "")
+    webUrl = deriveWebUrl(apiUrl)
+  } else {
+    const raw = inputUrl!
+    if (raw.startsWith("http")) {
+      const u = new URL(raw)
+      const host = u.hostname.replace(/^www\./, "")
+      apiUrl = `https://${host.replace(/api\./, "")}api.${host.replace(/.*?api\./, "")}`
+      webUrl = raw
+    } else {
+      const host = raw.replace(/^www\./, "")
+      apiUrl = `https://api.${host}`
+      webUrl = `https://${host}`
+    }
+  }
 
-  // Run all direct attempts in parallel with a race — first winner wins
+  console.log(`[Extract] Starting for apiUrl=${apiUrl} webUrl=${webUrl}`)
+
+  // Try all AppX API endpoints in parallel
   const tryEndpoint = async (url: string, type: "api" | "scrape"): Promise<{ series: unknown[]; type: string } | null> => {
     try {
-      const res = await fetchWithTimeout(url, { headers: DIRECT_HEADERS }, 3000)
+      const res = await fetchWithTimeout(url, { headers: HEADERS }, 3000)
       if (!res.ok) return null
       const text = await res.text()
       if (type === "api") {
@@ -149,7 +129,7 @@ export async function GET(request: Request) {
   const allAttempts = [
     tryEndpoint(`${apiUrl}/api/v1/test-series/?format=json`, "api"),
     tryEndpoint(`${apiUrl}/api/v2/test-series/?format=json`, "api"),
-    tryEndpoint(`${webUrl}/api/v1/test-series/?format=json`, "api"),
+    tryEndpoint(`${apiUrl}/api/v1/test-series/`, "api"),
     tryEndpoint(`${webUrl}/test-series/`, "scrape"),
     tryEndpoint(`${webUrl}/courses/`, "scrape"),
   ]
@@ -163,14 +143,13 @@ export async function GET(request: Request) {
     }
   }
 
-  console.log(`[Extract] All direct methods failed for ${webUrl}, using sample tests`)
+  console.log(`[Extract] All direct methods failed, using sample tests`)
 
   // Fallback: return sample tests matching the platform category
   const category = mapUrlToCategory(webUrl)
   const sampleSeries = getSampleSeriesForCategory(category)
   const fallback = sampleSeries.length > 0 ? sampleSeries : getAllSampleSeries().slice(0, 3)
 
-  // Format sample series to match the expected TestSeries shape
   const testSeries = fallback.map(s => ({
     id: s.id,
     title: s.title,
@@ -186,6 +165,6 @@ export async function GET(request: Request) {
     source: "sample",
     apiBase: `sample:${category}`,
     webBase: webUrl,
-    notice: "Live extraction not available for this platform. Showing sample tests instead.",
+    notice: "Live extraction unavailable for this platform. Showing sample practice tests.",
   })
 }

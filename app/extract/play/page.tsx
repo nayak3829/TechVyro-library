@@ -30,18 +30,21 @@ function PlayContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
+  const isSample = apiBase.startsWith("sample:")
+
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (authLoading) return
+    if (!testId || !apiBase) {
+      router.replace("/extract")
+      return
+    }
+    // Sample tests: allow without login
+    // Live tests: require login
+    if (!isSample && !user) {
       router.replace("/login?redirect=/extract")
       return
     }
-    if (!authLoading && user) {
-      if (!testId || !apiBase) {
-        router.replace("/extract")
-        return
-      }
-      fetchQuestions()
-    }
+    fetchQuestions()
   }, [authLoading, user, testId, apiBase])
 
   const fetchQuestions = async () => {

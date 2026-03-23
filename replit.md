@@ -3,27 +3,22 @@
 A Next.js 15 PDF library and quiz platform with admin dashboard, user accounts, AppX test extractor, and smart student features. Hosted on Replit with Supabase backend.
 
 ## AppX Test Extractor
-Full integration of test-series extraction from AppX-based educational websites:
-- **`/extract`** — 32+ pre-listed platforms with category filter tabs, one-click extraction; also supports custom URL entry
-- **`/extract/series`** — Shows subjects + individual tests for a selected series (with credits gating)
-- **`/extract/play`** — Plays extracted test using the existing `QuizPlayer` component (timer, scoring, explanations)
-- **`/api/extract/route.ts`** — Parallel fetch (5 endpoints × 3s timeout) → sample fallback in ~4-5 seconds
-- **`/api/extract/tests/route.ts`** — Fetches subjects + tests; handles `apiBase=sample:*` for sample series
-- **`/api/extract/questions/route.ts`** — Fetches questions; falls back to `lib/sample-tests.ts` by testId lookup
-- **`/api/credits/route.ts`** — Credits management (GET: fetch/auto-init, POST: use/referral)
-- **`lib/sample-tests.ts`** — Sample question database for NDA, JEE, SSC, Banking, Railways, CTET
+Full integration of test-series extraction from 2421 classx.co.in coaching platforms:
+- **`/extract`** — Search-driven UI; autocomplete from `lib/appx-platforms.json` (2421 platforms); popular platforms grid; no manual URL entry needed
+- **`/extract/series`** — Shows real live test titles from classx.co.in scraping; no login/credits required to play
+- **`/extract/play`** — Plays test using `QuizPlayer` component (timer, scoring, explanations)
+- **`/api/extract/route.ts`** — Parallel fetch with `__NEXT_DATA__` scraping; `deriveWebUrl()` converts API→web URL; sample fallback
+- **`/api/extract/tests/route.ts`** — Fetches real tests by series slug from classx.co.in; handles `sample:` prefix
+- **`/api/extract/questions/route.ts`** — Parallel 3s timeout on 7 endpoints → category-based sample fallback when live fails
+- **`/api/extract/search/route.ts`** — Searches appx-platforms.json by platform name for autocomplete
+- **`lib/appx-platforms.json`** — 2421 classx.co.in platforms with API URLs
+- **`lib/sample-tests.ts`** — Sample questions for NDA, JEE, SSC, Banking, Railways, CTET; `mapUrlToCategory()` and `getSampleSeriesForCategory()`
 
 ### Live Extraction Status
-Replit server IPs are blocked by Cloudflare on all major educational sites (522 errors). The system automatically falls back to `lib/sample-tests.ts` within ~4-5 seconds. The sample tests contain real public-domain exam questions mapped to platform categories.
-
-### Credits & Referral System
-- Credits stored in Supabase **user_metadata** — no extra SQL table or manual setup needed
-- New users get 10 free credits automatically on first request
-- Each test extraction costs 1 credit
-- Premium users have unlimited extractions
-- Referral codes: share your code, both parties get +5 credits
-- Credits shown in user profile page with referral code copy + apply UI
-- Header "Resources" dropdown + mobile nav include "Test Extractor" link
+- **Test series titles**: Work live from classx.co.in via `__NEXT_DATA__` scraping (~1.6s)
+- **Questions**: Require platform login (404 without auth) → category-based sample fallback served instantly
+- **No credits/login required** to play any test; all tests use sample questions as fallback
+- Major platforms (CareerWill, PW, Adda247, ExamPur): Not in classx.co.in DB → sample mode only
 
 ## Student Features (v2)
 - **User Accounts**: Supabase Auth (email/password) — Login/Signup modal in header (`components/auth-modal.tsx`, `hooks/use-auth.ts`)

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
-import { getSampleQuestions, getAllSampleSeries } from "@/lib/sample-tests"
+import { getSampleQuestions, getAllSampleSeries, getSampleSeriesForCategory, mapUrlToCategory } from "@/lib/sample-tests"
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 20000) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 3000) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), timeout)
   try {
@@ -147,6 +147,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "testId and apiBase required" }, { status: 400 })
   }
 
+  // Short-circuit: sample tests — skip all live API calls
+  if (apiBase.startsWith("sample:")) {
+    const sampleQ = getSampleQuestions(testId)
+    if (sampleQ && sampleQ.length > 0) {
+      return NextResponse.json({ success: true, questions: sampleQ, total: sampleQ.length })
+    }
+    for (const series of getAllSampleSeries()) {
+      const matched = series.tests.find(t => t.id === testId)
+      if (matched) {
+        return NextResponse.json({ success: true, questions: matched.questions, total: matched.questions.length })
+      }
+    }
+    return NextResponse.json({ error: "Sample test not found", testId }, { status: 404 })
+  }
+
   const errors: string[] = []
 
   const endpoints = [
@@ -159,43 +174,29 @@ export async function GET(request: Request) {
     `${apiBase}/api/v1/quiz/${testId}/questions/?format=json`,
   ]
 
-  for (const endpoint of endpoints) {
+  const tryQuestionEndpoint = async (endpoint: string): Promise<NormalizedQuestion[] | null> => {
     try {
-      console.log(`[Questions] Trying: ${endpoint}`)
-      const res = await fetchWithTimeout(endpoint, { headers: HEADERS }, 15000)
-      console.log(`[Questions] ${endpoint} → status ${res.status}`)
-
-      if (res.status === 401 || res.status === 403) {
-        errors.push(`${endpoint}: Requires authentication (${res.status})`)
-        continue
-      }
-
-      if (!res.ok) {
-        errors.push(`${endpoint}: HTTP ${res.status}`)
-        continue
-      }
-
+      const res = await fetchWithTimeout(endpoint, { headers: HEADERS }, 3000)
+      if (!res.ok) { errors.push(`${endpoint}: HTTP ${res.status}`); return null }
       const text = await res.text()
       let json: unknown
-      try { json = JSON.parse(text) } catch {
-        errors.push(`${endpoint}: Invalid JSON`)
-        continue
-      }
-
+      try { json = JSON.parse(text) } catch { return null }
       const rawQuestions = findQuestions(json)
-      console.log(`[Questions] Found ${rawQuestions.length} raw questions`)
-
       if (rawQuestions.length > 0) {
-        const questions = rawQuestions
-          .map((q, i) => normalizeQuestion(q as AppXQuestion, i))
-          .filter(Boolean) as NormalizedQuestion[]
-
-        if (questions.length > 0) {
-          return NextResponse.json({ success: true, questions, total: questions.length })
-        }
+        const questions = rawQuestions.map((q, i) => normalizeQuestion(q as AppXQuestion, i)).filter(Boolean) as NormalizedQuestion[]
+        return questions.length > 0 ? questions : null
       }
+      return null
     } catch (e) {
       errors.push(`${endpoint}: ${e instanceof Error ? e.message : "timeout"}`)
+      return null
+    }
+  }
+
+  const questionResults = await Promise.allSettled(endpoints.map(tryQuestionEndpoint))
+  for (const result of questionResults) {
+    if (result.status === "fulfilled" && result.value) {
+      return NextResponse.json({ success: true, questions: result.value, total: result.value.length })
     }
   }
 
@@ -213,8 +214,22 @@ export async function GET(request: Request) {
     }
   }
 
+  // Last resort: category-based sample fallback (live test that requires auth)
+  const category = mapUrlToCategory(apiBase)
+  const categorySeries = getSampleSeriesForCategory(category)
+  const fallbackSeries = categorySeries.length > 0 ? categorySeries[0] : getAllSampleSeries()[0]
+  if (fallbackSeries && fallbackSeries.tests.length > 0) {
+    const fallbackTest = fallbackSeries.tests[0]
+    return NextResponse.json({
+      success: true,
+      questions: fallbackTest.questions,
+      total: fallbackTest.questions.length,
+      notice: "Sample questions shown — actual questions require login on the source platform.",
+    })
+  }
+
   return NextResponse.json({
-    error: "Could not load questions. This test may require login on the original platform.",
+    error: "Could not load questions for this test.",
     debug: errors.slice(0, 4),
   }, { status: 404 })
 }

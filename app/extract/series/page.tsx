@@ -9,10 +9,9 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
   ArrowLeft, Loader2, BookOpen, Play, Clock, FileText,
-  ChevronDown, ChevronUp, AlertCircle, Lock
+  ChevronDown, ChevronUp, AlertCircle
 } from "lucide-react"
 import Link from "next/link"
-import { useAuth } from "@/hooks/use-auth"
 
 interface Subject {
   id?: string | number
@@ -36,8 +35,6 @@ interface Test {
 function SeriesContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user } = useAuth()
-
   const slug = searchParams.get("slug") || ""
   const apiBase = searchParams.get("apiBase") || ""
   const webBase = searchParams.get("webBase") || ""
@@ -48,8 +45,6 @@ function SeriesContent() {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [tests, setTests] = useState<Test[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [credits, setCredits] = useState<{ credits: number; is_premium: boolean } | null>(null)
-  const [creditLoading, setCreditLoading] = useState(false)
 
   useEffect(() => {
     if (!slug || !apiBase || !webBase) {
@@ -57,8 +52,7 @@ function SeriesContent() {
       return
     }
     fetchData()
-    if (user) fetchCredits()
-  }, [slug, apiBase, webBase, user])
+  }, [slug, apiBase, webBase])
 
   const fetchData = async () => {
     setLoading(true)
@@ -82,50 +76,15 @@ function SeriesContent() {
     }
   }
 
-  const fetchCredits = async () => {
-    try {
-      const res = await fetch("/api/credits")
-      const data = await res.json()
-      if (data.credits) setCredits(data.credits)
-    } catch {}
-  }
-
-  const startTest = async (test: Test) => {
-    if (!user) {
-      router.push("/login?redirect=/extract")
-      return
-    }
-
-    setCreditLoading(true)
-    try {
-      // Use a credit
-      const creditRes = await fetch("/api/credits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "use" }),
-      })
-      const creditData = await creditRes.json()
-
-      if (creditRes.status === 402) {
-        alert("You have no credits left! Please upgrade to premium or earn credits via referrals.")
-        return
-      }
-
-      if (creditData.credits) setCredits(creditData.credits)
-
-      const testId = String(test.id || test.slug || "")
-      const params = new URLSearchParams({
-        testId,
-        apiBase,
-        title: test.title || test.name || "Test",
-        duration: String(test.duration || test.time || 60),
-      })
-      router.push(`/extract/play?${params}`)
-    } catch {
-      alert("Error starting test. Please try again.")
-    } finally {
-      setCreditLoading(false)
-    }
+  const startTest = (test: Test) => {
+    const testId = String(test.id || test.slug || "")
+    const params = new URLSearchParams({
+      testId,
+      apiBase,
+      title: test.title || test.name || "Test",
+      duration: String(test.duration || test.time || 60),
+    })
+    router.push(`/extract/play?${params}`)
   }
 
   const toggleSubject = (id: string) => {
@@ -154,14 +113,6 @@ function SeriesContent() {
             <p className="text-muted-foreground mt-1">Select a test to start playing</p>
           </div>
 
-          {/* Credits Badge */}
-          {credits && (
-            <div className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-2">
-              <span className="text-sm font-medium text-violet-600 dark:text-violet-400">
-                {credits.is_premium ? "⭐ Premium" : `💳 ${credits.credits} credits`}
-              </span>
-            </div>
-          )}
         </div>
 
         {loading && (
@@ -211,7 +162,7 @@ function SeriesContent() {
                       {expanded[subjId] && subjTests.length > 0 && (
                         <div className="border-t divide-y">
                           {(subjTests as Test[]).map((test, tidx) => (
-                            <TestRow key={String(test.id || tidx)} test={test} onStart={() => startTest(test)} loading={creditLoading} />
+                            <TestRow key={String(test.id || tidx)} test={test} onStart={() => startTest(test)} loading={false} />
                           ))}
                         </div>
                       )}
@@ -235,7 +186,7 @@ function SeriesContent() {
                 </h2>
                 <Card className="divide-y overflow-hidden">
                   {tests.map((test, idx) => (
-                    <TestRow key={String(test.id || idx)} test={test} onStart={() => startTest(test)} loading={creditLoading} />
+                    <TestRow key={String(test.id || idx)} test={test} onStart={() => startTest(test)} loading={false} />
                   ))}
                 </Card>
               </div>
