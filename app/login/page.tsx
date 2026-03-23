@@ -361,6 +361,7 @@ function LoginPageContent() {
                           onChange={(e) => setEmail(e.target.value)}
                           className="pl-10 h-12 rounded-xl bg-muted/40 border-border/60 focus-visible:ring-primary"
                           required
+                          suppressHydrationWarning
                         />
                       </div>
                     </div>
@@ -389,6 +390,7 @@ function LoginPageContent() {
                             onChange={(e) => setPassword(e.target.value)}
                             className="pl-10 pr-12 h-12 rounded-xl bg-muted/40 border-border/60 focus-visible:ring-primary"
                             required
+                            suppressHydrationWarning
                           />
                           <button
                             type="button"

@@ -210,6 +210,8 @@ export default function ExtractPage() {
                     placeholder="Search platform e.g. CareerWill, Adda247..."
                     className="pl-10 pr-10 h-12 text-base"
                     disabled={loading}
+                    autoComplete="off"
+                    suppressHydrationWarning
                   />
                   {query && (
                     <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
