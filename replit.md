@@ -9,6 +9,7 @@ A Next.js 16 PDF library and quiz platform with admin dashboard, user accounts, 
 - **Reading Progress**: Live timer tracks time spent on each PDF — shown as badge and in sidebar stats
 - **Bookmark**: Heart icon on PDF page saves/removes bookmark — stored in localStorage (`techvyro_bookmarks`)
 - **Quiz History**: All quiz attempts saved to localStorage (`techvyro_quiz_history`) — shown in `/quiz` page (`components/quiz-history-section.tsx`)
+- **Content Structure Sidebar**: Testbook-style auto content tree on `/quiz` page (`components/quiz/quiz-content-structure.tsx`) — shows Folder→Category→Section hierarchy, only displays nodes that have quizzes linked via `structure_location`, clicking any node filters the quiz list; mobile-friendly collapsible
 - **About/Contact Page**: Full page at `/about` with mission, stats, features, and contact info
 - **Footer Quick Links**: About Us + Quiz Portal added to footer navigation
 

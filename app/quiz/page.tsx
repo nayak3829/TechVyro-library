@@ -10,10 +10,11 @@ import { QuizHistorySection } from "@/components/quiz-history-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { QuizContentStructure, type StructureFilter } from "@/components/quiz/quiz-content-structure"
 import { 
   Clock, FileText, Play, BookOpen, ArrowRight, Search, 
-  Trophy, X, ArrowUpDown, Zap, Target, Flame, ChevronRight,
-  Brain, Sparkles, ListFilter, Wifi, Lock
+  Trophy, X, Zap, Target, Flame, ChevronRight,
+  Brain, Sparkles, ListFilter, Lock
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import {
@@ -28,10 +29,13 @@ interface Quiz {
   title: string
   description: string
   category: string
+  section: string
+  difficulty: string
   time_limit: number
   questions: { id: string }[]
   enabled: boolean
   created_at: string
+  structure_location: { folderId: string; categoryId: string; sectionId: string } | null
 }
 
 const categoryConfig: Record<string, { color: string; bg: string; gradient: string }> = {
@@ -66,7 +70,9 @@ export default function QuizzesPage() {
   const [search, setSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("All")
   const [sortBy, setSortBy] = useState("newest")
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [structureFilter, setStructureFilter] = useState<StructureFilter>({
+    folderId: null, categoryId: null, sectionId: null
+  })
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function handleStartQuiz(e: React.MouseEvent, quizId: string) {
@@ -83,7 +89,6 @@ export default function QuizzesPage() {
       const data = await res.json()
       const all: Quiz[] = data.quizzes || []
       setQuizzes(all.filter(q => q.enabled && q.questions.length > 0))
-      setLastUpdated(new Date())
     } catch {}
     if (showLoading) setLoading(false)
   }, [])
@@ -101,14 +106,35 @@ export default function QuizzesPage() {
 
   const filtered = useMemo(() => {
     let result = quizzes
-    if (selectedCategory !== "All") result = result.filter(q => q.category === selectedCategory)
+
+    // Structure filter (sidebar)
+    if (structureFilter.folderId === "uncategorized") {
+      result = result.filter(q => !q.structure_location?.folderId)
+    } else if (structureFilter.sectionId) {
+      result = result.filter(q => q.structure_location?.sectionId === structureFilter.sectionId)
+    } else if (structureFilter.categoryId) {
+      result = result.filter(q => q.structure_location?.categoryId === structureFilter.categoryId)
+    } else if (structureFilter.folderId) {
+      result = result.filter(q => q.structure_location?.folderId === structureFilter.folderId)
+    }
+
+    // Category chip filter (only apply when no structure filter active)
+    if (!structureFilter.folderId && selectedCategory !== "All") {
+      result = result.filter(q => q.category === selectedCategory)
+    }
+
+    // Search
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(
-        quiz => quiz.title.toLowerCase().includes(q) || quiz.description?.toLowerCase().includes(q) || quiz.category.toLowerCase().includes(q)
+        quiz => quiz.title.toLowerCase().includes(q) ||
+                quiz.description?.toLowerCase().includes(q) ||
+                quiz.category.toLowerCase().includes(q)
       )
     }
-    result = [...result].sort((a, b) => {
+
+    // Sort
+    return [...result].sort((a, b) => {
       if (sortBy === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       if (sortBy === "most-questions") return b.questions.length - a.questions.length
@@ -117,11 +143,11 @@ export default function QuizzesPage() {
       if (sortBy === "shortest") return a.time_limit - b.time_limit
       return 0
     })
-    return result
-  }, [quizzes, selectedCategory, search, sortBy])
+  }, [quizzes, selectedCategory, search, sortBy, structureFilter])
 
   const totalQuestions = quizzes.reduce((sum, q) => sum + q.questions.length, 0)
   const activeSortLabel = sortOptions.find(s => s.value === sortBy)?.label || "Sort"
+  const hasStructureFilter = !!structureFilter.folderId
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -129,12 +155,10 @@ export default function QuizzesPage() {
 
       {/* Hero Banner */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-background border-b border-border/50">
-        {/* Decorative grid */}
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: "linear-gradient(to right,#000 1px,transparent 1px),linear-gradient(to bottom,#000 1px,transparent 1px)",
           backgroundSize: "32px 32px"
         }} />
-        {/* Gradient orbs */}
         <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
         <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-accent/20 blur-3xl" />
 
@@ -151,7 +175,6 @@ export default function QuizzesPage() {
               Challenge yourself with curated quizzes designed for NDA, SSC, and other competitive exams. Compete with students across India.
             </p>
 
-            {/* Quick stats strip */}
             {!loading && quizzes.length > 0 && (
               <div className="flex items-center gap-4 sm:gap-6 mt-6 flex-wrap justify-center">
                 {[
@@ -177,209 +200,226 @@ export default function QuizzesPage() {
         </div>
       </section>
 
+      {/* Main layout: sidebar + content */}
       <main className="flex-1 container mx-auto px-4 py-8">
+        <div className="flex gap-6 items-start">
 
-        {/* Search + Sort */}
-        {!loading && quizzes.length > 0 && (
-          <div className="flex flex-col sm:flex-row gap-3 mb-5">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search quizzes by title, subject..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-9 pr-9 h-11 text-sm bg-background border-border/60 focus-visible:ring-primary/30"
+          {/* Left: Content Structure Sidebar */}
+          {!loading && quizzes.length > 0 && (
+            <div className="w-64 shrink-0">
+              <QuizContentStructure
+                quizzes={quizzes}
+                filter={structureFilter}
+                onFilterChange={(f) => {
+                  setStructureFilter(f)
+                  setSelectedCategory("All")
+                  setSearch("")
+                }}
               />
-              {search && (
-                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                  <X className="h-4 w-4" />
-                </button>
-              )}
             </div>
-            <div className="flex gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-11 gap-2 text-xs sm:text-sm whitespace-nowrap px-3">
-                    <ListFilter className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{activeSortLabel}</span>
-                    <span className="sm:hidden">Sort</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {sortOptions.map(opt => (
-                    <DropdownMenuItem
-                      key={opt.value}
-                      onClick={() => setSortBy(opt.value)}
-                      className={sortBy === opt.value ? "bg-primary/10 text-primary font-medium" : ""}
-                    >
-                      {opt.value === sortBy && <Zap className="h-3.5 w-3.5 mr-2 text-primary" />}
-                      {opt.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Category filter chips */}
-        {!loading && categories.length > 2 && (
-          <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
-            {categories.map(cat => {
-              const isActive = selectedCategory === cat
-              const cfg = categoryConfig[cat] || defaultConfig
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className="shrink-0 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium border transition-all duration-200"
-                  style={isActive ? {
-                    backgroundColor: cat === "All" ? "hsl(var(--primary))" : cfg.color,
-                    color: "#fff",
-                    borderColor: "transparent"
-                  } : {
-                    backgroundColor: cat === "All" ? "transparent" : cfg.bg,
-                    color: cat === "All" ? "hsl(var(--muted-foreground))" : cfg.color,
-                    borderColor: cat === "All" ? "hsl(var(--border))" : `${cfg.color}40`
-                  }}
-                >
-                  {cat}
-                  {cat !== "All" && (
-                    <span className="ml-1.5 opacity-75 text-[10px]">
-                      ({quizzes.filter(q => q.category === cat).length})
-                    </span>
+          {/* Right: Quiz List */}
+          <div className="flex-1 min-w-0">
+
+            {/* Search + Sort */}
+            {!loading && quizzes.length > 0 && (
+              <div className="flex flex-col sm:flex-row gap-3 mb-5">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search quizzes by title, subject..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="pl-9 pr-9 h-11 text-sm bg-background border-border/60 focus-visible:ring-primary/30"
+                  />
+                  {search && (
+                    <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      <X className="h-4 w-4" />
+                    </button>
                   )}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Content */}
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="rounded-2xl border border-border/50 bg-muted/30 p-6 animate-pulse space-y-4">
-                <div className="h-5 bg-muted rounded-full w-3/4" />
-                <div className="h-3 bg-muted rounded-full w-1/2" />
-                <div className="h-3 bg-muted rounded-full w-2/3" />
-                <div className="h-10 bg-muted rounded-xl mt-4" />
-              </div>
-            ))}
-          </div>
-        ) : quizzes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="h-20 w-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-5">
-              <BookOpen className="h-10 w-10 text-muted-foreground/50" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">No Quizzes Yet</h3>
-            <p className="text-sm text-muted-foreground max-w-xs mb-6">
-              Quizzes will appear here once they are published by the admin.
-            </p>
-            <Button asChild variant="outline">
-              <Link href="/">
-                Browse PDFs Instead
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Target className="h-12 w-12 text-muted-foreground/40 mb-4" />
-            <h3 className="text-lg font-bold mb-1">No quizzes match</h3>
-            <p className="text-sm text-muted-foreground mb-4">Try adjusting your search or filter</p>
-            <Button variant="outline" size="sm" onClick={() => { setSearch(""); setSelectedCategory("All") }}>
-              Clear Filters
-            </Button>
-          </div>
-        ) : (
-          <>
-            <p className="text-xs text-muted-foreground mb-4">
-              Showing <span className="font-semibold text-foreground">{filtered.length}</span> of {quizzes.length} quizzes
-              {selectedCategory !== "All" && <> in <span className="font-semibold text-foreground">{selectedCategory}</span></>}
-              {search && <> matching &quot;<span className="font-semibold text-foreground">{search}</span>&quot;</>}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-              {filtered.map((quiz, idx) => {
-                const cfg = categoryConfig[quiz.category] || defaultConfig
-                const isNew = (Date.now() - new Date(quiz.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000
-                return (
-                  <div
-                    key={quiz.id}
-                    className="group relative rounded-2xl border border-border/50 bg-card overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 hover:border-transparent flex flex-col"
-                    style={{ "--hover-border": cfg.color } as React.CSSProperties}
-                  >
-                    {/* Top color bar */}
-                    <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${cfg.color}, ${cfg.color}88)` }} />
-
-                    {/* Subtle gradient bg */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${cfg.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-
-                    <div className="relative p-5 flex-1 flex flex-col">
-                      {/* Header row */}
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div className="flex-1 min-w-0">
-                          {isNew && (
-                            <div className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5 mb-1.5">
-                              <Sparkles className="h-2.5 w-2.5" />
-                              NEW
-                            </div>
-                          )}
-                          <h3 className="font-bold text-sm sm:text-base leading-snug group-hover:text-primary transition-colors line-clamp-2">
-                            {quiz.title}
-                          </h3>
-                        </div>
-                        <span
-                          className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full text-white shadow-sm"
-                          style={{ backgroundColor: cfg.color }}
-                        >
-                          {quiz.category}
-                        </span>
-                      </div>
-
-                      {quiz.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
-                          {quiz.description}
-                        </p>
-                      )}
-
-                      {/* Stats chips */}
-                      <div className="flex items-center gap-2 mb-4 mt-auto">
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 text-[11px] font-medium text-foreground">
-                          <FileText className="h-3 w-3 text-primary" />
-                          {quiz.questions.length} Q
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 text-[11px] font-medium text-foreground">
-                          <Clock className="h-3 w-3 text-accent" />
-                          {Math.floor(quiz.time_limit / 60)} min
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 text-[11px] font-medium text-foreground">
-                          <Flame className="h-3 w-3 text-orange-500" />
-                          {quiz.questions.length > 30 ? "Hard" : quiz.questions.length > 15 ? "Medium" : "Easy"}
-                        </div>
-                      </div>
-
-                      {/* CTA Button */}
-                      <Link
-                        href={`/quiz/${quiz.id}`}
-                        onClick={(e) => handleStartQuiz(e, quiz.id)}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-300 shadow-md group-hover:shadow-lg"
-                        style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)` }}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-11 gap-2 text-xs sm:text-sm whitespace-nowrap px-3">
+                      <ListFilter className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{activeSortLabel}</span>
+                      <span className="sm:hidden">Sort</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {sortOptions.map(opt => (
+                      <DropdownMenuItem
+                        key={opt.value}
+                        onClick={() => setSortBy(opt.value)}
+                        className={sortBy === opt.value ? "bg-primary/10 text-primary font-medium" : ""}
                       >
-                        {user ? (
-                          <Play className="h-3.5 w-3.5 fill-white" />
-                        ) : (
-                          <Lock className="h-3.5 w-3.5" />
-                        )}
-                        {user ? "Start Quiz" : "Login to Start"}
-                      </Link>
-                    </div>
+                        {opt.value === sortBy && <Zap className="h-3.5 w-3.5 mr-2 text-primary" />}
+                        {opt.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            {/* Category chips — only when no structure filter */}
+            {!loading && categories.length > 2 && !hasStructureFilter && (
+              <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
+                {categories.map(cat => {
+                  const isActive = selectedCategory === cat
+                  const cfg = categoryConfig[cat] || defaultConfig
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className="shrink-0 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium border transition-all duration-200"
+                      style={isActive ? {
+                        backgroundColor: cat === "All" ? "hsl(var(--primary))" : cfg.color,
+                        color: "#fff",
+                        borderColor: "transparent"
+                      } : {
+                        backgroundColor: cat === "All" ? "transparent" : cfg.bg,
+                        color: cat === "All" ? "hsl(var(--muted-foreground))" : cfg.color,
+                        borderColor: cat === "All" ? "hsl(var(--border))" : `${cfg.color}40`
+                      }}
+                    >
+                      {cat}
+                      {cat !== "All" && (
+                        <span className="ml-1.5 opacity-75 text-[10px]">
+                          ({quizzes.filter(q => q.category === cat).length})
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Content */}
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-border/50 bg-muted/30 p-6 animate-pulse space-y-4">
+                    <div className="h-5 bg-muted rounded-full w-3/4" />
+                    <div className="h-3 bg-muted rounded-full w-1/2" />
+                    <div className="h-3 bg-muted rounded-full w-2/3" />
+                    <div className="h-10 bg-muted rounded-xl mt-4" />
                   </div>
-                )
-              })}
-            </div>
-          </>
-        )}
+                ))}
+              </div>
+            ) : quizzes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="h-20 w-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-5">
+                  <BookOpen className="h-10 w-10 text-muted-foreground/50" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">No Quizzes Yet</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mb-6">
+                  Quizzes will appear here once they are published by the admin.
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/">
+                    Browse PDFs Instead
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <Target className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                <h3 className="text-lg font-bold mb-1">No quizzes match</h3>
+                <p className="text-sm text-muted-foreground mb-4">Try adjusting your search or filter</p>
+                <Button variant="outline" size="sm" onClick={() => {
+                  setSearch("")
+                  setSelectedCategory("All")
+                  setStructureFilter({ folderId: null, categoryId: null, sectionId: null })
+                }}>
+                  Clear Filters
+                </Button>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Showing <span className="font-semibold text-foreground">{filtered.length}</span> of {quizzes.length} quizzes
+                  {selectedCategory !== "All" && !hasStructureFilter && <> in <span className="font-semibold text-foreground">{selectedCategory}</span></>}
+                  {search && <> matching &quot;<span className="font-semibold text-foreground">{search}</span>&quot;</>}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                  {filtered.map((quiz) => {
+                    const cfg = categoryConfig[quiz.category] || defaultConfig
+                    const isNew = (Date.now() - new Date(quiz.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000
+                    return (
+                      <div
+                        key={quiz.id}
+                        className="group relative rounded-2xl border border-border/50 bg-card overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 hover:border-transparent flex flex-col"
+                      >
+                        <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${cfg.color}, ${cfg.color}88)` }} />
+                        <div className={`absolute inset-0 bg-gradient-to-br ${cfg.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+
+                        <div className="relative p-5 flex-1 flex flex-col">
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex-1 min-w-0">
+                              {isNew && (
+                                <div className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5 mb-1.5">
+                                  <Sparkles className="h-2.5 w-2.5" />
+                                  NEW
+                                </div>
+                              )}
+                              <h3 className="font-bold text-sm sm:text-base leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                {quiz.title}
+                              </h3>
+                            </div>
+                            <span
+                              className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full text-white shadow-sm"
+                              style={{ backgroundColor: cfg.color }}
+                            >
+                              {quiz.category}
+                            </span>
+                          </div>
+
+                          {quiz.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
+                              {quiz.description}
+                            </p>
+                          )}
+
+                          <div className="flex items-center gap-2 mb-4 mt-auto flex-wrap">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 text-[11px] font-medium text-foreground">
+                              <FileText className="h-3 w-3 text-primary" />
+                              {quiz.questions.length} Q
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 text-[11px] font-medium text-foreground">
+                              <Clock className="h-3 w-3 text-accent" />
+                              {Math.floor(quiz.time_limit / 60)} min
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 text-[11px] font-medium text-foreground capitalize">
+                              <Flame className="h-3 w-3 text-orange-500" />
+                              {quiz.difficulty}
+                            </div>
+                          </div>
+
+                          <Link
+                            href={`/quiz/${quiz.id}`}
+                            onClick={(e) => handleStartQuiz(e, quiz.id)}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-300 shadow-md group-hover:shadow-lg"
+                            style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)` }}
+                          >
+                            {user ? (
+                              <Play className="h-3.5 w-3.5 fill-white" />
+                            ) : (
+                              <Lock className="h-3.5 w-3.5" />
+                            )}
+                            {user ? "Start Quiz" : "Login to Start"}
+                          </Link>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </main>
 
       {/* Quiz History */}

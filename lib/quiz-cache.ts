@@ -5,10 +5,13 @@ export interface QuizListItem {
   title: string
   description: string
   category: string
+  section: string
+  difficulty: string
   time_limit: number
   enabled: boolean
   created_at: string
   questions: { id: string }[]
+  structure_location: { folderId: string; categoryId: string; sectionId: string } | null
 }
 
 let _cache: { data: QuizListItem[]; at: number } | null = null
@@ -23,7 +26,7 @@ export async function getQuizList(): Promise<QuizListItem[]> {
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("quizzes")
-      .select("id, title, description, category, time_limit, questions, enabled, created_at")
+      .select("id, title, description, category, section, difficulty, time_limit, questions, enabled, created_at, structure_location")
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -35,13 +38,16 @@ export async function getQuizList(): Promise<QuizListItem[]> {
       id: q.id,
       title: q.title,
       description: q.description,
-      category: q.category,
+      category: q.category || "General",
+      section: q.section || "General",
+      difficulty: q.difficulty || "medium",
       time_limit: q.time_limit,
       enabled: q.enabled,
       created_at: q.created_at,
       questions: Array.isArray(q.questions)
         ? q.questions.map((qs: { id?: string }) => ({ id: qs.id ?? "" }))
         : [],
+      structure_location: q.structure_location ?? null,
     }))
 
     _cache = { data: quizzes, at: Date.now() }
