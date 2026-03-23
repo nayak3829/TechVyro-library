@@ -47,7 +47,7 @@ function SeriesContent() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    if (!slug || !apiBase || !webBase) {
+    if (!slug || !apiBase) {
       router.push("/extract")
       return
     }

@@ -30,8 +30,8 @@ export async function GET(request: Request) {
   const apiBase = searchParams.get("apiBase")
   const webBase = searchParams.get("webBase")
 
-  if (!slug || !apiBase || !webBase) {
-    return NextResponse.json({ error: "slug, apiBase, webBase required" }, { status: 400 })
+  if (!slug || !apiBase) {
+    return NextResponse.json({ error: "slug and apiBase required" }, { status: 400 })
   }
 
   // Handle sample series

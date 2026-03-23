@@ -246,6 +246,15 @@ const SERIES_LIBRARY: DisplaySeries[] = [
 ]
 
 // ── Component ──────────────────────────────────────────────────────────────
+// Popular platforms to auto-fetch on page load (tries real AppX API)
+const AUTO_PLATFORMS = [
+  { name: "Careerwill", api: "https://careerwillapi.classx.co.in", webBase: "https://careerwill.classx.co.in" },
+  { name: "Exampur", api: "https://exampurapi.classx.co.in", webBase: "https://exampur.classx.co.in" },
+  { name: "Adda247", api: "https://adda247api.classx.co.in", webBase: "https://adda247.classx.co.in" },
+  { name: "DronsStudy", api: "https://dronstudyapi.classx.co.in", webBase: "https://dronstudy.classx.co.in" },
+  { name: "Mahendras", api: "https://mahendrasapi.classx.co.in", webBase: "https://mahendras.classx.co.in" },
+]
+
 export default function ExtractPage() {
   const router = useRouter()
   const [selectedCat, setSelectedCat] = useState("all")
@@ -257,12 +266,65 @@ export default function ExtractPage() {
   const [loading, setLoading] = useState(false)
   const [platformName, setPlatformName] = useState("")
   const [liveSeries, setLiveSeries] = useState<DisplaySeries[] | null>(null)
+  const [autoLiveSeries, setAutoLiveSeries] = useState<(DisplaySeries & { _apiBase: string; _webBase: string; _raw: unknown })[]>([])
+  const [autoFetching, setAutoFetching] = useState(true)
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
   const [showAll, setShowAll] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // Auto-fetch from real AppX APIs on page load
+  useEffect(() => {
+    let cancelled = false
+    const fetchAll = async () => {
+      setAutoFetching(true)
+      const found: (DisplaySeries & { _apiBase: string; _webBase: string; _raw: unknown })[] = []
+
+      await Promise.allSettled(
+        AUTO_PLATFORMS.map(async (platform) => {
+          try {
+            const params = new URLSearchParams({ apiUrl: platform.api, url: platform.webBase })
+            const res = await fetch(`/api/extract?${params}`)
+            if (!res.ok) return
+            const data = await res.json()
+            if (!data.success || data.source === "sample" || !data.testSeries?.length) return
+            const catColor = "#8b5cf6"
+            const mapped = (data.testSeries as Array<{ id?: string | number; title?: string; name?: string; slug?: string; description?: string; total_tests?: number }>)
+              .slice(0, 6)
+              .map((s, i) => ({
+                id: `live-${platform.name}-${s.id || i}`,
+                title: s.title || s.name || `Test Series ${i + 1}`,
+                subtitle: `Live from ${platform.name}`,
+                category: "all" as const,
+                examTags: [platform.name, "LIVE"],
+                totalTests: s.total_tests || 10,
+                totalQuestions: (s.total_tests || 10) * 15,
+                duration: "60 min/test",
+                language: "Hindi + English",
+                slug: s.slug || String(s.id || i),
+                sampleCategory: "ssc-banking",
+                color: catColor,
+                icon: "🎓",
+                badge: "LIVE" as const,
+                _apiBase: data.apiBase || platform.api,
+                _webBase: data.webBase || platform.webBase,
+                _raw: s,
+              }))
+            if (!cancelled) found.push(...mapped)
+          } catch { /* blocked/timeout — ignore */ }
+        })
+      )
+
+      if (!cancelled) {
+        setAutoLiveSeries(found)
+        setAutoFetching(false)
+      }
+    }
+    fetchAll()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -377,10 +439,13 @@ export default function ExtractPage() {
     setLoading(false)
   }
 
-  // Determine which series to show
-  const displaySeries: DisplaySeries[] = liveSeries || SERIES_LIBRARY
+  // Determine which series to show — live series on top, then sample
+  const baseLibrary = liveSeries || [
+    ...(autoLiveSeries as DisplaySeries[]),
+    ...SERIES_LIBRARY,
+  ]
 
-  const filtered = displaySeries.filter(s => {
+  const filtered = baseLibrary.filter(s => {
     const catMatch = selectedCat === "all" || s.category === selectedCat
     const qMatch = !searchQuery || s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.examTags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -566,6 +631,20 @@ export default function ExtractPage() {
             </div>
           )}
 
+          {/* Auto-fetch live status */}
+          {autoFetching && !liveSeries && (
+            <div className="flex items-center gap-2 mb-4 px-1 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />
+              <span>Fetching live test series from AppX platforms...</span>
+            </div>
+          )}
+          {!autoFetching && autoLiveSeries.length > 0 && !liveSeries && (
+            <div className="flex items-center gap-2 mb-4 px-1 text-sm text-green-600 font-medium">
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span>{autoLiveSeries.length} live series loaded from AppX</span>
+            </div>
+          )}
+
           {/* Series grid */}
           {!loading && filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -687,9 +766,11 @@ function SeriesCard({ series, onStart }: { series: DisplaySeries; onStart: () =>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                 series.badge === "HOT"
                   ? "bg-red-100 text-red-600 border-red-200"
+                  : series.badge === "LIVE"
+                  ? "bg-green-100 text-green-700 border-green-200 animate-pulse"
                   : "bg-amber-100 text-amber-700 border-amber-200"
               }`}>
-                {series.badge}
+                {series.badge === "LIVE" ? "🔴 LIVE" : series.badge}
               </span>
             )}
           </div>
@@ -705,7 +786,7 @@ function SeriesCard({ series, onStart }: { series: DisplaySeries; onStart: () =>
 
         {/* Exam tags */}
         <div className="flex flex-wrap gap-1.5">
-          {series.examTags.slice(0, 3).map(tag => (
+          {series.examTags.filter(t => t !== "LIVE").slice(0, 3).map(tag => (
             <span
               key={tag}
               className="text-[10px] font-semibold px-2 py-0.5 rounded-md border"
