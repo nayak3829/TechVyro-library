@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { X, Mail, Lock, User, Eye, EyeOff, LogIn, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,22 +21,36 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const [loading, setLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
 
-  const supabase = createClient()
+  const supabaseRef = useRef<SupabaseClient | null>(null)
+  if (!supabaseRef.current) {
+    supabaseRef.current = createClient()
+  }
+  const supabase = supabaseRef.current
+
+  const getRedirectURL = () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    return `${origin}/auth/callback`
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     if (!email.trim() || !password.trim()) return
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
       if (error) {
-        if (error.message.includes("Invalid login")) {
+        if (error.message.toLowerCase().includes("invalid login") || error.message.toLowerCase().includes("invalid credentials")) {
           toast.error("Invalid email or password")
+        } else if (error.message.toLowerCase().includes("email not confirmed")) {
+          toast.error("Please verify your email before logging in. Check your inbox.")
         } else {
           toast.error(error.message)
         }
       } else {
-        toast.success("Welcome back! Login successful")
+        toast.success("Welcome back!")
         onClose()
       }
     } finally {
@@ -52,20 +67,26 @@ export function AuthModal({ onClose }: AuthModalProps) {
     }
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { full_name: name.trim() } },
+        options: {
+          data: { full_name: name.trim() },
+          emailRedirectTo: getRedirectURL(),
+        },
       })
       if (error) {
-        if (error.message.includes("already registered")) {
+        if (error.message.toLowerCase().includes("already registered") || error.message.toLowerCase().includes("user already")) {
           toast.error("This email is already registered. Please login.")
           setMode("login")
         } else {
           toast.error(error.message)
         }
+      } else if (data.user && !data.session) {
+        toast.success("Account created! Check your email to verify your account.")
+        onClose()
       } else {
-        toast.success("Account created! Please verify your email if prompted.")
+        toast.success("Account created! You are now logged in.")
         onClose()
       }
     } finally {
@@ -78,7 +99,9 @@ export function AuthModal({ onClose }: AuthModalProps) {
     if (!email.trim()) return
     setLoading(true)
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim())
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: getRedirectURL(),
+      })
       if (error) {
         toast.error(error.message)
       } else {
@@ -88,6 +111,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const switchMode = (newMode: "login" | "signup") => {
+    setMode(newMode)
+    setPassword("")
+    setName("")
   }
 
   return (
@@ -104,7 +133,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
                 {mode === "login" ? "Welcome Back" : mode === "signup" ? "Create Account" : "Reset Password"}
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {mode === "login" ? "Sign in to your account" : mode === "signup" ? "Create your free account" : "We'll send you a reset link"}
+                {mode === "login"
+                  ? "Sign in to your account"
+                  : mode === "signup"
+                  ? "Create your free account"
+                  : "We'll send you a reset link"}
               </p>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-lg">
@@ -119,7 +152,9 @@ export function AuthModal({ onClose }: AuthModalProps) {
               </div>
               <div>
                 <p className="font-semibold text-foreground">Email Sent!</p>
-                <p className="text-sm text-muted-foreground mt-1">Check your inbox and click the reset link.</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Check your inbox and click the reset link.
+                </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setMode("login")} className="gap-2">
                 <LogIn className="h-4 w-4" />
@@ -127,7 +162,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
               </Button>
             </div>
           ) : (
-            <form onSubmit={mode === "login" ? handleLogin : mode === "signup" ? handleSignup : handleForgot} className="space-y-4">
+            <form
+              onSubmit={
+                mode === "login" ? handleLogin : mode === "signup" ? handleSignup : handleForgot
+              }
+              className="space-y-4"
+            >
               {mode === "signup" && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground">Full Name</label>
@@ -137,7 +177,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
                       type="text"
                       placeholder="Enter your full name"
                       value={name}
-                      onChange={e => setName(e.target.value)}
+                      onChange={(e) => setName(e.target.value)}
                       className="pl-9 h-11 rounded-xl"
                       required
                     />
@@ -153,7 +193,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
                     type="email"
                     placeholder="your@email.com"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="pl-9 h-11 rounded-xl"
                     required
                   />
@@ -169,7 +209,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
                       type={showPassword ? "text" : "password"}
                       placeholder={mode === "signup" ? "At least 6 characters" : "Enter your password"}
                       value={password}
-                      onChange={e => setPassword(e.target.value)}
+                      onChange={(e) => setPassword(e.target.value)}
                       className="pl-9 pr-10 h-11 rounded-xl"
                       required
                     />
@@ -183,7 +223,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
                   </div>
                   {mode === "login" && (
                     <div className="flex justify-end">
-                      <button type="button" onClick={() => setMode("forgot")} className="text-xs text-primary hover:underline">
+                      <button
+                        type="button"
+                        onClick={() => setMode("forgot")}
+                        className="text-xs text-primary hover:underline"
+                      >
                         Forgot password?
                       </button>
                     </div>
@@ -199,11 +243,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : mode === "login" ? (
-                  <><LogIn className="h-4 w-4" />Login</>
+                  <><LogIn className="h-4 w-4" /> Login</>
                 ) : mode === "signup" ? (
-                  <><UserPlus className="h-4 w-4" />Create Account</>
+                  <><UserPlus className="h-4 w-4" /> Create Account</>
                 ) : (
-                  <><Mail className="h-4 w-4" />Send Reset Link</>
+                  <><Mail className="h-4 w-4" /> Send Reset Link</>
                 )}
               </Button>
             </form>
@@ -216,7 +260,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
                 {" "}
                 <button
                   type="button"
-                  onClick={() => { setMode(mode === "login" ? "signup" : "login"); setPassword(""); setName("") }}
+                  onClick={() => switchMode(mode === "login" ? "signup" : "login")}
                   className="text-primary font-medium hover:underline"
                 >
                   {mode === "login" ? "Sign up" : "Login"}
@@ -227,7 +271,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
           {mode === "forgot" && !forgotSent && (
             <div className="mt-5 pt-4 border-t border-border/40 text-center">
-              <button type="button" onClick={() => setMode("login")} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
                 ← Back to Login
               </button>
             </div>
