@@ -4,16 +4,34 @@ import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 export async function GET() {
   const result: Record<string, unknown> = {}
 
-  // 1. Check token
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  result.token_set = !!token
-  result.token_preview = token ? `${token.slice(0, 10)}...` : "NOT SET"
+  // Show all env var NAMES that contain "TELEGRAM" (safe — no values shown)
+  const allKeys = Object.keys(process.env)
+  result.env_keys_with_telegram = allKeys.filter(k => k.toUpperCase().includes("TELEGRAM"))
+  result.env_keys_with_bot = allKeys.filter(k => k.toUpperCase().includes("BOT"))
+
+  // 1. Check token — try multiple possible names
+  const token =
+    process.env.TELEGRAM_BOT_TOKEN ||
+    process.env.telegram_bot_token ||
+    process.env.TELEGRAM_TOKEN ||
+    process.env.BOT_TOKEN
+
+  result.TELEGRAM_BOT_TOKEN = !!process.env.TELEGRAM_BOT_TOKEN
+  result.telegram_bot_token_lower = !!process.env.telegram_bot_token
+  result.TELEGRAM_TOKEN = !!process.env.TELEGRAM_TOKEN
+  result.BOT_TOKEN = !!process.env.BOT_TOKEN
+  result.token_found = !!token
+  result.token_preview = token ? `${token.slice(0, 12)}...` : "NOT FOUND IN ANY VARIATION"
 
   // 2. Check Supabase admin
   result.supabase_configured = isAdminConfigured()
 
   if (!token) {
-    return NextResponse.json({ ...result, error: "TELEGRAM_BOT_TOKEN is not set in environment variables" })
+    return NextResponse.json({
+      ...result,
+      error: "Token not found. Check env_keys_with_telegram above to see what name Vercel used.",
+      fix: "In Vercel, add env var with EXACT name: TELEGRAM_BOT_TOKEN"
+    })
   }
 
   // 3. Verify token with Telegram
@@ -24,7 +42,7 @@ export async function GET() {
     result.bot_name = meData.result?.first_name || "Unknown"
     result.bot_username = meData.result?.username || "Unknown"
     if (!meData.ok) {
-      return NextResponse.json({ ...result, error: "Token is invalid — get a new one from @BotFather" })
+      return NextResponse.json({ ...result, error: "Token invalid — get new one from @BotFather" })
     }
   } catch {
     return NextResponse.json({ ...result, error: "Could not reach Telegram API" })
@@ -41,11 +59,11 @@ export async function GET() {
       .single()
     chatId = String((data?.value as Record<string, string>)?.telegramChatId || "")
     result.chat_id_configured = !!chatId
-    result.chat_id_value = chatId || "NOT SET — go to Admin → General Settings → Telegram Chat ID"
+    result.chat_id_value = chatId || "NOT SET — Admin Panel → General Settings → Telegram Chat ID"
   }
 
   if (!chatId) {
-    return NextResponse.json({ ...result, error: "Telegram Chat ID is not configured. Go to Admin Panel → General Settings → set your Telegram Chat ID" })
+    return NextResponse.json({ ...result, error: "Chat ID missing — set it in Admin Panel → General Settings → Telegram Chat ID" })
   }
 
   // 5. Send test message
@@ -55,19 +73,16 @@ export async function GET() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
-        text: "✅ <b>TechVyro Bot Test</b>\n\nYour Telegram bot is working correctly!\n\nStudents can now chat with you via the website.",
+        text: "✅ <b>TechVyro Bot Test</b>\n\nYour Telegram bot is working!",
         parse_mode: "HTML",
       }),
     })
     const sendData = await sendRes.json()
     result.message_sent = sendData.ok
     result.send_error = sendData.ok ? null : sendData.description
-    if (!sendData.ok) {
-      return NextResponse.json({ ...result, error: `Failed to send message: ${sendData.description}. Check if Chat ID "${chatId}" is correct.` })
-    }
   } catch {
-    return NextResponse.json({ ...result, error: "Failed to send test message" })
+    result.message_sent = false
   }
 
-  return NextResponse.json({ ...result, success: true, message: "Everything is working! Check your Telegram for a test message." })
+  return NextResponse.json({ ...result, success: true })
 }
