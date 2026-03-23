@@ -30,20 +30,20 @@ function PlayContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  const isSample = apiBase.startsWith("sample:")
-
   useEffect(() => {
     if (authLoading) return
+
     if (!testId || !apiBase) {
       router.replace("/extract")
       return
     }
-    // Sample tests: allow without login
-    // Live tests: require login
-    if (!isSample && !user) {
-      router.replace("/login?redirect=/extract")
+
+    if (!user) {
+      const currentUrl = `/extract/play?${searchParams.toString()}`
+      router.replace(`/login?redirect=${encodeURIComponent(currentUrl)}`)
       return
     }
+
     fetchQuestions()
   }, [authLoading, user, testId, apiBase])
 
@@ -73,11 +73,18 @@ function PlayContent() {
     }
   }
 
-  if (authLoading || (loading && !error)) {
+  if (authLoading || (!user && !error)) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-violet-600" />
-        <p className="text-muted-foreground font-medium">Loading test questions...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -107,12 +114,19 @@ function PlayContent() {
     )
   }
 
+  const userName = user
+    ? (user.user_metadata?.full_name as string | undefined)
+      || (user.user_metadata?.name as string | undefined)
+      || user.email?.split("@")[0]
+      || ""
+    : ""
+
   return (
     <QuizPlayer
       title={title}
       questions={questions}
       timeLimit={duration}
-      userName={user?.email?.split("@")[0] || "Student"}
+      userName={userName}
     />
   )
 }
@@ -121,7 +135,7 @@ export default function PlayPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-violet-600" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     }>
       <PlayContent />
