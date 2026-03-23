@@ -346,6 +346,8 @@ export function Header() {
                   onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true) }}
                   onFocus={() => setShowSuggestions(true)}
                   className="pl-10 pr-24 h-10 bg-muted/50 border-border/50 focus-visible:ring-primary focus-visible:ring-1 focus-visible:border-primary/50 text-sm rounded-xl transition-all duration-300"
+                  autoComplete="off"
+                  suppressHydrationWarning
                 />
                 <div className="absolute right-2 flex items-center gap-1">
                   {searching && <span className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
@@ -671,6 +673,8 @@ export function Header() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-10 h-12 bg-muted/50 border-border/50 focus-visible:ring-primary text-base rounded-xl"
               autoFocus
+              autoComplete="off"
+              suppressHydrationWarning
             />
             {searchQuery && (
               <Button type="button" variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 p-0 rounded-lg" onClick={() => { setSearchQuery(""); setLiveResults([]) }}>

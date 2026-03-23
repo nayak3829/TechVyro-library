@@ -288,6 +288,8 @@ export default function BrowsePage() {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="pl-9 pr-9 h-11 text-sm bg-background border-border/60"
+                  autoComplete="off"
+                  suppressHydrationWarning
                 />
                 {search && (
                   <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">

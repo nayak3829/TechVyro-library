@@ -73,6 +73,7 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter admin password"
+                  autoComplete="current-password"
                   required
                 />
               </Field>

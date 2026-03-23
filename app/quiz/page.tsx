@@ -247,6 +247,8 @@ export default function QuizzesPage() {
                   value={searchRaw}
                   onChange={e => setSearchRaw(e.target.value)}
                   className="w-full h-11 pl-9 pr-9 rounded-xl border border-border/60 bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
+                  autoComplete="off"
+                  suppressHydrationWarning
                 />
                 {searchRaw && (
                   <button
