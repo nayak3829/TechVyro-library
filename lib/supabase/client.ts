@@ -1,11 +1,12 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+// Supabase client with graceful fallback when env vars are missing
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export function createClient() {
+  // Return mock client when Supabase is not configured
   if (!supabaseUrl || !supabaseAnonKey) {
-    // Return a mock client that won't crash when env vars are missing
     return {
       auth: {
         getUser: async () => ({ data: { user: null }, error: null }),
