@@ -2,15 +2,19 @@
 
 A Next.js 15 PDF library and quiz platform with admin dashboard, user accounts, AppX test extractor, and smart student features. Hosted on Replit with Supabase backend.
 
-## AppX Test Extractor (New Major Feature)
+## AppX Test Extractor
 Full integration of test-series extraction from AppX-based educational websites:
-- **`/extract`** — Main extractor page: user inputs any AppX website URL, gets list of test series
+- **`/extract`** — 32+ pre-listed platforms with category filter tabs, one-click extraction; also supports custom URL entry
 - **`/extract/series`** — Shows subjects + individual tests for a selected series (with credits gating)
 - **`/extract/play`** — Plays extracted test using the existing `QuizPlayer` component (timer, scoring, explanations)
-- **`/api/extract/route.ts`** — Scrapes test series list via AppX API + `__NEXT_DATA__` fallback
-- **`/api/extract/tests/route.ts`** — Fetches subjects + tests for a specific series slug
-- **`/api/extract/questions/route.ts`** — Fetches & normalizes questions into QuizPlayer format
+- **`/api/extract/route.ts`** — Parallel fetch (5 endpoints × 3s timeout) → sample fallback in ~4-5 seconds
+- **`/api/extract/tests/route.ts`** — Fetches subjects + tests; handles `apiBase=sample:*` for sample series
+- **`/api/extract/questions/route.ts`** — Fetches questions; falls back to `lib/sample-tests.ts` by testId lookup
 - **`/api/credits/route.ts`** — Credits management (GET: fetch/auto-init, POST: use/referral)
+- **`lib/sample-tests.ts`** — Sample question database for NDA, JEE, SSC, Banking, Railways, CTET
+
+### Live Extraction Status
+Replit server IPs are blocked by Cloudflare on all major educational sites (522 errors). The system automatically falls back to `lib/sample-tests.ts` within ~4-5 seconds. The sample tests contain real public-domain exam questions mapped to platform categories.
 
 ### Credits & Referral System
 - Credits stored in Supabase **user_metadata** — no extra SQL table or manual setup needed

@@ -58,7 +58,7 @@ function PlayContent() {
       }
 
       if (!data.questions || data.questions.length === 0) {
-        setError("No questions found in this test")
+        setError("No questions found. This test may be empty or require login on the source platform.")
         return
       }
 

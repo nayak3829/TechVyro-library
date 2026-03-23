@@ -22,12 +22,20 @@ function defaultMeta(existingMeta: Record<string, unknown> = {}) {
 export async function GET() {
   try {
     const supabase = await createClient()
-    if (!supabase) return NextResponse.json({ error: "DB not configured" }, { status: 503 })
+    if (!supabase) return NextResponse.json({ credits: defaultMeta() })
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const admin = createAdminClient()
+    let admin
+    try {
+      admin = createAdminClient()
+    } catch {
+      // Service role key not configured — return defaults from user metadata
+      const meta = (user.user_metadata || {}) as Record<string, unknown>
+      return NextResponse.json({ credits: defaultMeta(meta) })
+    }
+
     const meta = (user.user_metadata || {}) as Record<string, unknown>
 
     // Auto-init credits for first-time users

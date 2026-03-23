@@ -100,6 +100,7 @@ export default function ExtractPage() {
   const [loading, setLoading] = useState(false)
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
   const [testSeries, setTestSeries] = useState<TestSeries[]>([])
   const [apiBase, setApiBase] = useState("")
   const [webBase, setWebBase] = useState("")
@@ -116,10 +117,6 @@ export default function ExtractPage() {
   }, [user])
 
   const doExtract = async (targetUrl: string, platformName?: string) => {
-    if (!user) {
-      router.push(`/login?redirect=/extract`)
-      return
-    }
     const cleanUrl = targetUrl.trim()
     if (!cleanUrl) return
 
@@ -141,6 +138,7 @@ export default function ExtractPage() {
       setTestSeries(data.testSeries || [])
       setApiBase(data.apiBase || "")
       setWebBase(data.webBase || "")
+      setNotice(data.notice || "")
       setSearched(true)
     } catch {
       setError("Network error. Please try again.")
@@ -219,6 +217,19 @@ export default function ExtractPage() {
             </div>
           </div>
         </section>
+
+        {/* Notice (sample tests fallback) */}
+        {notice && (
+          <div className="max-w-3xl mx-auto px-4 mb-4">
+            <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+              <Zap className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-amber-700 dark:text-amber-400">Showing Sample Tests</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{notice}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

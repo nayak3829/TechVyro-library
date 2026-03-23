@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { SAMPLE_SERIES } from "@/lib/sample-tests"
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 15000) {
   const controller = new AbortController()
@@ -31,6 +32,26 @@ export async function GET(request: Request) {
 
   if (!slug || !apiBase || !webBase) {
     return NextResponse.json({ error: "slug, apiBase, webBase required" }, { status: 400 })
+  }
+
+  // Handle sample series
+  if (apiBase.startsWith("sample:")) {
+    const series = SAMPLE_SERIES.find(s => s.slug === slug || s.id === slug)
+    if (series) {
+      const subjects = [{
+        id: series.id,
+        name: series.title,
+        tests: series.tests.map(t => ({
+          id: t.id,
+          title: t.title,
+          duration: t.duration,
+          total_questions: t.total_questions,
+          is_free: true,
+        }))
+      }]
+      return NextResponse.json({ success: true, subjects, tests: [], source: "sample" })
+    }
+    return NextResponse.json({ error: "Sample series not found" }, { status: 404 })
   }
 
   const headers = {

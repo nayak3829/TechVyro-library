@@ -1,0 +1,26 @@
+{
+  "name": "Test Extractor Bot",
+  "description": "Minimal config for Telegram test extractor bot.",
+  "repository": "https://github.com/surabhai00007/Teat",
+  "env": {
+    "API_ID": {
+      "description": "Your Telegram API ID",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Your Telegram API Hash",
+      "required": true
+    },
+    "BOT_TOKEN": {
+      "description": "Your Telegram Bot Token",
+      "required": true
+    },
+    "ADMIN_ID": {
+      "description": "Owner/Admin Telegram User ID (as integer, e.g. 123456789)",
+      "required": true
+    }
+  },
+  "buildpacks": [
+    { "url": "heroku/python" }
+  ]
+}
