@@ -583,8 +583,7 @@ export function Header() {
           <ThemeToggle />
 
           {/* Auth button */}
-          {!authLoading && (
-            user ? (
+          {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="px-2.5 sm:px-3 gap-1.5 border-primary/30 hover:bg-primary/5 hover:border-primary/50 transition-all">
@@ -649,8 +648,7 @@ export function Header() {
                   <span className="hidden sm:inline">Login</span>
                 </Link>
               </Button>
-            )
-          )}
+            )}
 
           <Button variant="outline" size="sm" asChild className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300">
             <Link href="/admin">

@@ -16,17 +16,18 @@ export function useAuth() {
   useEffect(() => {
     const supabase = supabaseRef.current!
 
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-      setLoading(false)
-    })
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    // Fallback: if onAuthStateChange doesn't fire within 1.5s, unblock UI
+    const fallback = setTimeout(() => setLoading(false), 1500)
+
+    return () => {
+      clearTimeout(fallback)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function signOut() {
