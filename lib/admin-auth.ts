@@ -2,6 +2,11 @@ import { createHmac, timingSafeEqual } from "crypto"
 
 const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
+// Check if admin is configured
+export function isAdminConfigured(): boolean {
+  return Boolean(process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.trim().length > 0)
+}
+
 // In-memory rate limiting (resets on server restart, good enough for single-instance)
 const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes

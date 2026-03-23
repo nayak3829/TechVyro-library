@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Lock, AlertCircle } from "lucide-react"
+import { Lock, AlertCircle, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,10 +16,12 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [notConfigured, setNotConfigured] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
+    setNotConfigured(false)
     setIsLoading(true)
 
     try {
@@ -33,6 +35,8 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
 
       if (response.ok && data.token) {
         onLogin(data.token)
+      } else if (data.error === "Admin not configured") {
+        setNotConfigured(true)
       } else {
         setError(data.error || "Invalid password")
       }
@@ -58,7 +62,16 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         <CardContent>
           <form onSubmit={handleSubmit}>
             <FieldGroup>
-              {error && (
+              {notConfigured && (
+                <Alert className="border-amber-500/50 bg-amber-500/10">
+                  <Settings className="h-4 w-4 text-amber-500" />
+                  <AlertDescription className="text-amber-700 dark:text-amber-400">
+                    <strong>Admin not configured.</strong> Please set the <code className="bg-amber-500/20 px-1 py-0.5 rounded text-xs">ADMIN_PASSWORD</code> environment variable in your Vercel project settings.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {error && !notConfigured && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
