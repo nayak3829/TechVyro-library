@@ -44,7 +44,8 @@ function LoginPageContent() {
     const origin = window.location.origin
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
     const base = (origin.includes("localhost") && siteUrl) ? siteUrl : origin
-    return `${base}/auth/callback`
+    const next = redirectTo !== "/" ? `?next=${encodeURIComponent(redirectTo)}` : ""
+    return `${base}/auth/callback${next}`
   }
 
   const switchMode = (m: Mode) => {
@@ -57,21 +58,6 @@ function LoginPageContent() {
   async function handleGoogleSignIn() {
     setGoogleLoading(true)
     try {
-      const settingsRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/settings`,
-        { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! } }
-      )
-      if (settingsRes.ok) {
-        const settings = await settingsRes.json()
-        if (!settings?.external?.google) {
-          toast.error(
-            "Google login is not enabled yet. Please enable it in your Supabase Dashboard → Authentication → Providers → Google.",
-            { duration: 6000 }
-          )
-          return
-        }
-      }
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
