@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { PageAutoRefresh } from "@/components/page-auto-refresh"
@@ -12,8 +13,9 @@ import { Input } from "@/components/ui/input"
 import { 
   Clock, FileText, Play, BookOpen, ArrowRight, Search, 
   Trophy, X, ArrowUpDown, Zap, Target, Flame, ChevronRight,
-  Brain, Sparkles, ListFilter, Wifi
+  Brain, Sparkles, ListFilter, Wifi, Lock
 } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +59,8 @@ const sortOptions = [
 const REFRESH_INTERVAL = 2 * 60 * 1000
 
 export default function QuizzesPage() {
+  const router = useRouter()
+  const { user } = useAuth()
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -64,6 +68,13 @@ export default function QuizzesPage() {
   const [sortBy, setSortBy] = useState("newest")
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  function handleStartQuiz(e: React.MouseEvent, quizId: string) {
+    if (!user) {
+      e.preventDefault()
+      router.push(`/login?redirect=/quiz/${quizId}`)
+    }
+  }
 
   const fetchQuizzes = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
@@ -351,11 +362,16 @@ export default function QuizzesPage() {
                       {/* CTA Button */}
                       <Link
                         href={`/quiz/${quiz.id}`}
+                        onClick={(e) => handleStartQuiz(e, quiz.id)}
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-300 shadow-md group-hover:shadow-lg"
                         style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)` }}
                       >
-                        <Play className="h-3.5 w-3.5 fill-white" />
-                        Start Quiz
+                        {user ? (
+                          <Play className="h-3.5 w-3.5 fill-white" />
+                        ) : (
+                          <Lock className="h-3.5 w-3.5" />
+                        )}
+                        {user ? "Start Quiz" : "Login to Start"}
                       </Link>
                     </div>
                   </div>

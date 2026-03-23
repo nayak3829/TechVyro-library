@@ -1,12 +1,13 @@
 "use client"
 
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { QuizPlayer } from "@/components/quiz/quiz-player"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ArrowLeft, FileText } from "lucide-react"
+import { ArrowLeft, FileText, Lock } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 interface Question {
   id: string
@@ -30,31 +31,47 @@ interface Quiz {
 
 export default function QuizPage() {
   const params = useParams()
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const id = params.id as string
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/api/quizzes/${id}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.error || !data.quiz) {
-          setError("Quiz not found")
-          return
-        }
-        const q: Quiz = data.quiz
-        if (!q.enabled) {
-          setError("This quiz is currently disabled")
-        } else if (!q.questions || q.questions.length === 0) {
-          setError("This quiz has no questions yet")
-        } else {
-          setQuiz(q)
-        }
-      })
-      .catch(() => setError("Failed to load quiz"))
-      .finally(() => setLoading(false))
-  }, [id])
+    if (!authLoading && !user) {
+      router.replace(`/login?redirect=/quiz/${id}`)
+      return
+    }
+    if (!authLoading && user) {
+      fetch(`/api/quizzes/${id}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.error || !data.quiz) {
+            setError("Quiz not found")
+            return
+          }
+          const q: Quiz = data.quiz
+          if (!q.enabled) {
+            setError("This quiz is currently disabled")
+          } else if (!q.questions || q.questions.length === 0) {
+            setError("This quiz has no questions yet")
+          } else {
+            setQuiz(q)
+          }
+        })
+        .catch(() => setError("Failed to load quiz"))
+        .finally(() => setLoading(false))
+    }
+  }, [id, user, authLoading, router])
+
+  if (authLoading || (!user && !error)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

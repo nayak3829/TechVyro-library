@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { 
   ArrowLeft, Download, Share2, FileText, Calendar, Eye, 
   Check, Maximize2, X, Send, BookOpen, Shield, Bookmark,
-  BookmarkCheck, Clock, ChevronRight
+  BookmarkCheck, Clock, ChevronRight, Lock
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,6 +16,7 @@ import { ReviewsSection } from "@/components/reviews-section"
 import { StarRating } from "@/components/star-rating"
 import { FavoriteButton } from "@/components/favorite-button"
 import { saveRecentlyViewed } from "@/components/home/recently-viewed-section"
+import { useAuth } from "@/hooks/use-auth"
 import type { PDF } from "@/lib/types"
 
 const BOOKMARK_KEY = "techvyro_bookmarks"
@@ -48,6 +50,8 @@ function formatReadingTime(seconds: number): string {
 }
 
 export function PDFViewer({ pdf, relatedPDFs = [] }: PDFViewerProps) {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [viewCount, setViewCount] = useState(pdf.view_count || 0)
@@ -147,6 +151,16 @@ export function PDFViewer({ pdf, relatedPDFs = [] }: PDFViewerProps) {
   }
 
   async function handleDownload() {
+    if (!user) {
+      toast.error("Please login to download PDFs", {
+        description: "Create a free account to access downloads",
+        action: {
+          label: "Login",
+          onClick: () => router.push(`/login?redirect=/pdf/${pdf.id}`),
+        },
+      })
+      return
+    }
     setDownloading(true)
     try {
       const response = await fetch(`/api/pdfs/${pdf.id}/download-watermarked`)
@@ -305,10 +319,14 @@ export function PDFViewer({ pdf, relatedPDFs = [] }: PDFViewerProps) {
                   className="flex-1 gap-2 font-semibold shadow-lg transition-all duration-300"
                   style={{ background: `linear-gradient(135deg, ${categoryColor}, ${categoryColor}cc)` }}
                   onClick={handleDownload}
-                  disabled={downloading}
+                  disabled={downloading || authLoading}
                 >
-                  <Download className="h-4 w-4" />
-                  {downloading ? "Downloading..." : "Download"}
+                  {user ? (
+                    <Download className="h-4 w-4" />
+                  ) : (
+                    <Lock className="h-4 w-4" />
+                  )}
+                  {downloading ? "Downloading..." : user ? "Download" : "Login to Download"}
                 </Button>
                 <FavoriteButton pdfId={pdf.id} size="md" />
                 <Button
@@ -484,11 +502,11 @@ export function PDFViewer({ pdf, relatedPDFs = [] }: PDFViewerProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
-                disabled={downloading}
+                disabled={downloading || authLoading}
                 className="h-8 px-2 sm:px-3 text-xs sm:text-sm gap-1.5"
               >
-                <Download className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{downloading ? "Downloading..." : "Download"}</span>
+                {user ? <Download className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{downloading ? "Downloading..." : user ? "Download" : "Login"}</span>
               </Button>
               <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(false)} className="h-8 w-8">
                 <X className="h-4 w-4" />
