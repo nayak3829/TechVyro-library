@@ -8,27 +8,42 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check if already authenticated
     const token = sessionStorage.getItem("admin_token")
-    if (token) {
-      // Verify token
-      fetch("/api/admin/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          setIsAuthenticated(data.valid)
-        })
-        .catch(() => {
-          setIsAuthenticated(false)
-        })
-        .finally(() => {
-          setIsLoading(false)
-        })
-    } else {
+    if (!token) {
       setIsLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+
+    fetch("/api/admin/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.valid) {
+          setIsAuthenticated(true)
+        } else {
+          sessionStorage.removeItem("admin_token")
+          setIsAuthenticated(false)
+        }
+      })
+      .catch(() => {
+        sessionStorage.removeItem("admin_token")
+        setIsAuthenticated(false)
+      })
+      .finally(() => {
+        clearTimeout(timeout)
+        setIsLoading(false)
+      })
+
+    return () => {
+      controller.abort()
+      clearTimeout(timeout)
     }
   }, [])
 
