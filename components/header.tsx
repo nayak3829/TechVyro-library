@@ -3,7 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { FileText, Settings, Home, ExternalLink, Search, X, Sparkles, Clock, TrendingUp, Filter, ChevronDown, Flame, Download, Star, BookOpen, FolderOpen, User, LogOut, Info } from "lucide-react"
+import {
+  FileText, Settings, Home, Search, X, Sparkles, Clock, TrendingUp, Filter,
+  ChevronDown, Flame, Download, Star, BookOpen, FolderOpen, User, LogOut,
+  Info, MessageCircle, Trophy, Zap, GraduationCap, Layers, ArrowRight,
+  LayoutGrid, Send
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -33,6 +38,8 @@ const FALLBACK_SUGGESTIONS = [
   "Previous Year Papers", "CBSE Notes", "JEE", "NEET"
 ]
 
+const DEFAULT_WHATSAPP = "https://whatsapp.com/channel/0029Vadk2XHLSmbX3oEVmX37"
+
 interface LiveResult {
   id: string
   title: string
@@ -52,8 +59,13 @@ export function Header() {
   const [categories, setCategories] = useState<string[]>([])
   const [liveResults, setLiveResults] = useState<LiveResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [whatsappUrl, setWhatsappUrl] = useState(DEFAULT_WHATSAPP)
+  const [browseOpen, setBrowseOpen] = useState(false)
+  const [resourcesOpen, setResourcesOpen] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+  const browseRef = useRef<HTMLDivElement>(null)
+  const resourcesRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -69,6 +81,13 @@ export function Header() {
       .then(data => {
         const cats: { name: string }[] = data.categories || []
         setCategories(cats.map(c => c.name))
+      })
+      .catch(() => {})
+
+    fetch("/api/site-settings?key=general_settings")
+      .then(r => r.json())
+      .then(data => {
+        if (data.value?.whatsappChannelUrl) setWhatsappUrl(data.value.whatsappChannelUrl)
       })
       .catch(() => {})
   }, [])
@@ -94,6 +113,8 @@ export function Header() {
         setSearchOpen(false)
         setSearchQuery("")
         setShowSuggestions(false)
+        setBrowseOpen(false)
+        setResourcesOpen(false)
       }
     }
     window.addEventListener("keydown", handleKeyDown)
@@ -104,6 +125,12 @@ export function Header() {
     const handleClickOutside = (e: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
         setShowSuggestions(false)
+      }
+      if (browseRef.current && !browseRef.current.contains(e.target as Node)) {
+        setBrowseOpen(false)
+      }
+      if (resourcesRef.current && !resourcesRef.current.contains(e.target as Node)) {
+        setResourcesOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -172,7 +199,6 @@ export function Header() {
   }
 
   const suggestions = categories.length > 0 ? categories : FALLBACK_SUGGESTIONS
-
   const filteredSuggestions = searchQuery
     ? suggestions.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
     : suggestions.slice(0, 6)
@@ -287,11 +313,13 @@ export function Header() {
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
       <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between gap-4 px-4">
+
+        {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="relative">
             <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-300">
-              <FileText className="h-5 w-5 sm:h-5 sm:w-5 text-primary-foreground" />
+              <FileText className="h-5 w-5 text-primary-foreground" />
             </div>
           </div>
           <div className="flex flex-col">
@@ -315,17 +343,12 @@ export function Header() {
                   type="search"
                   placeholder="Search PDFs, notes, subjects... (Ctrl+K)"
                   value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    setShowSuggestions(true)
-                  }}
+                  onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true) }}
                   onFocus={() => setShowSuggestions(true)}
                   className="pl-10 pr-24 h-10 bg-muted/50 border-border/50 focus-visible:ring-primary focus-visible:ring-1 focus-visible:border-primary/50 text-sm rounded-xl transition-all duration-300"
                 />
                 <div className="absolute right-2 flex items-center gap-1">
-                  {searching && (
-                    <span className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                  )}
+                  {searching && <span className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
                   {searchQuery && !searching && (
                     <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg hover:bg-destructive/10 hover:text-destructive" onClick={() => { setSearchQuery(""); setLiveResults([]) }}>
                       <X className="h-3.5 w-3.5" />
@@ -373,23 +396,174 @@ export function Header() {
                 </div>
               </div>
             </form>
-
             {showSuggestions && <SuggestionsPanel />}
           </div>
         </div>
 
-        <nav className="flex items-center gap-1.5 sm:gap-2">
+        {/* Desktop Nav */}
+        <nav className="flex items-center gap-1 sm:gap-1.5">
+
+          {/* Mobile search icon */}
           <Button variant="ghost" size="sm" className="md:hidden h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary" onClick={() => { setSearchOpen(!searchOpen); setShowSuggestions(true) }}>
             <Search className="h-4 w-4" />
           </Button>
 
-          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-2 hover:bg-primary/10 hover:text-primary">
+          {/* Home */}
+          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
             <Link href="/"><Home className="h-4 w-4" />Home</Link>
           </Button>
 
-          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-2 hover:bg-primary/10 hover:text-primary">
-            <Link href="/about"><Info className="h-4 w-4" />About</Link>
-          </Button>
+          {/* Browse Dropdown */}
+          <div className="relative hidden lg:block" ref={browseRef}>
+            <button
+              onClick={() => { setBrowseOpen(!browseOpen); setResourcesOpen(false) }}
+              className={`flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${browseOpen ? "bg-primary/10 text-primary" : "text-foreground/80"}`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Browse
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${browseOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {browseOpen && (
+              <div className="absolute top-full left-0 mt-2 w-[480px] bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                <div className="p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Access</p>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {[
+                      { href: "/#content", icon: BookOpen, label: "All PDFs", desc: "Browse full library", color: "text-primary", bg: "bg-primary/10" },
+                      { href: "/?q=popular#content", icon: Flame, label: "Popular", desc: "Most downloaded", color: "text-rose-500", bg: "bg-rose-500/10" },
+                      { href: "/?q=latest#content", icon: Sparkles, label: "Latest", desc: "Recently added", color: "text-amber-500", bg: "bg-amber-500/10" },
+                      { href: "/?q=notes#content", icon: FileText, label: "Study Notes", desc: "Exam-ready notes", color: "text-blue-500", bg: "bg-blue-500/10" },
+                    ].map(item => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setBrowseOpen(false)}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all duration-150 group border border-transparent hover:border-border/50"
+                      >
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.bg}`}>
+                          <item.icon className={`h-4.5 w-4.5 ${item.color}`} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                          <p className="text-[11px] text-muted-foreground">{item.desc}</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {categories.length > 0 && (
+                    <>
+                      <div className="h-px bg-border/50 mb-3" />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Browse by Category</p>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {categories.slice(0, 10).map(cat => (
+                          <Link
+                            key={cat}
+                            href={`/?q=${encodeURIComponent(cat)}#content`}
+                            onClick={() => setBrowseOpen(false)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/60 hover:bg-primary/10 hover:text-primary border border-border/40 hover:border-primary/30 text-xs font-medium transition-all duration-150"
+                          >
+                            <Layers className="h-3 w-3 shrink-0" />
+                            {cat}
+                          </Link>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="h-px bg-border/50 mb-3" />
+                  <Link
+                    href="/#content"
+                    onClick={() => setBrowseOpen(false)}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 hover:border-primary/40 transition-all group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold text-primary">View Full Library</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Resources Dropdown */}
+          <div className="relative hidden lg:block" ref={resourcesRef}>
+            <button
+              onClick={() => { setResourcesOpen(!resourcesOpen); setBrowseOpen(false) }}
+              className={`flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${resourcesOpen ? "bg-primary/10 text-primary" : "text-foreground/80"}`}
+            >
+              <Zap className="h-4 w-4" />
+              Resources
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${resourcesOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {resourcesOpen && (
+              <div className="absolute top-full left-0 mt-2 w-64 bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                <div className="p-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Resources</p>
+                  <div className="space-y-0.5">
+                    {[
+                      { href: "/quiz", icon: Trophy, label: "Quiz Portal", desc: "Test your knowledge", color: "text-amber-500", bg: "bg-amber-500/10" },
+                      { href: "/about", icon: Info, label: "About Us", desc: "Learn about TechVyro", color: "text-blue-500", bg: "bg-blue-500/10" },
+                    ].map(item => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setResourcesOpen(false)}
+                        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/60 transition-all group"
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.bg}`}>
+                          <item.icon className={`h-4 w-4 ${item.color}`} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                          <p className="text-[11px] text-muted-foreground">{item.desc}</p>
+                        </div>
+                      </Link>
+                    ))}
+
+                    <div className="h-px bg-border/50 my-1" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">Get Updates</p>
+
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setResourcesOpen(false)}
+                      className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#25D366]/10 transition-all group"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#25D366]/10">
+                        <MessageCircle className="h-4 w-4 text-[#25D366]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground group-hover:text-[#25D366] transition-colors">WhatsApp Channel</p>
+                        <p className="text-[11px] text-muted-foreground">Join for latest PDFs</p>
+                      </div>
+                    </a>
+
+                    <a
+                      href="https://t.me"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setResourcesOpen(false)}
+                      className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#229ED9]/10 transition-all group"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#229ED9]/10">
+                        <Send className="h-4 w-4 text-[#229ED9]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground group-hover:text-[#229ED9] transition-colors">Telegram Channel</p>
+                        <p className="text-[11px] text-muted-foreground">Instant notifications</p>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <ThemeToggle />
 
@@ -407,31 +581,53 @@ export function Header() {
                     <span className="hidden sm:inline text-xs max-w-[80px] truncate">
                       {user.user_metadata?.full_name?.split(" ")[0] || user.email?.split("@")[0]}
                     </span>
+                    <ChevronDown className="h-3 w-3 hidden sm:block text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel className="text-xs">
-                    <p className="font-semibold truncate">{user.user_metadata?.full_name || "Student"}</p>
-                    <p className="text-muted-foreground font-normal truncate">{user.email}</p>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/quiz" className="gap-2 cursor-pointer">
-                      <Star className="h-4 w-4" />Quiz History
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
-                    <LogOut className="h-4 w-4" />Sign Out
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-3 py-2.5 border-b border-border/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
+                        <span className="text-sm font-bold text-white">
+                          {(user.user_metadata?.full_name || user.email || "U")[0].toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{user.user_metadata?.full_name || "Student"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-1">
+                    <DropdownMenuItem asChild>
+                      <Link href="/" className="gap-2 cursor-pointer rounded-lg">
+                        <Home className="h-4 w-4 text-muted-foreground" />Home
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/quiz" className="gap-2 cursor-pointer rounded-lg">
+                        <Trophy className="h-4 w-4 text-amber-500" />Quiz History
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/about" className="gap-2 cursor-pointer rounded-lg">
+                        <Info className="h-4 w-4 text-blue-500" />About
+                      </Link>
+                    </DropdownMenuItem>
+                  </div>
+                  <div className="p-1 border-t border-border/50">
+                    <DropdownMenuItem onClick={signOut} className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer rounded-lg">
+                      <LogOut className="h-4 w-4" />Sign Out
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
                 asChild
-                className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-primary/30 hover:border-primary/60 hover:bg-primary/5 transition-all duration-300"
+                className="px-3 sm:px-4 gap-1.5 sm:gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white border-0 shadow-md shadow-primary/20 transition-all duration-300"
               >
                 <Link href="/login">
                   <User className="h-4 w-4" />
@@ -495,39 +691,52 @@ export function Header() {
             <div className="mt-3 pb-3 border-b border-border/30">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground">Recent</span>
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={clearRecentSearches}>Clear</Button>
+                <button onClick={clearRecentSearches} className="text-xs text-muted-foreground hover:text-destructive transition-colors">Clear</button>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {recentSearches.slice(0, 3).map((search, idx) => (
-                  <button key={idx} onClick={() => handleSuggestionClick(search)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    {search}
+                {recentSearches.map((s, i) => (
+                  <button key={i} onClick={() => { handleSuggestionClick(s); setSearchOpen(false) }} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-xs hover:bg-muted transition-colors">
+                    <Clock className="h-3 w-3 text-muted-foreground" />{s}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {!searchQuery && (
+          {/* Mobile nav links */}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {[
+              { href: "/", icon: Home, label: "Home", color: "text-primary" },
+              { href: "/#content", icon: BookOpen, label: "All PDFs", color: "text-blue-500" },
+              { href: "/quiz", icon: Trophy, label: "Quiz Portal", color: "text-amber-500" },
+              { href: "/about", icon: Info, label: "About Us", color: "text-emerald-500" },
+            ].map(item => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSearchOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/40 hover:bg-muted text-sm font-medium transition-colors"
+              >
+                <item.icon className={`h-4 w-4 ${item.color} shrink-0`} />
+                {item.label}
+              </Link>
+            ))}
+          </div>
+
+          {categories.length > 0 && (
             <div className="mt-3">
-              <span className="text-xs font-medium text-muted-foreground mb-2 block">
-                {categories.length > 0 ? "Browse Subjects" : "Quick Filters"}
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {categories.length > 0
-                  ? categories.slice(0, 8).map(cat => (
-                      <button key={cat} onClick={() => { handleSuggestionClick(cat); setSearchOpen(false) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                        <FolderOpen className="h-3 w-3" />
-                        {cat}
-                      </button>
-                    ))
-                  : quickFilters.map((filter) => (
-                      <button key={filter.id} onClick={() => { setSelectedFilter(filter.label); setSearchOpen(false); document.getElementById("content")?.scrollIntoView({ behavior: "smooth" }) }} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${filter.bg} ${filter.color} ${filter.hoverBg} transition-colors`}>
-                        <filter.icon className="h-3 w-3" />
-                        {filter.label}
-                      </button>
-                    ))
-                }
+              <span className="text-xs font-medium text-muted-foreground mb-2 block">Categories</span>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.slice(0, 8).map(cat => (
+                  <Link
+                    key={cat}
+                    href={`/?q=${encodeURIComponent(cat)}#content`}
+                    onClick={() => setSearchOpen(false)}
+                    className="px-2.5 py-1 rounded-full bg-muted/60 hover:bg-primary/10 hover:text-primary border border-border/40 text-xs font-medium transition-colors"
+                  >
+                    {cat}
+                  </Link>
+                ))}
               </div>
             </div>
           )}
