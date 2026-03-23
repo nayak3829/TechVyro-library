@@ -1,6 +1,16 @@
 # TechVyro PDF Library
 
-A Next.js 16 PDF library and quiz platform with admin dashboard, hosted on Replit with Supabase backend.
+A Next.js 16 PDF library and quiz platform with admin dashboard, user accounts, and smart student features. Hosted on Replit with Supabase backend.
+
+## Student Features (v2)
+- **User Accounts**: Supabase Auth (email/password) — Login/Signup modal in header (`components/auth-modal.tsx`, `hooks/use-auth.ts`)
+- **Recently Viewed**: localStorage-based horizontal scroll section on homepage (`components/home/recently-viewed-section.tsx`) — auto-saved when any PDF is opened
+- **Related PDFs**: Same-category PDFs shown at bottom of each PDF view page (server-side fetch in `app/pdf/[id]/page.tsx`)
+- **Reading Progress**: Live timer tracks time spent on each PDF — shown as badge and in sidebar stats
+- **Bookmark**: Heart icon on PDF page saves/removes bookmark — stored in localStorage (`techvyro_bookmarks`)
+- **Quiz History**: All quiz attempts saved to localStorage (`techvyro_quiz_history`) — shown in `/quiz` page (`components/quiz-history-section.tsx`)
+- **About/Contact Page**: Full page at `/about` with mission, stats, features, and contact info
+- **Footer Quick Links**: About Us + Quiz Portal added to footer navigation
 
 ## Design System (Advanced Level)
 All public pages follow a consistent premium design language:

@@ -60,6 +60,8 @@ export function Footer() {
 
   const quickLinks = [
     { name: "Home", href: "/" },
+    { name: "Quiz Portal", href: "/quiz" },
+    { name: "About Us", href: "/about" },
     { name: "Admin Panel", href: "/admin" },
     { name: "Main Website", href: s.mainWebsite, external: true },
   ]

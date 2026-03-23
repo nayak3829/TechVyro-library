@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { FileText, Settings, Home, ExternalLink, Search, X, Sparkles, Clock, TrendingUp, Filter, ChevronDown, Flame, Download, Star, BookOpen, FolderOpen } from "lucide-react"
+import { FileText, Settings, Home, ExternalLink, Search, X, Sparkles, Clock, TrendingUp, Filter, ChevronDown, Flame, Download, Star, BookOpen, FolderOpen, User, LogOut, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { AuthModal } from "@/components/auth-modal"
+import { useAuth } from "@/hooks/use-auth"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +43,8 @@ interface LiveResult {
 
 export function Header() {
   const router = useRouter()
+  const { user, loading: authLoading, signOut } = useAuth()
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isScrolled, setIsScrolled] = useState(false)
@@ -386,12 +390,56 @@ export function Header() {
           </Button>
 
           <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-2 hover:bg-primary/10 hover:text-primary">
-            <a href="https://www.techvyro.in/" target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-4 w-4" />Website
-            </a>
+            <Link href="/about"><Info className="h-4 w-4" />About</Link>
           </Button>
 
           <ThemeToggle />
+
+          {/* Auth button */}
+          {!authLoading && (
+            user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="px-2.5 sm:px-3 gap-1.5 border-primary/30 hover:bg-primary/5 hover:border-primary/50 transition-all">
+                    <div className="h-5 w-5 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                      <span className="text-[9px] font-bold text-white">
+                        {(user.user_metadata?.full_name || user.email || "U")[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <span className="hidden sm:inline text-xs max-w-[80px] truncate">
+                      {user.user_metadata?.full_name?.split(" ")[0] || user.email?.split("@")[0]}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel className="text-xs">
+                    <p className="font-semibold truncate">{user.user_metadata?.full_name || "Student"}</p>
+                    <p className="text-muted-foreground font-normal truncate">{user.email}</p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/quiz" className="gap-2 cursor-pointer">
+                      <Star className="h-4 w-4" />Quiz History
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
+                    <LogOut className="h-4 w-4" />Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAuthModal(true)}
+                className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-primary/30 hover:border-primary/60 hover:bg-primary/5 transition-all duration-300"
+              >
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">Login</span>
+              </Button>
+            )
+          )}
 
           <Button variant="outline" size="sm" asChild className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300">
             <Link href="/admin">
@@ -401,6 +449,9 @@ export function Header() {
           </Button>
         </nav>
       </div>
+
+      {/* Auth Modal */}
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
 
       {/* Mobile Search Overlay */}
       {searchOpen && (

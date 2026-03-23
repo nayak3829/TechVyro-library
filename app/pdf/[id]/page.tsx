@@ -17,10 +17,7 @@ async function getPDF(id: string): Promise<PDF | null> {
   
   const { data, error } = await supabase
     .from("pdfs")
-    .select(`
-      *,
-      category:categories(*)
-    `)
+    .select(`*, category:categories(*)`)
     .eq("id", id)
     .single()
 
@@ -30,6 +27,20 @@ async function getPDF(id: string): Promise<PDF | null> {
   }
 
   return data
+}
+
+async function getRelatedPDFs(categoryId: string | null, currentId: string): Promise<PDF[]> {
+  if (!categoryId || !isSupabaseConfigured()) return []
+  const supabase = await createClient()
+  if (!supabase) return []
+  const { data } = await supabase
+    .from("pdfs")
+    .select(`*, category:categories(*)`)
+    .eq("category_id", categoryId)
+    .neq("id", currentId)
+    .order("download_count", { ascending: false })
+    .limit(6)
+  return data || []
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -54,11 +65,13 @@ export default async function PDFDetailPage({ params }: PageProps) {
     notFound()
   }
 
+  const relatedPDFs = await getRelatedPDFs(pdf.category_id, id)
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
-        <PDFViewer pdf={pdf} />
+        <PDFViewer pdf={pdf} relatedPDFs={relatedPDFs} />
       </main>
       <PageAutoRefresh interval={60000} label="Live" showToast={false} />
     </div>

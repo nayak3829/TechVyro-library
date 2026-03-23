@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { PageAutoRefresh } from "@/components/page-auto-refresh"
+import { QuizHistorySection } from "@/components/quiz-history-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -364,6 +365,11 @@ export default function QuizzesPage() {
           </>
         )}
       </main>
+
+      {/* Quiz History */}
+      <div className="container mx-auto px-4 pb-10">
+        <QuizHistorySection />
+      </div>
 
       <Footer />
       <PageAutoRefresh

@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
+import { saveQuizHistory } from "@/components/quiz-history-section"
 
 interface Question {
   qid: string
@@ -325,6 +326,19 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
         quizTitle: title,
         timestamp: new Date().toISOString()
       }
+
+      // Save to local quiz history
+      saveQuizHistory({
+        quizId: quizId || "unknown",
+        quizTitle: title,
+        score,
+        percentage,
+        correct,
+        wrong,
+        skipped,
+        totalTime,
+        timestamp: entry.timestamp,
+      })
       
       fetch("/api/quiz-results", {
         method: "POST",
@@ -399,6 +413,19 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete }: 
         quizTitle: title,
         timestamp: new Date().toISOString()
       }
+
+      // Save to local quiz history
+      saveQuizHistory({
+        quizId: quizId || "unknown",
+        quizTitle: title,
+        score,
+        percentage,
+        correct,
+        wrong,
+        skipped,
+        totalTime,
+        timestamp: entry.timestamp,
+      })
       
       fetch("/api/quiz-results", {
         method: "POST",

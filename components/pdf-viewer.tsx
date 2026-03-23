@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { 
   ArrowLeft, Download, Share2, FileText, Calendar, Eye, 
-  Check, Maximize2, X, Send, TrendingDown, BarChart3,
-  BookOpen, Shield
+  Check, Maximize2, X, Send, BookOpen, Shield, Bookmark,
+  BookmarkCheck, Clock, ChevronRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -14,10 +14,15 @@ import { toast } from "sonner"
 import { ReviewsSection } from "@/components/reviews-section"
 import { StarRating } from "@/components/star-rating"
 import { FavoriteButton } from "@/components/favorite-button"
+import { saveRecentlyViewed } from "@/components/home/recently-viewed-section"
 import type { PDF } from "@/lib/types"
+
+const BOOKMARK_KEY = "techvyro_bookmarks"
+const READING_TIME_KEY = "techvyro_reading_time"
 
 interface PDFViewerProps {
   pdf: PDF
+  relatedPDFs?: PDF[]
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -35,11 +40,22 @@ function formatDate(dateString: string): string {
   })
 }
 
-export function PDFViewer({ pdf }: PDFViewerProps) {
+function formatReadingTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
+}
+
+export function PDFViewer({ pdf, relatedPDFs = [] }: PDFViewerProps) {
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [viewCount, setViewCount] = useState(pdf.view_count || 0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [readingTime, setReadingTime] = useState(0)
+  const readingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const startTimeRef = useRef<number>(Date.now())
 
   const pdfUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/pdfs/${pdf.file_path}`
   const categoryColor = pdf.category?.color || "#6366f1"
@@ -70,6 +86,65 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
     }
     trackView()
   }, [pdf.id])
+
+  // Save to recently viewed
+  useEffect(() => {
+    saveRecentlyViewed({
+      id: pdf.id,
+      title: pdf.title,
+      categoryName: pdf.category?.name,
+      categoryColor: pdf.category?.color,
+    })
+  }, [pdf.id, pdf.title, pdf.category])
+
+  // Load bookmark state
+  useEffect(() => {
+    try {
+      const bookmarks: string[] = JSON.parse(localStorage.getItem(BOOKMARK_KEY) || "[]")
+      setIsBookmarked(bookmarks.includes(pdf.id))
+    } catch {}
+  }, [pdf.id])
+
+  // Reading time tracker
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(READING_TIME_KEY) || "{}")
+      setReadingTime(stored[pdf.id] || 0)
+    } catch {}
+
+    startTimeRef.current = Date.now()
+    readingTimerRef.current = setInterval(() => {
+      setReadingTime(prev => {
+        const newTime = prev + 1
+        try {
+          const stored = JSON.parse(localStorage.getItem(READING_TIME_KEY) || "{}")
+          stored[pdf.id] = newTime
+          localStorage.setItem(READING_TIME_KEY, JSON.stringify(stored))
+        } catch {}
+        return newTime
+      })
+    }, 1000)
+
+    return () => {
+      if (readingTimerRef.current) clearInterval(readingTimerRef.current)
+    }
+  }, [pdf.id])
+
+  function toggleBookmark() {
+    try {
+      const bookmarks: string[] = JSON.parse(localStorage.getItem(BOOKMARK_KEY) || "[]")
+      let updated: string[]
+      if (isBookmarked) {
+        updated = bookmarks.filter(id => id !== pdf.id)
+        toast.success("Bookmark hataya gaya")
+      } else {
+        updated = [...bookmarks, pdf.id]
+        toast.success("Bookmark save ho gaya!")
+      }
+      localStorage.setItem(BOOKMARK_KEY, JSON.stringify(updated))
+      setIsBookmarked(!isBookmarked)
+    } catch {}
+  }
 
   async function handleDownload() {
     setDownloading(true)
@@ -136,10 +211,8 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
         {/* Sidebar */}
         <div className="md:col-span-1 space-y-4">
           <Card className="border-border/50 overflow-hidden shadow-lg">
-            {/* Color top accent */}
             <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${categoryColor}, ${categoryColor}88)` }} />
 
-            {/* Preview header */}
             <div
               className="relative aspect-[4/3] flex items-center justify-center overflow-hidden"
               style={{ background: `linear-gradient(135deg, ${categoryColor}18 0%, ${categoryColor}08 100%)` }}
@@ -159,10 +232,17 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                   {pdf.category.name}
                 </Badge>
               )}
+
+              {/* Reading time badge */}
+              {readingTime > 0 && (
+                <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 text-[10px] font-medium text-foreground">
+                  <Clock className="h-2.5 w-2.5 text-primary" />
+                  {formatReadingTime(readingTime)}
+                </div>
+              )}
             </div>
 
             <CardContent className="p-4 sm:p-5 space-y-4">
-              {/* Title + Rating */}
               <div className="space-y-2">
                 <h1 className="text-lg sm:text-xl font-extrabold text-foreground leading-tight">
                   {pdf.title}
@@ -207,10 +287,16 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                   <BookOpen className="h-3.5 w-3.5 shrink-0 text-accent" />
                   <span>Size: {formatFileSize(pdf.file_size)}</span>
                 </div>
-                <div className="flex items-center gap-2.5 py-2">
+                <div className="flex items-center gap-2.5 py-2 border-b border-border/30">
                   <Shield className="h-3.5 w-3.5 shrink-0 text-green-500" />
                   <span>Watermarked download</span>
                 </div>
+                {readingTime > 60 && (
+                  <div className="flex items-center gap-2.5 py-2">
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>Time spent: {formatReadingTime(readingTime)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Action buttons */}
@@ -225,6 +311,15 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
                   {downloading ? "Downloading..." : "Download"}
                 </Button>
                 <FavoriteButton pdfId={pdf.id} size="md" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={toggleBookmark}
+                  className={`hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors ${isBookmarked ? "border-amber-500/60 bg-amber-500/10 text-amber-500" : ""}`}
+                  title={isBookmarked ? "Bookmark hatao" : "Bookmark karo"}
+                >
+                  {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-amber-500" /> : <Bookmark className="h-4 w-4" />}
+                </Button>
                 <Button
                   variant="outline"
                   size="icon"
@@ -268,7 +363,6 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
         {/* PDF Preview Panel */}
         <Card className="md:col-span-2 border-border/50 overflow-hidden shadow-xl">
           <CardContent className="p-0">
-            {/* Toolbar */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-gradient-to-r from-muted/60 to-muted/30">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
@@ -304,6 +398,63 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
         </Card>
       </div>
 
+      {/* Related PDFs */}
+      {relatedPDFs.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${categoryColor}18` }}>
+                <FileText className="h-4 w-4" style={{ color: categoryColor }} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-foreground">Related PDFs</h2>
+                <p className="text-[10px] text-muted-foreground">
+                  {pdf.category?.name} ke aur documents
+                </p>
+              </div>
+            </div>
+            {pdf.category && (
+              <Link
+                href={`/category/${pdf.category.slug || pdf.category_id}`}
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                Sab dekhो <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+            {relatedPDFs.map((relPdf) => (
+              <Link
+                key={relPdf.id}
+                href={`/pdf/${relPdf.id}`}
+                className="group flex flex-col rounded-xl border border-border/50 bg-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+              >
+                <div
+                  className="aspect-[3/2] flex items-center justify-center relative"
+                  style={{ background: `linear-gradient(135deg, ${relPdf.category?.color || categoryColor}15, ${relPdf.category?.color || categoryColor}05)` }}
+                >
+                  <FileText
+                    className="h-8 w-8"
+                    style={{ color: relPdf.category?.color || categoryColor }}
+                  />
+                  {relPdf.download_count > 0 && (
+                    <span className="absolute bottom-1 right-1 flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                      <Download className="h-2.5 w-2.5" />{relPdf.download_count}
+                    </span>
+                  )}
+                </div>
+                <div className="p-2.5">
+                  <p className="text-xs font-semibold text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                    {relPdf.title}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Reviews */}
       <ReviewsSection pdfId={pdf.id} />
 
@@ -323,6 +474,12 @@ export function PDFViewer({ pdf }: PDFViewerProps) {
               )}
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {readingTime > 0 && (
+                <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formatReadingTime(readingTime)}
+                </div>
+              )}
               <Button
                 variant="outline"
                 size="sm"
