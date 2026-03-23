@@ -556,17 +556,25 @@ function AdminLiveChat({ onBack }: { onBack: () => void }) {
       const url = `/api/admin-chat/poll?sessionId=${sid}${since ? `&since=${encodeURIComponent(since)}` : ""}`
       const res = await fetch(url)
       const data = await res.json()
-      const newMsgs: LiveMessage[] = data.messages || []
+
+      // Only take ADMIN messages from poll — student messages are always shown locally
+      const newMsgs: LiveMessage[] = (data.messages || []).filter(
+        (m: LiveMessage) => m.sender === "admin"
+      )
 
       if (newMsgs.length > 0) {
         setLiveMessages(prev => {
-          // Deduplicate: filter out messages already in the list (by DB id)
           const existingIds = new Set(prev.map(m => m.id))
           const unique = newMsgs.filter(m => !existingIds.has(m.id))
           return unique.length > 0 ? [...prev, ...unique] : prev
         })
-        setLastSince(newMsgs[newMsgs.length - 1].created_at)
         setAdminTyping(false)
+      }
+
+      // Always update lastSince from ALL messages (admin + student) to advance the cursor
+      const allMsgs: LiveMessage[] = data.messages || []
+      if (allMsgs.length > 0) {
+        setLastSince(allMsgs[allMsgs.length - 1].created_at)
       }
     } catch {}
   }, [])
