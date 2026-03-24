@@ -688,13 +688,16 @@ function SortDropdown({ sortBy, onSort, label, compact }: {
   )
 }
 
+// Main page component with Suspense for useSearchParams
 export default function TestSeriesPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
+        </div>
+      }
+    >
       <TestSeriesContent />
     </Suspense>
   )

@@ -194,81 +194,32 @@ export async function GET(request: Request) {
   const bulkMode = searchParams.get("bulk") === "true"
   const category = searchParams.get("category")?.trim()
 
-  // Known platforms that reliably have test series content
-  const KNOWN_PLATFORMS: Record<string, string[]> = {
-    ssc: [
-      "https://sscaddaapi.classx.co.in",
-      "https://sscguruapi.classx.co.in",
-      "https://sscmasterapi.classx.co.in",
-      "https://sscwalaapi.classx.co.in",
-    ],
-    banking: [
-      "https://bankersaddaapi.classx.co.in", 
-      "https://bankingguruapi.classx.co.in",
-      "https://ibpsmasterapi.classx.co.in",
-    ],
-    defence: [
-      "https://ndaguruapi.classx.co.in",
-      "https://defenceguruapi.classx.co.in",
-      "https://agniveergurujiapi.classx.co.in",
-    ],
-    railways: [
-      "https://railwayguruapi.classx.co.in",
-      "https://rrbnptcapi.classx.co.in",
-    ],
-    upsc: [
-      "https://upscpathshalaapi.classx.co.in",
-      "https://iasguruapi.classx.co.in",
-    ],
-    teaching: [
-      "https://ctetguruapi.classx.co.in",
-      "https://tetmasterapi.classx.co.in",
-    ],
-    police: [
-      "https://policeexamapi.classx.co.in",
-    ],
-    general: [
-      "https://examguruapi.classx.co.in",
-      "https://testbookapi.classx.co.in",
-    ],
-  }
-
-  // Bulk mode: fetch from multiple platforms for a category
+  // Bulk mode: fetch from multiple APX platforms and filter by category
   if (bulkMode && category) {
-    const categoryKeywords: Record<string, string[]> = {
-      ssc: ["ssc", "cgl", "chsl", "mts", "gd", "staff", "selection"],
-      banking: ["bank", "ibps", "sbi", "rbi", "clerk", "po", "finance"],
-      defence: ["nda", "cds", "defence", "army", "navy", "airforce", "capf", "agniveer"],
-      railways: ["railway", "rrb", "ntpc", "group", "technician", "loco"],
-      upsc: ["upsc", "ias", "pcs", "civil", "service"],
-      teaching: ["ctet", "tet", "teacher", "kvs", "nvs", "education"],
-      police: ["police", "constable", "si", "law"],
-      "jee-neet": ["jee", "neet", "physics", "chemistry", "biology", "medical", "engineering"],
+    // Keywords to filter test series TITLES by category
+    const categoryTitleKeywords: Record<string, string[]> = {
+      ssc: ["ssc", "cgl", "chsl", "mts", "gd", "staff selection", "ssc je", "stenographer"],
+      banking: ["bank", "ibps", "sbi", "rbi", "clerk", "po ", "probationary", "finance", "nabard"],
+      defence: ["nda", "cds", "defence", "army", "navy", "airforce", "capf", "agniveer", "military", "afcat"],
+      railways: ["railway", "rrb", "ntpc", "group d", "technician", "loco pilot", "alp", "je railway"],
+      upsc: ["upsc", "ias", "civil service", "prelims", "mains", "cse", "epfo", "capf ac"],
+      teaching: ["ctet", "tet", "teacher", "kvs", "nvs", "dsssb", "super tet", "b.ed"],
+      police: ["police", "constable", "si ", "sub inspector", "delhi police", "up police"],
+      "jee-neet": ["jee", "neet", "physics", "chemistry", "biology", "engineering", "iit", "aiims", "bitsat"],
     }
 
-    const keywords = categoryKeywords[category] || [category]
+    const filterKeywords = categoryTitleKeywords[category] || []
     
-    // Get platforms matching category keywords
-    const matchingPlatforms = PLATFORM_LIST.filter(p => 
-      keywords.some(kw => p.name.toLowerCase().includes(kw))
-    ).slice(0, 15)
+    // Randomly select platforms from the full list to get variety
+    const shuffledPlatforms = [...PLATFORM_LIST].sort(() => Math.random() - 0.5)
+    const platformsToTry = shuffledPlatforms.slice(0, 15)
 
-    // Add known platforms for this category
-    const knownForCategory = KNOWN_PLATFORMS[category] || KNOWN_PLATFORMS.general
-    const knownPlatformObjects = knownForCategory.map(api => ({
-      name: api.replace(/api\..*$/, "").replace(/https?:\/\//, ""),
-      api,
-    }))
-
-    // Combine and dedupe
-    const allPlatformsToTry = [...knownPlatformObjects, ...matchingPlatforms]
-      .filter((p, i, arr) => arr.findIndex(x => x.api === p.api) === i)
-      .slice(0, 12)
+    console.log(`[v0] Fetching from ${platformsToTry.length} random APX platforms for category ${category}`)
 
     const allSeries: unknown[] = []
     
-    // Try to fetch from platforms in parallel (limit to 6 concurrent)
-    const fetchPromises = allPlatformsToTry.slice(0, 6).map(async (platform) => {
+    // Try to fetch from platforms in parallel (limit to 8 concurrent)
+    const fetchPromises = platformsToTry.slice(0, 8).map(async (platform) => {
       try {
         const series = await tryFetchFromPlatform(platform.api)
         if (series && series.length > 0) {
@@ -276,6 +227,7 @@ export async function GET(request: Request) {
             ...(s as object),
             _sourceApi: platform.api,
             _sourceWeb: deriveWebUrl(platform.api),
+            _platformName: platform.name,
           }))
         }
       } catch {
@@ -291,12 +243,38 @@ export async function GET(request: Request) {
       }
     }
 
+    console.log(`[v0] Fetched ${allSeries.length} total series from APX platforms`)
+
+    // Filter by category if we have keywords, otherwise return all
+    let filteredSeries = allSeries
+    if (filterKeywords.length > 0 && category !== "all") {
+      filteredSeries = allSeries.filter(item => {
+        const s = item as Record<string, unknown>
+        const title = String(s.title || s.name || "").toLowerCase()
+        const desc = String(s.description || s.subtitle || "").toLowerCase()
+        return filterKeywords.some(kw => title.includes(kw) || desc.includes(kw))
+      })
+      console.log(`[v0] Filtered to ${filteredSeries.length} series matching ${category}`)
+    }
+
+    if (filteredSeries.length > 0) {
+      return NextResponse.json({
+        success: true,
+        testSeries: cleanSeriesData(filteredSeries),
+        source: "apx-bulk",
+        count: filteredSeries.length,
+        totalFetched: allSeries.length,
+      })
+    }
+
+    // If filtering removed everything but we had data, return unfiltered
     if (allSeries.length > 0) {
       return NextResponse.json({
         success: true,
-        testSeries: cleanSeriesData(allSeries),
-        source: "bulk",
-        count: allSeries.length,
+        testSeries: cleanSeriesData(allSeries.slice(0, 20)),
+        source: "apx-bulk",
+        count: Math.min(allSeries.length, 20),
+        notice: `Showing all available test series (no ${category} specific found)`,
       })
     }
 
@@ -313,7 +291,7 @@ export async function GET(request: Request) {
         isSample: true,
       })),
       source: "sample",
-      notice: "Showing practice tests from our library.",
+      notice: "APX platforms unavailable. Showing practice tests.",
     })
   }
 
