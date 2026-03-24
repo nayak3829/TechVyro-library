@@ -545,53 +545,80 @@ export default function ExtractPage() {
     return () => window.removeEventListener("error", handleError)
   }, [])
 
-  // Auto-fetch mock tests from database on page load
+  // Auto-fetch from real AppX APIs on page load (batched for performance)
   useEffect(() => {
     let cancelled = false
-    const fetchMockTests = async () => {
+    const fetchAll = async () => {
       setAutoFetching(true)
-      try {
-        // Fetch all mock tests from the database
-        const res = await fetch(`/api/extract`)
-        if (!res.ok) throw new Error("Failed to fetch")
-        const data = await res.json()
+      const found: (DisplaySeries & { _apiBase: string; _webBase: string; _raw: unknown })[] = []
+
+      // Process platforms in batches of 8 to avoid overwhelming the browser
+      const batchSize = 8
+      for (let i = 0; i < AUTO_PLATFORMS.length && !cancelled; i += batchSize) {
+        const batch = AUTO_PLATFORMS.slice(i, i + batchSize)
         
-        if (!cancelled && data.success && data.testSeries?.length > 0) {
-          const mapped = (data.testSeries as Array<{ 
-            id: string; title: string; slug: string; description: string; 
-            total_tests: number; total_questions: number; duration: string;
-            language: string; category: string; examTags: string[]; is_free: boolean 
-          }>).map((s) => {
-            const detectedCat = detectCategory(s.title || s.category || "")
-            return {
-              id: s.id,
-              title: s.title,
-              subtitle: s.description || "Complete preparation series with practice tests",
-              category: detectedCat,
-              examTags: s.examTags || extractExamTags(s.title || ""),
-              totalTests: s.total_tests || 10,
-              totalQuestions: s.total_questions || (s.total_tests || 10) * 25,
-              duration: s.duration || "60 min/test",
-              language: s.language || "Hindi + English",
-              slug: s.slug,
-              sampleCategory: detectedCat,
-              color: CAT_COLORS[detectedCat] || "#8b5cf6",
-              icon: "🎓",
-              badge: "FREE" as const,
-              _apiBase: `mock:${s.category}`,
-              _webBase: `mock:${s.slug}`,
-              _raw: s,
+        const batchResults = await Promise.allSettled(
+          batch.map(async (platform, batchIdx) => {
+            const idx = i + batchIdx
+            try {
+              const params = new URLSearchParams({ apiUrl: platform.api, url: platform.webBase })
+              const res = await fetch(`/api/extract?${params}`, { 
+                signal: AbortSignal.timeout(12000) // 12 second timeout per request
+              })
+              if (!res.ok) return []
+              const data = await res.json()
+              if (!data.success || data.source === "sample" || !data.testSeries?.length) return []
+              
+              // Get up to 6 test series per platform for variety
+              return (data.testSeries as Array<{ id?: string | number; title?: string; name?: string; slug?: string; description?: string; total_tests?: number }>)
+                .slice(0, 6)
+                .map((s, seriesIdx) => {
+                  const detectedCat = detectCategory(s.title || s.name || "")
+                  return {
+                    id: `live-${idx}-${s.id || seriesIdx}`,
+                    title: s.title || s.name || `Mock Test ${seriesIdx + 1}`,
+                    subtitle: s.description || "Complete preparation series with practice tests",
+                    category: detectedCat,
+                    examTags: extractExamTags(s.title || s.name || ""),
+                    totalTests: s.total_tests || 10,
+                    totalQuestions: (s.total_tests || 10) * 15,
+                    duration: "60 min/test",
+                    language: "Hindi + English",
+                    slug: s.slug || String(s.id || seriesIdx),
+                    sampleCategory: "ssc-banking",
+                    color: CAT_COLORS[detectedCat] || "#8b5cf6",
+                    icon: "🎓",
+                    badge: "LIVE" as const,
+                    _apiBase: data.apiBase || platform.api,
+                    _webBase: data.webBase || platform.webBase,
+                    _raw: s,
+                  }
+                })
+            } catch { 
+              return [] 
             }
           })
-          setAutoLiveSeries(mapped)
+        )
+
+        // Collect successful results
+        for (const result of batchResults) {
+          if (result.status === "fulfilled" && Array.isArray(result.value)) {
+            found.push(...result.value)
+          }
         }
-      } catch (err) {
-        console.error("Failed to fetch mock tests:", err)
-      } finally {
-        if (!cancelled) setAutoFetching(false)
+
+        // Update UI progressively after each batch
+        if (!cancelled && found.length > 0) {
+          setAutoLiveSeries([...found])
+        }
+      }
+
+      if (!cancelled) {
+        setAutoLiveSeries(found)
+        setAutoFetching(false)
       }
     }
-    fetchMockTests()
+    fetchAll()
     return () => { cancelled = true }
   }, [])
 
@@ -625,10 +652,10 @@ export default function ExtractPage() {
     debounceRef.current = setTimeout(() => searchPlatforms(val), 300)
   }
 
-const loadPlatform = async (platform: SearchResult & { category?: string; displayName?: string }) => {
+const loadPlatform = async (platform: SearchResult) => {
   setShowDropdown(false)
   setPlatformQuery("")
-  setPlatformName("")
+  setPlatformName("") // Don't show platform name
   setLoading(true)
   setError("")
   setNotice("")
@@ -636,48 +663,50 @@ const loadPlatform = async (platform: SearchResult & { category?: string; displa
   setSelectedCat("all")
   
   try {
-    // Use category-based search from the mock test database
-    const category = platform.category || platform.api.replace("mock:", "")
-    const res = await fetch(`/api/extract?category=${encodeURIComponent(category)}`)
-    if (!res.ok) throw new Error("Network error")
-    const data = await res.json()
-    
-    if (!data.success || !data.testSeries?.length) {
-      setError("Could not load mock tests. Try another search.")
-      setLoading(false)
-      return
-    }
-    
-    const rawSeries = data.testSeries as Array<{ 
-      id: string; title: string; slug: string; description: string; 
-      total_tests: number; total_questions: number; duration: string;
-      language: string; category: string; examTags: string[]; is_free: boolean 
-    }>
-    
-    const mapped: DisplaySeries[] = rawSeries.map((s) => ({
-      id: s.id,
-      title: s.title,
-      subtitle: s.description || "Complete preparation with mock tests",
-      category: detectCategory(s.title || s.category || ""),
-      examTags: s.examTags || extractExamTags(s.title || ""),
-      totalTests: s.total_tests || 10,
-      totalQuestions: s.total_questions || (s.total_tests || 10) * 25,
-      duration: s.duration || "60 min/test",
-      language: s.language || "Hindi + English",
-      slug: s.slug,
-      sampleCategory: s.category,
-      color: CAT_COLORS[detectCategory(s.title || s.category || "")] || "#8b5cf6",
-      icon: "🎓",
-      badge: "FREE" as const,
-    }))
-    
-    setLiveSeries(mapped)
-  } catch {
-    setError("Network error. Please try again.")
-  } finally {
-    setLoading(false)
+  const params = new URLSearchParams({ apiUrl: platform.api, url: platform.webBase })
+  const res = await fetch(`/api/extract?${params}`)
+  if (!res.ok) throw new Error("Network error")
+  const data = await res.json()
+  
+  if (!data.success) {
+  setError("Could not load mock tests. Try another search.")
+  setLoading(false)
+  return
   }
-}
+  
+  const rawSeries = (data.testSeries || []) as Array<{ id?: string | number; title?: string; name?: string; slug?: string; description?: string; total_tests?: number }>
+  if (data.source === "sample" || rawSeries.length === 0) {
+  setNotice("Live extraction unavailable. Showing practice tests below.")
+  setLiveSeries(null)
+  } else {
+  const mapped: DisplaySeries[] = rawSeries.map((s, i) => ({
+  id: String(s.id || i),
+  title: s.title || s.name || `Mock Test ${i + 1}`,
+  subtitle: s.description || "Complete preparation with mock tests",
+  category: detectCategory(s.title || s.name || ""),
+  examTags: extractExamTags(s.title || s.name || ""),
+  totalTests: s.total_tests || 10,
+  totalQuestions: (s.total_tests || 10) * 15,
+  duration: "60 min/test",
+  language: "Hindi + English",
+  slug: s.slug || String(s.id || i),
+  sampleCategory: "ssc-banking",
+  color: CAT_COLORS[detectCategory(s.title || s.name || "")] || "#8b5cf6",
+  icon: "🎓",
+  badge: "LIVE" as const,
+  _raw: s,
+  _apiBase: data.apiBase,
+  _webBase: data.webBase,
+  } as DisplaySeries & { _raw: typeof s; _apiBase: string; _webBase: string }))
+  setPlatformName("") // Don't expose any names
+  setLiveSeries(mapped)
+  }
+    } catch {
+      setError("Network error. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const goToSeries = (series: DisplaySeries & { _raw?: unknown; _apiBase?: string; _webBase?: string }) => {
     // Save to recently viewed
