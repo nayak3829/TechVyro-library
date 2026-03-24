@@ -1,39 +1,34 @@
 "use client"
 
-import { useEffect, useState, useMemo, useRef, useCallback, Suspense } from "react"
+import { useEffect, useState, useMemo, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useAuth } from "@/hooks/use-auth"
 import { AuthModal } from "@/components/auth-modal"
 import {
-  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger
-} from "@/components/ui/drawer"
-import {
-  Clock, FileText, Play, BookOpen, Search,
-  X, Zap, Target, Flame, 
-  Brain, Sparkles, Lock, SlidersHorizontal,
-  ChevronDown, Shield, Train, TrendingUp, Atom,
-  GraduationCap, Loader2, RefreshCw, Globe
+  Search, X, FileText, Clock, Play, Loader2, Lock, ChevronDown,
+  Target, TrendingUp, Shield, Train, BookOpen, Atom, GraduationCap, Globe
 } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
 
 interface TestSeries {
   id: string
   title: string
   slug: string
-  description: string
-  total_tests: number
-  total_questions: number
-  duration: number
-  is_free: boolean
-  category: string
+  description?: string
+  total_tests?: number
+  total_questions?: number
+  duration?: number
+  is_free?: boolean
+  category?: string
   isSample?: boolean
   _sourceApi?: string
   _sourceWeb?: string
+  _platformName?: string
 }
 
 const CATEGORIES = [
@@ -44,70 +39,55 @@ const CATEGORIES = [
   { id: "railways", label: "Railways", icon: Train, color: "#f97316" },
   { id: "upsc", label: "UPSC", icon: BookOpen, color: "#8b5cf6" },
   { id: "jee-neet", label: "JEE/NEET", icon: Atom, color: "#06b6d4" },
-  { id: "teaching", label: "Teaching", icon: GraduationCap, color: "#ec4899" },
 ]
 
-const sortOptions = [
-  { value: "newest", label: "Newest First", icon: Sparkles },
-  { value: "popular", label: "Most Popular", icon: Flame },
-  { value: "most-tests", label: "Most Tests", icon: FileText },
-]
-
-const PAGE_SIZE = 20
-
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay)
-    return () => clearTimeout(t)
-  }, [value, delay])
-  return debounced
+function getCategoryColor(category: string): string {
+  const cat = CATEGORIES.find(c => c.id === category)
+  return cat?.color || "#6366f1"
 }
 
-function getCategoryColor(catId: string): string {
-  return CATEGORIES.find(c => c.id === catId)?.color || "#6366f1"
+function getCategoryIcon(category: string) {
+  const cat = CATEGORIES.find(c => c.id === category)
+  return cat?.icon || GraduationCap
 }
 
-function getCategoryIcon(catId: string) {
-  return CATEGORIES.find(c => c.id === catId)?.icon || Globe
-}
-
-function TestSeriesContent() {
+export default function TestSeriesPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   
-  const initialCategory = searchParams.get("category") || "all"
-  
+  const [selectedCategory, setSelectedCategory] = useState("all")
   const [testSeries, setTestSeries] = useState<TestSeries[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchRaw, setSearchRaw] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
-  const [sortBy, setSortBy] = useState("newest")
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
-  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [search, setSearch] = useState("")
   const [fetchError, setFetchError] = useState("")
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const search = useDebounce(searchRaw, 280)
+  // Get initial category from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const cat = params.get("category")
+    if (cat && CATEGORIES.some(c => c.id === cat)) {
+      setSelectedCategory(cat)
+    }
+  }, [])
 
-  const fetchTestSeries = useCallback(async (showLoading = false, category?: string) => {
-    if (showLoading) setLoading(true)
+  const fetchTestSeries = useCallback(async (category: string) => {
+    setLoading(true)
     setFetchError("")
     
     try {
-      const cat = category || selectedCategory
-      const res = await fetch(`/api/extract?bulk=true&category=${cat === "all" ? "ssc" : cat}`)
+      const cat = category === "all" ? "ssc" : category
+      const res = await fetch(`/api/extract?bulk=true&category=${cat}`)
       const data = await res.json()
       
-      if (data.success && data.testSeries && data.testSeries.length > 0) {
+      if (data.success && data.testSeries?.length > 0) {
         setTestSeries(data.testSeries.map((s: TestSeries, idx: number) => ({
           ...s,
           id: s.id || `series-${idx}`,
           category: s.category || cat,
         })))
-        setFetchError(data.notice || "")
+        setFetchError("")
       } else {
         setTestSeries([])
         setFetchError(data.notice || "No test series found")
@@ -117,36 +97,34 @@ function TestSeriesContent() {
       setFetchError("Could not load tests")
       setTestSeries([])
     } finally {
-      if (showLoading) setLoading(false)
+      setLoading(false)
     }
-  }, [selectedCategory])
+  }, [])
 
   useEffect(() => {
-    fetchTestSeries(true)
-  }, [fetchTestSeries])
+    fetchTestSeries(selectedCategory)
+  }, [selectedCategory, fetchTestSeries])
 
-  useEffect(() => { 
-    setVisibleCount(PAGE_SIZE) 
-  }, [search, selectedCategory, sortBy])
-
-  const handleCategoryChange = (cat: string) => {
-    setSelectedCategory(cat)
-    const url = new URL(window.location.href)
-    if (cat === "all") {
-      url.searchParams.delete("category")
-    } else {
-      url.searchParams.set("category", cat)
-    }
-    window.history.replaceState({}, "", url.toString())
-    fetchTestSeries(true, cat)
+  const handleCategoryChange = (catId: string) => {
+    setSelectedCategory(catId)
+    setSearch("")
+    router.push(`/test-series?category=${catId}`, { scroll: false })
   }
+
+  const filteredSeries = useMemo(() => {
+    if (!search.trim()) return testSeries
+    const q = search.toLowerCase()
+    return testSeries.filter(s =>
+      s.title?.toLowerCase().includes(q) ||
+      s.description?.toLowerCase().includes(q)
+    )
+  }, [testSeries, search])
 
   const handleStartSeries = (series: TestSeries) => {
     if (!series.isSample && !user && !authLoading) {
       setShowAuthModal(true)
       return
     }
-    
     const params = new URLSearchParams({
       slug: series.slug || series.id,
       apiBase: series._sourceApi || `sample:${series.category}`,
@@ -156,379 +134,206 @@ function TestSeriesContent() {
     router.push(`/test-series/series?${params}`)
   }
 
-  const filtered = useMemo(() => {
-    let result = testSeries
-
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      result = result.filter(s =>
-        s.title.toLowerCase().includes(q) ||
-        s.description?.toLowerCase().includes(q) ||
-        s.category?.toLowerCase().includes(q)
-      )
-    }
-
-    return [...result].sort((a, b) => {
-      if (sortBy === "most-tests") return (b.total_tests || 0) - (a.total_tests || 0)
-      if (sortBy === "popular") return (b.total_questions || 0) - (a.total_questions || 0)
-      return 0
-    })
-  }, [testSeries, search, sortBy])
-
-  const visible = filtered.slice(0, visibleCount)
-  const hasMore = visibleCount < filtered.length
-  const hasAnyFilter = selectedCategory !== "all" || search.trim() !== ""
-
-  const clearAll = () => {
-    setSearchRaw("")
-    handleCategoryChange("all")
-  }
-
-  const totalTests = testSeries.reduce((sum, s) => sum + (s.total_tests || 1), 0)
-  const totalQuestions = testSeries.reduce((sum, s) => sum + (s.total_questions || 0), 0)
-
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-
-      <section className="relative overflow-hidden bg-gradient-to-br from-violet-500/10 via-primary/5 to-background border-b border-border/50">
-        <div className="absolute inset-0 opacity-[0.025]" style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)",
-          backgroundSize: "28px 28px"
-        }} />
-        <div className="absolute -top-32 -right-32 h-80 w-80 rounded-full bg-violet-500/15 blur-3xl pointer-events-none" />
-
-        <div className="relative container mx-auto px-4 py-8 sm:py-12">
-          <div className="flex flex-col items-center text-center max-w-2xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 text-xs font-semibold mb-4 shadow-sm">
-              <Zap className="h-3.5 w-3.5" />
-              Mock Test Series
+    <div className="min-h-screen bg-background pb-24">
+      {/* Header */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border/50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground">Mock Tests</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Practice with {testSeries.length}+ test series
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                <Globe className="h-3 w-3 mr-1" />
+                APX Live
+              </Badge>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight mb-3 text-foreground text-balance">
-              Practice <span className="bg-gradient-to-r from-violet-600 to-primary bg-clip-text text-transparent">Mock Tests</span>
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground max-w-xl leading-relaxed">
-              Free unlimited mock tests for SSC, Banking, NDA, Railways & more competitive exams
-            </p>
 
-            {!loading && testSeries.length > 0 && (
-              <div className="flex items-center gap-5 sm:gap-8 mt-6 flex-wrap justify-center">
-                {[
-                  { label: "Test Series", value: testSeries.length, color: "text-violet-600" },
-                  { label: "Total Tests", value: totalTests, color: "text-primary" },
-                  { label: "Questions", value: totalQuestions > 0 ? totalQuestions : "1000+", color: "text-green-500" },
-                ].map(s => (
-                  <div key={s.label} className="flex flex-col items-center gap-0.5">
-                    <span className={`text-xl sm:text-2xl font-black ${s.color} tabular-nums`}>{s.value}</span>
-                    <span className="text-[10px] sm:text-xs text-muted-foreground font-medium">{s.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!authLoading && !user && (
-              <div className="mt-6 flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2">
-                <Lock className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-                <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-400">
-                  <button onClick={() => setShowAuthModal(true)} className="font-semibold underline">Login</button> to save your progress
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
-        <div className="sticky top-[57px] z-20 bg-background/95 backdrop-blur-sm pb-3 pt-1 -mx-4 px-4 border-b border-border/40 mb-5">
-          <div className="flex gap-2 items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <input
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
                 ref={searchRef}
-                type="search"
                 placeholder="Search test series..."
-                value={searchRaw}
-                onChange={e => setSearchRaw(e.target.value)}
-                className="w-full h-10 sm:h-11 pl-9 pr-9 rounded-xl border border-border/60 bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all"
-                autoComplete="off"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-9 h-10 text-sm bg-muted/30 border-border/50"
               />
-              {searchRaw && (
-                <button onClick={() => setSearchRaw("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                  <X className="h-3.5 w-3.5" />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
 
-            <Drawer open={filterDrawerOpen} onOpenChange={setFilterDrawerOpen}>
-              <DrawerTrigger asChild>
-                <button className="relative h-10 sm:h-11 px-3 sm:px-4 rounded-xl border border-border/60 bg-background flex items-center gap-1.5 sm:gap-2 text-sm font-medium hover:bg-muted/60 transition-colors shrink-0">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  <span className="hidden sm:inline">Filters</span>
-                  {hasAnyFilter && (
-                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-violet-600 text-white text-[9px] font-bold flex items-center justify-center">!</span>
-                  )}
-                </button>
-              </DrawerTrigger>
-              <DrawerContent className="max-h-[85dvh]">
-                <DrawerHeader className="pb-2">
-                  <DrawerTitle className="text-base">Filters & Sort</DrawerTitle>
-                </DrawerHeader>
-                <div className="px-4 pb-6 overflow-y-auto space-y-5">
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sort by</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {sortOptions.map(opt => {
-                        const Icon = opt.icon
-                        return (
-                          <button
-                            key={opt.value}
-                            onClick={() => { setSortBy(opt.value); setFilterDrawerOpen(false) }}
-                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                              sortBy === opt.value
-                                ? "border-violet-500 bg-violet-500/10 text-violet-600"
-                                : "border-border/60 text-muted-foreground hover:bg-muted/60"
-                            }`}
-                          >
-                            <Icon className="h-4 w-4" />
-                            <span className="truncate">{opt.label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Exam Category</p>
-                    <div className="flex flex-wrap gap-2">
-                      {CATEGORIES.map(cat => {
-                        const Icon = cat.icon
-                        const isActive = selectedCategory === cat.id
-                        return (
-                          <button
-                            key={cat.id}
-                            onClick={() => { handleCategoryChange(cat.id); setFilterDrawerOpen(false) }}
-                            className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5"
-                            style={isActive ? {
-                              backgroundColor: cat.color,
-                              color: "#fff",
-                              borderColor: "transparent"
-                            } : {
-                              backgroundColor: `${cat.color}15`,
-                              color: cat.color,
-                              borderColor: `${cat.color}40`
-                            }}
-                          >
-                            <Icon className="h-3 w-3" />
-                            {cat.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {hasAnyFilter && (
-                    <button
-                      onClick={() => { clearAll(); setFilterDrawerOpen(false) }}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-rose-500/30 text-rose-500 text-sm font-semibold hover:bg-rose-500/5 transition-colors"
-                    >
-                      <X className="h-4 w-4" /> Clear All Filters
-                    </button>
-                  )}
-                </div>
-              </DrawerContent>
-            </Drawer>
-
-            <button
-              onClick={() => fetchTestSeries(true)}
-              disabled={loading}
-              className="h-10 sm:h-11 px-3 rounded-xl border border-border/60 bg-background flex items-center justify-center hover:bg-muted/60 transition-colors shrink-0"
-              title="Refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-
-          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-            {CATEGORIES.map(cat => {
-              const Icon = cat.icon
-              const isActive = selectedCategory === cat.id
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => handleCategoryChange(cat.id)}
-                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 whitespace-nowrap flex items-center gap-1.5"
-                  style={isActive ? {
-                    backgroundColor: cat.color,
-                    color: "#fff",
-                    borderColor: "transparent",
-                    boxShadow: `0 2px 8px ${cat.color}44`
-                  } : {
-                    backgroundColor: `${cat.color}10`,
-                    color: cat.color,
-                    borderColor: `${cat.color}30`
-                  }}
-                >
-                  <Icon className="h-3 w-3" />
-                  {cat.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-16 sm:py-24">
-            <Loader2 className="h-8 w-8 animate-spin text-violet-600 mb-4" />
-            <p className="text-sm text-muted-foreground">Loading test series...</p>
-          </div>
-        )}
-
-        {!loading && fetchError && testSeries.length === 0 && (
-          <div className="text-center py-8 mb-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm">
-              <Brain className="h-4 w-4" />
-              {fetchError}
-            </div>
-          </div>
-        )}
-
-        {!loading && filtered.length > 0 && (
-          <>
-            {hasAnyFilter && (
-              <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <span className="text-xs text-muted-foreground">Showing {filtered.length} results</span>
-                {selectedCategory !== "all" && (
-                  <Badge variant="secondary" className="gap-1 text-xs capitalize bg-violet-500/10 text-violet-600 border-violet-500/20">
-                    {selectedCategory}
-                    <button onClick={() => handleCategoryChange("all")} className="ml-1">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {visible.map((series, idx) => {
-                const catColor = getCategoryColor(series.category)
-                const CatIcon = getCategoryIcon(series.category)
-                
+            {/* Categories */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {CATEGORIES.map(cat => {
+                const Icon = cat.icon
+                const isActive = selectedCategory === cat.id
                 return (
-                  <Card 
-                    key={series.id || idx}
-                    className="group overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/50 hover:border-violet-400/40 flex flex-col"
+                  <button
+                    key={cat.id}
+                    onClick={() => handleCategoryChange(cat.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all shrink-0 ${
+                      isActive
+                        ? "text-white border-transparent shadow-md"
+                        : "bg-background border-border/50 text-foreground hover:border-border"
+                    }`}
+                    style={isActive ? { backgroundColor: cat.color } : {}}
                   >
-                    <div className="p-4 flex flex-col flex-1">
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div 
-                          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: `${catColor}15` }}
-                        >
-                          <CatIcon className="h-5 w-5" style={{ color: catColor }} />
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                          <Badge 
-                            className="text-[10px] text-white py-0.5 px-1.5"
-                            style={{ backgroundColor: catColor }}
-                          >
-                            {series.category?.toUpperCase() || "GENERAL"}
-                          </Badge>
-                          {series.isSample && (
-                            <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20 py-0.5 px-1.5">
-                              SAMPLE
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-violet-600 transition-colors mb-2">
-                        {series.title}
-                      </h3>
-
-                      {series.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-                          {series.description}
-                        </p>
-                      )}
-                      
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-4 mt-auto">
-                        <div className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          <span>{series.total_tests || 10} Tests</span>
-                        </div>
-                        {series.duration > 0 && (
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            <span>{series.duration} min</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <Button 
-                        onClick={() => handleStartSeries(series)}
-                        size="sm" 
-                        className="w-full h-9 text-xs bg-violet-600 hover:bg-violet-700 gap-1"
-                      >
-                        <Play className="h-3 w-3" />
-                        Start Now
-                        {!authLoading && !user && !series.isSample && (
-                          <Lock className="h-2.5 w-2.5 ml-0.5 opacity-70" />
-                        )}
-                      </Button>
-                    </div>
-                  </Card>
+                    <Icon className="h-3.5 w-3.5" />
+                    {cat.label}
+                  </button>
                 )
               })}
             </div>
+          </div>
+        </div>
+      </div>
 
-            {hasMore && (
-              <div className="flex justify-center mt-8">
-                <Button
-                  variant="outline"
-                  onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-                  className="gap-2"
-                >
-                  Load More
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </>
+      {/* Content */}
+      <div className="container mx-auto px-4 py-6">
+        {/* Loading */}
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <Card key={i} className="p-4">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-12 w-12 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+                <Skeleton className="h-9 w-full mt-4 rounded-lg" />
+              </Card>
+            ))}
+          </div>
         )}
 
-        {!loading && filtered.length === 0 && testSeries.length > 0 && (
-          <div className="text-center py-16">
-            <Search className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No results found</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Try adjusting your search or filters
-            </p>
-            <Button variant="outline" onClick={clearAll}>
-              Clear Filters
+        {/* Error */}
+        {!loading && fetchError && testSeries.length === 0 && (
+          <div className="text-center py-12">
+            <GraduationCap className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground">{fetchError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => fetchTestSeries(selectedCategory)}
+            >
+              Try Again
             </Button>
           </div>
         )}
-      </main>
 
-      <Footer />
-      
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+        {/* Test Series Grid */}
+        {!loading && filteredSeries.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredSeries.map((series, idx) => {
+              const color = getCategoryColor(series.category || "ssc")
+              const Icon = getCategoryIcon(series.category || "ssc")
+
+              return (
+                <Card
+                  key={series.id || idx}
+                  className="group overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-border/50 hover:border-violet-400/40"
+                >
+                  <div className="p-4">
+                    {/* Header */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: `${color}15` }}
+                      >
+                        <Icon className="h-6 w-6" style={{ color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-violet-600 transition-colors">
+                          {series.title}
+                        </h3>
+                        {series._platformName && (
+                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                            {series._platformName}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {series.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                        {series.description}
+                      </p>
+                    )}
+
+                    {/* Stats */}
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-4">
+                      {series.total_tests && (
+                        <div className="flex items-center gap-1">
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>{series.total_tests} Tests</span>
+                        </div>
+                      )}
+                      {series.duration && series.duration > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>{series.duration} min</span>
+                        </div>
+                      )}
+                      {series.isSample && (
+                        <Badge className="text-[9px] bg-amber-500/10 text-amber-600 border-amber-500/20">
+                          SAMPLE
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* CTA */}
+                    <Button
+                      onClick={() => handleStartSeries(series)}
+                      size="sm"
+                      className="w-full h-9 text-xs bg-violet-600 hover:bg-violet-700 gap-1.5"
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                      Start Now
+                      {!series.isSample && !user && !authLoading && (
+                        <Lock className="h-3 w-3 ml-0.5 opacity-70" />
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+
+        {/* No Results */}
+        {!loading && search && filteredSeries.length === 0 && testSeries.length > 0 && (
+          <div className="text-center py-12">
+            <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground">No results for "{search}"</p>
+            <Button variant="link" size="sm" onClick={() => setSearch("")}>
+              Clear search
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title="Login Required"
+        description="Please login to access this test series"
+      />
     </div>
-  )
-}
-
-function TestSeriesPageLoading() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
-    </div>
-  )
-}
-
-export default function Page() {
-  return (
-    <Suspense fallback={<TestSeriesPageLoading />}>
-      <TestSeriesContent />
-    </Suspense>
   )
 }
