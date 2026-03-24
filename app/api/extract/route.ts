@@ -194,27 +194,81 @@ export async function GET(request: Request) {
   const bulkMode = searchParams.get("bulk") === "true"
   const category = searchParams.get("category")?.trim()
 
+  // Known platforms that reliably have test series content
+  const KNOWN_PLATFORMS: Record<string, string[]> = {
+    ssc: [
+      "https://sscaddaapi.classx.co.in",
+      "https://sscguruapi.classx.co.in",
+      "https://sscmasterapi.classx.co.in",
+      "https://sscwalaapi.classx.co.in",
+    ],
+    banking: [
+      "https://bankersaddaapi.classx.co.in", 
+      "https://bankingguruapi.classx.co.in",
+      "https://ibpsmasterapi.classx.co.in",
+    ],
+    defence: [
+      "https://ndaguruapi.classx.co.in",
+      "https://defenceguruapi.classx.co.in",
+      "https://agniveergurujiapi.classx.co.in",
+    ],
+    railways: [
+      "https://railwayguruapi.classx.co.in",
+      "https://rrbnptcapi.classx.co.in",
+    ],
+    upsc: [
+      "https://upscpathshalaapi.classx.co.in",
+      "https://iasguruapi.classx.co.in",
+    ],
+    teaching: [
+      "https://ctetguruapi.classx.co.in",
+      "https://tetmasterapi.classx.co.in",
+    ],
+    police: [
+      "https://policeexamapi.classx.co.in",
+    ],
+    general: [
+      "https://examguruapi.classx.co.in",
+      "https://testbookapi.classx.co.in",
+    ],
+  }
+
   // Bulk mode: fetch from multiple platforms for a category
   if (bulkMode && category) {
     const categoryKeywords: Record<string, string[]> = {
-      ssc: ["ssc", "cgl", "chsl", "mts", "gd", "staff selection"],
-      banking: ["bank", "ibps", "sbi", "rbi", "clerk", "po"],
-      defence: ["nda", "cds", "defence", "army", "navy", "airforce", "capf"],
-      railways: ["railway", "rrb", "ntpc", "group d", "technician"],
-      upsc: ["upsc", "ias", "pcs", "civil services"],
-      teaching: ["ctet", "tet", "teacher", "kvs", "nvs"],
-      police: ["police", "constable", "si"],
+      ssc: ["ssc", "cgl", "chsl", "mts", "gd", "staff", "selection"],
+      banking: ["bank", "ibps", "sbi", "rbi", "clerk", "po", "finance"],
+      defence: ["nda", "cds", "defence", "army", "navy", "airforce", "capf", "agniveer"],
+      railways: ["railway", "rrb", "ntpc", "group", "technician", "loco"],
+      upsc: ["upsc", "ias", "pcs", "civil", "service"],
+      teaching: ["ctet", "tet", "teacher", "kvs", "nvs", "education"],
+      police: ["police", "constable", "si", "law"],
+      "jee-neet": ["jee", "neet", "physics", "chemistry", "biology", "medical", "engineering"],
     }
 
     const keywords = categoryKeywords[category] || [category]
+    
+    // Get platforms matching category keywords
     const matchingPlatforms = PLATFORM_LIST.filter(p => 
       keywords.some(kw => p.name.toLowerCase().includes(kw))
-    ).slice(0, 10)
+    ).slice(0, 15)
+
+    // Add known platforms for this category
+    const knownForCategory = KNOWN_PLATFORMS[category] || KNOWN_PLATFORMS.general
+    const knownPlatformObjects = knownForCategory.map(api => ({
+      name: api.replace(/api\..*$/, "").replace(/https?:\/\//, ""),
+      api,
+    }))
+
+    // Combine and dedupe
+    const allPlatformsToTry = [...knownPlatformObjects, ...matchingPlatforms]
+      .filter((p, i, arr) => arr.findIndex(x => x.api === p.api) === i)
+      .slice(0, 12)
 
     const allSeries: unknown[] = []
     
-    // Try to fetch from matching platforms in parallel (limit to 5 concurrent)
-    const fetchPromises = matchingPlatforms.slice(0, 5).map(async (platform) => {
+    // Try to fetch from platforms in parallel (limit to 6 concurrent)
+    const fetchPromises = allPlatformsToTry.slice(0, 6).map(async (platform) => {
       try {
         const series = await tryFetchFromPlatform(platform.api)
         if (series && series.length > 0) {
@@ -246,21 +300,38 @@ export async function GET(request: Request) {
       })
     }
 
-    // Fallback to sample tests
+    // Fallback to sample tests with category-specific data
     const sampleSeries = getSampleSeriesForCategory(category)
+    const fallbackSeries = sampleSeries.length > 0 ? sampleSeries : getAllSampleSeries()
     return NextResponse.json({
       success: true,
-      testSeries: sampleSeries.map(s => ({
+      testSeries: fallbackSeries.map(s => ({
         id: s.id, title: s.title, slug: s.slug,
-        description: s.description, total_tests: s.tests.length, isSample: true,
+        description: s.description, total_tests: s.tests.length, 
+        total_questions: s.tests.reduce((acc, t) => acc + (t.questions?.length || 5), 0),
+        duration: 60, is_free: true, category: s.category || category,
+        isSample: true,
       })),
       source: "sample",
-      notice: "Showing practice tests.",
+      notice: "Showing practice tests from our library.",
     })
   }
 
   if (!inputUrl && !directApiUrl) {
-    return NextResponse.json({ error: "url or apiUrl required" }, { status: 400 })
+    // No specific URL provided - return sample data from all categories
+    const allSamples = getAllSampleSeries()
+    return NextResponse.json({
+      success: true,
+      testSeries: allSamples.map(s => ({
+        id: s.id, title: s.title, slug: s.slug,
+        description: s.description, total_tests: s.tests.length,
+        total_questions: s.tests.reduce((acc, t) => acc + (t.questions?.length || 5), 0),
+        duration: 60, is_free: true, category: s.category,
+        isSample: true,
+      })),
+      source: "sample",
+      notice: "Showing practice tests from our library.",
+    })
   }
 
   // Sample tests shortcut

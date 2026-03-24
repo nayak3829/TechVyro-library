@@ -260,11 +260,132 @@ export const SAMPLE_SERIES: SampleSeries[] = [
       }
     ]
   },
+
+  // ─── UPSC / Civil Services ────────────────────────────────────────────────
+  {
+    id: "upsc-prelims-1",
+    slug: "upsc-prelims-gs",
+    title: "UPSC Prelims GS Sample Series",
+    description: "General Studies for UPSC Civil Services Preliminary Exam",
+    category: "upsc",
+    tests: [
+      {
+        id: "upsc-gs-t1",
+        title: "UPSC Prelims GS Mock Test 1",
+        duration: 30,
+        total_questions: 15,
+        questions: [
+          { qid: "1", question: "Which of the following is NOT a fundamental right under the Indian Constitution?", options: ["Right to Equality", "Right to Property", "Right to Freedom of Religion", "Right against Exploitation"], correct: 1, marks: 2, explanation: "Right to Property was removed as a Fundamental Right by the 44th Amendment (1978). It is now a legal right under Article 300A." },
+          { qid: "2", question: "The 'Basic Structure Doctrine' was propounded in which case?", options: ["Golaknath case", "Kesavananda Bharati case", "Minerva Mills case", "Maneka Gandhi case"], correct: 1, marks: 2, explanation: "The Basic Structure Doctrine was established in Kesavananda Bharati v. State of Kerala (1973)." },
+          { qid: "3", question: "Which Schedule of the Constitution deals with the allocation of subjects between Union and States?", options: ["Fifth Schedule", "Sixth Schedule", "Seventh Schedule", "Eighth Schedule"], correct: 2, marks: 2, explanation: "The Seventh Schedule contains three lists: Union List, State List, and Concurrent List." },
+          { qid: "4", question: "The monsoon in India is part of which global wind system?", options: ["Trade Winds", "Westerlies", "ITCZ seasonal shift", "Polar Easterlies"], correct: 2, marks: 2, explanation: "Indian monsoon is primarily driven by the seasonal shift of the Inter-Tropical Convergence Zone (ITCZ)." },
+          { qid: "5", question: "Which Article of the Constitution empowers the President to impose President's Rule in a state?", options: ["Article 352", "Article 356", "Article 360", "Article 365"], correct: 1, marks: 2, explanation: "Article 356 allows the President to impose President's Rule if constitutional machinery breaks down in a state." },
+          { qid: "6", question: "The 'Chipko Movement' was associated with:", options: ["Anti-corruption", "Forest conservation", "Land reforms", "Women's rights"], correct: 1, marks: 2, explanation: "Chipko Movement (1973) was an environmental movement for forest conservation in Uttarakhand." },
+          { qid: "7", question: "Which of the following is the largest producer of solar energy in India?", options: ["Gujarat", "Rajasthan", "Karnataka", "Tamil Nadu"], correct: 1, marks: 2, explanation: "Rajasthan is India's largest producer of solar energy with the highest installed capacity." },
+          { qid: "8", question: "The concept of 'Judicial Review' in India was borrowed from:", options: ["UK", "USA", "Canada", "Australia"], correct: 1, marks: 2, explanation: "Judicial Review was borrowed from the Constitution of the United States of America." },
+          { qid: "9", question: "Which Five Year Plan introduced the concept of 'Inclusive Growth'?", options: ["9th FYP", "10th FYP", "11th FYP", "12th FYP"], correct: 2, marks: 2, explanation: "The 11th Five Year Plan (2007-2012) had 'Faster and More Inclusive Growth' as its theme." },
+          { qid: "10", question: "The Indus Valley Civilization was primarily:", options: ["Rural", "Urban", "Forest-based", "Nomadic"], correct: 1, marks: 2, explanation: "The Indus Valley Civilization was an urban civilization with well-planned cities like Mohenjo-daro and Harappa." },
+          { qid: "11", question: "Which of the following is NOT a greenhouse gas?", options: ["Carbon dioxide", "Methane", "Nitrogen", "Nitrous oxide"], correct: 2, marks: 2, explanation: "Nitrogen (N₂) is not a greenhouse gas. It makes up about 78% of the atmosphere but doesn't trap heat." },
+          { qid: "12", question: "The Right to Information Act was passed in:", options: ["2003", "2005", "2007", "2009"], correct: 1, marks: 2, explanation: "The Right to Information Act was enacted in 2005 to promote transparency in government functioning." },
+          { qid: "13", question: "Which river is known as 'Sorrow of Bihar'?", options: ["Ganga", "Kosi", "Gandak", "Son"], correct: 1, marks: 2, explanation: "The Kosi River is called the 'Sorrow of Bihar' due to its frequent flooding and course changes." },
+          { qid: "14", question: "The first session of the Indian National Congress was held in:", options: ["1884", "1885", "1886", "1887"], correct: 1, marks: 2, explanation: "The first session of the Indian National Congress was held in Bombay (Mumbai) in December 1885." },
+          { qid: "15", question: "Which constitutional body is responsible for conducting elections in India?", options: ["Supreme Court", "Election Commission", "Parliament", "President"], correct: 1, marks: 2, explanation: "The Election Commission of India (Article 324) is an autonomous body responsible for conducting elections." },
+        ]
+      }
+    ]
+  },
+
+  // ─── SSC specific ─────────────────────────────────────────────────────────
+  {
+    id: "ssc-english-1",
+    slug: "ssc-english-grammar",
+    title: "SSC English Grammar & Vocabulary",
+    description: "English language preparation for SSC exams",
+    category: "ssc",
+    tests: [
+      {
+        id: "ssc-eng-t1",
+        title: "SSC English Mock Test 1",
+        duration: 20,
+        total_questions: 10,
+        questions: [
+          { qid: "1", question: "Choose the correct synonym of 'ABUNDANT':", options: ["Scarce", "Plentiful", "Rare", "Limited"], correct: 1, marks: 1, explanation: "Abundant means plentiful or in large quantities. Plentiful is the correct synonym." },
+          { qid: "2", question: "Choose the correct antonym of 'OPTIMISTIC':", options: ["Hopeful", "Confident", "Pessimistic", "Cheerful"], correct: 2, marks: 1, explanation: "Optimistic means hopeful about the future. Pessimistic (expecting the worst) is the antonym." },
+          { qid: "3", question: "Identify the error: 'He has been working (A) / here since (B) / the last five years (C) / No error (D)'", options: ["A", "B", "C", "D"], correct: 2, marks: 1, explanation: "Error is in part C. 'For the last five years' is correct, not 'since the last five years'." },
+          { qid: "4", question: "One word for 'A person who loves books':", options: ["Bibliophile", "Philanthropist", "Misogynist", "Bibliographer"], correct: 0, marks: 1, explanation: "Bibliophile means a person who loves or collects books." },
+          { qid: "5", question: "Choose the correct spelling:", options: ["Accomodation", "Accommodation", "Acommodation", "Acomodation"], correct: 1, marks: 1, explanation: "The correct spelling is 'Accommodation' (double 'c' and double 'm')." },
+          { qid: "6", question: "Meaning of idiom 'To beat around the bush':", options: ["To hit someone", "To avoid the main topic", "To clear bushes", "To work hard"], correct: 1, marks: 1, explanation: "'To beat around the bush' means to avoid talking directly about the main topic." },
+          { qid: "7", question: "Fill in the blank: 'She has been ill ___ Monday.'", options: ["from", "since", "for", "by"], correct: 1, marks: 1, explanation: "'Since' is used with a point in time (Monday). 'For' is used with duration." },
+          { qid: "8", question: "Voice change: 'The teacher is teaching the students.'", options: ["The students are being taught by the teacher.", "The students were taught by the teacher.", "The students are taught by the teacher.", "The students have been taught by the teacher."], correct: 0, marks: 1, explanation: "Present Continuous Active → Present Continuous Passive: 'is being + V3'." },
+          { qid: "9", question: "Choose the correctly punctuated sentence:", options: ["What a beautiful day", "What a beautiful day!", "what a beautiful day!", "What! a beautiful day"], correct: 1, marks: 1, explanation: "Exclamatory sentences end with an exclamation mark and begin with a capital letter." },
+          { qid: "10", question: "One word for 'Government by a few powerful people':", options: ["Democracy", "Oligarchy", "Monarchy", "Theocracy"], correct: 1, marks: 1, explanation: "Oligarchy is a form of government where power rests with a small number of people." },
+        ]
+      }
+    ]
+  },
+
+  // ─── Banking specific ─────────────────────────────────────────────────────
+  {
+    id: "banking-gk-1",
+    slug: "ibps-banking-awareness",
+    title: "IBPS Banking Awareness Series",
+    description: "Banking knowledge for IBPS PO/Clerk exams",
+    category: "banking",
+    tests: [
+      {
+        id: "bank-gk-t1",
+        title: "Banking Awareness Mock Test 1",
+        duration: 20,
+        total_questions: 10,
+        questions: [
+          { qid: "1", question: "The Reserve Bank of India was established in:", options: ["1934", "1935", "1947", "1949"], correct: 1, marks: 1, explanation: "RBI was established on April 1, 1935, based on the RBI Act, 1934." },
+          { qid: "2", question: "What is the full form of RTGS?", options: ["Real Time Gross Settlement", "Real Transaction Gross System", "Reserve Transfer Gross Settlement", "Real Time General Settlement"], correct: 0, marks: 1, explanation: "RTGS stands for Real Time Gross Settlement - a fund transfer mechanism for large value transactions." },
+          { qid: "3", question: "Who is the current Governor of RBI (as of 2024)?", options: ["Urjit Patel", "Raghuram Rajan", "Shaktikanta Das", "D. Subbarao"], correct: 2, marks: 1, explanation: "Shaktikanta Das is the Governor of RBI (assumed office in December 2018)." },
+          { qid: "4", question: "NEFT transactions are settled in batches how many times a day?", options: ["12", "24", "48", "Continuous"], correct: 3, marks: 1, explanation: "Since December 2019, NEFT operates round the clock (24x7) with half-hourly batches." },
+          { qid: "5", question: "What is the minimum capital requirement for starting a new bank in India?", options: ["₹100 crore", "₹200 crore", "₹500 crore", "₹1000 crore"], correct: 2, marks: 1, explanation: "The minimum capital requirement for new banks in India is ₹500 crore." },
+          { qid: "6", question: "CRR stands for:", options: ["Capital Reserve Ratio", "Cash Reserve Ratio", "Credit Reserve Ratio", "Central Reserve Ratio"], correct: 1, marks: 1, explanation: "CRR (Cash Reserve Ratio) is the percentage of deposits banks must keep with RBI as cash." },
+          { qid: "7", question: "Which bank is known as the 'Bankers' Bank' in India?", options: ["SBI", "RBI", "NABARD", "IDBI"], correct: 1, marks: 1, explanation: "RBI is called the Bankers' Bank as it provides banking services to commercial banks." },
+          { qid: "8", question: "What is the current Repo Rate (approximately)?", options: ["4.50%", "5.50%", "6.50%", "7.50%"], correct: 2, marks: 1, explanation: "The Repo Rate is around 6.50% (subject to change based on RBI's monetary policy decisions)." },
+          { qid: "9", question: "IMPS stands for:", options: ["Immediate Mobile Payment System", "Immediate Payment Service", "Inter-bank Mobile Payment Service", "Indian Mobile Payment System"], correct: 1, marks: 1, explanation: "IMPS stands for Immediate Payment Service - for instant interbank fund transfers." },
+          { qid: "10", question: "The first bank established in India was:", options: ["State Bank of India", "Bank of Hindustan", "Imperial Bank", "Reserve Bank of India"], correct: 1, marks: 1, explanation: "Bank of Hindustan was the first bank in India, established in 1770 (later failed in 1832)." },
+        ]
+      }
+    ]
+  },
 ]
+
+// Category alias mapping for better matching
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  "ssc": ["ssc-banking", "ssc", "ssc-cgl", "ssc-chsl"],
+  "banking": ["ssc-banking", "banking", "ibps", "sbi"],
+  "defence": ["nda", "defence", "cds", "army"],
+  "railways": ["railways", "rrb", "ntpc"],
+  "upsc": ["upsc", "ias", "pcs"],
+  "jee-neet": ["jee-neet", "jee", "neet", "physics"],
+  "teaching": ["teaching", "ctet", "tet"],
+  "general": ["general", "all"],
+}
 
 // Get sample series for a platform category
 export function getSampleSeriesForCategory(category: string): SampleSeries[] {
-  return SAMPLE_SERIES.filter(s => s.category === category)
+  const normalizedCat = category?.toLowerCase() || "general"
+  
+  // Direct match first
+  const direct = SAMPLE_SERIES.filter(s => s.category === normalizedCat)
+  if (direct.length > 0) return direct
+  
+  // Check aliases
+  for (const [key, aliases] of Object.entries(CATEGORY_ALIASES)) {
+    if (aliases.includes(normalizedCat) || normalizedCat === key) {
+      const aliasMatch = SAMPLE_SERIES.filter(s => 
+        aliases.includes(s.category) || s.category === key
+      )
+      if (aliasMatch.length > 0) return aliasMatch
+    }
+  }
+  
+  // Return all as fallback
+  return SAMPLE_SERIES
 }
 
 // Get all sample series

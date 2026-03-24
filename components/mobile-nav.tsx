@@ -3,15 +3,14 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BookOpen, Zap, Trophy, User } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Home, BookOpen, Zap, Trophy, User, FileCheck } from "lucide-react"
 
 const navItems = [
-  { icon: Home,     label: "Home",        href: "/" },
-  { icon: BookOpen, label: "Browse",      href: "/browse" },
-  { icon: Zap,      label: "Quiz",        href: "/quiz" },
-  { icon: Trophy,   label: "Leaderboard", href: "/quiz/leaderboard" },
-  { icon: User,     label: "Profile",     href: "/profile" },
+  { icon: Home,      label: "Home",   href: "/" },
+  { icon: BookOpen,  label: "Browse", href: "/browse" },
+  { icon: FileCheck, label: "Tests",  href: "/test-series" },
+  { icon: Zap,       label: "Quiz",   href: "/quiz" },
+  { icon: User,      label: "Profile", href: "/profile" },
 ]
 
 export function MobileNav() {

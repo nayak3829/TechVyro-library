@@ -11,9 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/hooks/use-auth"
 import {
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger
+} from "@/components/ui/drawer"
+import {
   Search, X, FileText, BookOpen, Clock, Play, Flame,
   Lock, Sparkles, Brain, GraduationCap, LayoutGrid,
-  ChevronRight
+  ChevronRight, SlidersHorizontal
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -75,6 +78,7 @@ export default function BrowsePage() {
   const [filter, setFilter] = useState<ContentStructureFilter>({
     folderId: null, categoryId: null, sectionId: null
   })
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
 
   // Build category name → content structure categoryId mapping for PDFs
   const [catNameMap, setCatNameMap] = useState<Record<string, string>>({})
@@ -246,11 +250,11 @@ export default function BrowsePage() {
         </div>
       </section>
 
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
         <div className="flex gap-6 items-start">
 
-          {/* Sidebar — always visible, loads independently */}
-          <div className="w-60 xl:w-64 shrink-0">
+          {/* Sidebar — hidden on mobile, visible on lg+ */}
+          <div className="hidden lg:block w-60 xl:w-64 shrink-0 sticky top-20">
             <ContentStructureNav
               filter={filter}
               onFilterChange={(f) => { setFilter(f); setSearch("") }}
@@ -262,22 +266,60 @@ export default function BrowsePage() {
           {/* Main content */}
           <div className="flex-1 min-w-0">
             {/* Tabs + Search bar */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-5">
-              {/* Tab pills */}
-              <div className="flex gap-1 p-1 rounded-xl bg-muted/50 border border-border/50 h-fit">
-                {(["all", "pdfs", "quizzes"] as Tab[]).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
-                      activeTab === tab
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {tab === "all" ? "All" : tab === "pdfs" ? "PDFs" : "Quizzes"}
-                  </button>
-                ))}
+            <div className="flex flex-col gap-3 mb-5">
+              <div className="flex items-center gap-2">
+                {/* Tab pills */}
+                <div className="flex gap-1 p-1 rounded-xl bg-muted/50 border border-border/50 h-fit">
+                  {(["all", "pdfs", "quizzes"] as Tab[]).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
+                        activeTab === tab
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {tab === "all" ? "All" : tab === "pdfs" ? "PDFs" : "Quizzes"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Mobile filter button - visible on screens < lg */}
+                <Drawer open={filterDrawerOpen} onOpenChange={setFilterDrawerOpen}>
+                  <DrawerTrigger asChild>
+                    <button className="lg:hidden relative h-10 px-3 rounded-xl border border-border/60 bg-background flex items-center gap-1.5 text-sm font-medium text-foreground hover:bg-muted/60 transition-colors shrink-0 ml-auto">
+                      <SlidersHorizontal className="h-4 w-4" />
+                      <span className="hidden sm:inline">Filters</span>
+                      {hasFilter && (
+                        <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+                          !
+                        </span>
+                      )}
+                    </button>
+                  </DrawerTrigger>
+                  <DrawerContent className="max-h-[85dvh]">
+                    <DrawerHeader className="pb-2">
+                      <DrawerTitle className="text-base">Browse by Subject</DrawerTitle>
+                    </DrawerHeader>
+                    <div className="px-4 pb-6 overflow-y-auto">
+                      <ContentStructureNav
+                        filter={filter}
+                        onFilterChange={(f) => { setFilter(f); setSearch(""); setFilterDrawerOpen(false) }}
+                        showType={activeTab === "pdfs" ? "pdfs" : activeTab === "quizzes" ? "quizzes" : "all"}
+                        autoRefreshMs={REFRESH_MS}
+                      />
+                      {hasFilter && (
+                        <button
+                          onClick={() => { setFilter({ folderId: null, categoryId: null, sectionId: null }); setFilterDrawerOpen(false) }}
+                          className="w-full flex items-center justify-center gap-2 py-3 mt-4 rounded-xl border border-rose-500/30 text-rose-500 text-sm font-semibold hover:bg-rose-500/5 transition-colors"
+                        >
+                          <X className="h-4 w-4" /> Clear Filter
+                        </button>
+                      )}
+                    </div>
+                  </DrawerContent>
+                </Drawer>
               </div>
 
               {/* Search */}

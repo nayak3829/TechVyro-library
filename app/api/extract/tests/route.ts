@@ -156,7 +156,74 @@ export async function GET(request: Request) {
     }
   } catch {}
 
+  // Fallback: return sample tests for the category detected from slug/URL
+  const category = detectCategory(slug, webBase, apiBase)
+  const sampleSeries = SAMPLE_SERIES.filter(s => 
+    s.category === category || s.slug.includes(category)
+  )
+  
+  if (sampleSeries.length > 0) {
+    // Use the first matching sample series
+    const series = sampleSeries[0]
+    const subjects = [{
+      id: series.id,
+      name: series.title,
+      tests: series.tests.map(t => ({
+        id: t.id,
+        title: t.title,
+        duration: t.duration,
+        total_questions: t.total_questions,
+        is_free: true,
+      }))
+    }]
+    return NextResponse.json({ 
+      success: true, 
+      subjects, 
+      tests: [], 
+      source: "sample-fallback",
+      notice: "Live data unavailable. Showing practice tests." 
+    })
+  }
+
+  // Last resort: return generic sample tests
+  const genericSample = SAMPLE_SERIES[0]
+  if (genericSample) {
+    const subjects = [{
+      id: genericSample.id,
+      name: genericSample.title,
+      tests: genericSample.tests.map(t => ({
+        id: t.id,
+        title: t.title,
+        duration: t.duration,
+        total_questions: t.total_questions,
+        is_free: true,
+      }))
+    }]
+    return NextResponse.json({ 
+      success: true, 
+      subjects, 
+      tests: [], 
+      source: "sample-fallback",
+      notice: "Live data unavailable. Showing practice tests." 
+    })
+  }
+
   return NextResponse.json({ error: "Could not fetch test details" }, { status: 404 })
+}
+
+// Detect category from slug or URL
+function detectCategory(slug: string, webBase: string, apiBase: string): string {
+  const combined = `${slug} ${webBase} ${apiBase}`.toLowerCase()
+  
+  if (combined.includes("ssc") || combined.includes("cgl") || combined.includes("chsl")) return "ssc"
+  if (combined.includes("bank") || combined.includes("ibps") || combined.includes("sbi")) return "banking"
+  if (combined.includes("nda") || combined.includes("defence") || combined.includes("cds")) return "nda"
+  if (combined.includes("railway") || combined.includes("rrb") || combined.includes("ntpc")) return "railways"
+  if (combined.includes("upsc") || combined.includes("ias") || combined.includes("pcs")) return "upsc"
+  if (combined.includes("jee") || combined.includes("neet") || combined.includes("physics")) return "jee-neet"
+  if (combined.includes("ctet") || combined.includes("tet") || combined.includes("teacher")) return "teaching"
+  
+  return "ssc-banking" // default
 }
 
 function findSubjects(data: unknown): unknown[] {
