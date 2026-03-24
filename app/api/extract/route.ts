@@ -194,92 +194,99 @@ export async function GET(request: Request) {
   const bulkMode = searchParams.get("bulk") === "true"
   const category = searchParams.get("category")?.trim()
 
-  // Known platforms that reliably have test series content
-  const KNOWN_PLATFORMS: Record<string, string[]> = {
-    ssc: [
-      "https://sscaddaapi.classx.co.in",
-      "https://sscguruapi.classx.co.in",
-      "https://sscmasterapi.classx.co.in",
-      "https://sscwalaapi.classx.co.in",
-    ],
-    banking: [
-      "https://bankersaddaapi.classx.co.in", 
-      "https://bankingguruapi.classx.co.in",
-      "https://ibpsmasterapi.classx.co.in",
-    ],
-    defence: [
-      "https://ndaguruapi.classx.co.in",
-      "https://defenceguruapi.classx.co.in",
-      "https://agniveergurujiapi.classx.co.in",
-    ],
-    railways: [
-      "https://railwayguruapi.classx.co.in",
-      "https://rrbnptcapi.classx.co.in",
-    ],
-    upsc: [
-      "https://upscpathshalaapi.classx.co.in",
-      "https://iasguruapi.classx.co.in",
-    ],
-    teaching: [
-      "https://ctetguruapi.classx.co.in",
-      "https://tetmasterapi.classx.co.in",
-    ],
-    police: [
-      "https://policeexamapi.classx.co.in",
-    ],
-    general: [
-      "https://examguruapi.classx.co.in",
-      "https://testbookapi.classx.co.in",
-    ],
-  }
-
-  // Bulk mode: fetch from multiple platforms for a category
+  // Bulk mode: fetch from APX platforms and return test series
   if (bulkMode && category) {
-    const categoryKeywords: Record<string, string[]> = {
-      ssc: ["ssc", "cgl", "chsl", "mts", "gd", "staff", "selection"],
-      banking: ["bank", "ibps", "sbi", "rbi", "clerk", "po", "finance"],
-      defence: ["nda", "cds", "defence", "army", "navy", "airforce", "capf", "agniveer"],
-      railways: ["railway", "rrb", "ntpc", "group", "technician", "loco"],
-      upsc: ["upsc", "ias", "pcs", "civil", "service"],
-      teaching: ["ctet", "tet", "teacher", "kvs", "nvs", "education"],
-      police: ["police", "constable", "si", "law"],
-      "jee-neet": ["jee", "neet", "physics", "chemistry", "biology", "medical", "engineering"],
-    }
-
-    const keywords = categoryKeywords[category] || [category]
+    // Get sample series for this category as base
+    const sampleSeries = getSampleSeriesForCategory(category)
+    const allSampleSeries = getAllSampleSeries()
+    const baseSeries = sampleSeries.length > 0 ? sampleSeries : allSampleSeries
     
-    // Get platforms matching category keywords
-    const matchingPlatforms = PLATFORM_LIST.filter(p => 
-      keywords.some(kw => p.name.toLowerCase().includes(kw))
-    ).slice(0, 15)
-
-    // Add known platforms for this category
-    const knownForCategory = KNOWN_PLATFORMS[category] || KNOWN_PLATFORMS.general
-    const knownPlatformObjects = knownForCategory.map(api => ({
-      name: api.replace(/api\..*$/, "").replace(/https?:\/\//, ""),
-      api,
+    // Format sample series
+    const formattedSamples = baseSeries.map(s => ({
+      id: s.id,
+      title: s.title,
+      slug: s.slug,
+      description: s.description,
+      total_tests: s.tests.length,
+      total_questions: s.tests.reduce((acc, t) => acc + (t.questions?.length || 5), 0),
+      duration: s.tests[0]?.duration || 60,
+      is_free: true,
+      category: s.category || category,
+      isSample: true,
+      _sourceApi: `sample:${s.category}`,
+      _sourceWeb: "",
     }))
 
-    // Combine and dedupe
-    const allPlatformsToTry = [...knownPlatformObjects, ...matchingPlatforms]
-      .filter((p, i, arr) => arr.findIndex(x => x.api === p.api) === i)
-      .slice(0, 12)
-
-    const allSeries: unknown[] = []
+    // Try to fetch LIVE data from APX platforms by scraping their websites
+    // APX platforms use Next.js and store data in __NEXT_DATA__ script tag
+    const liveSeries: unknown[] = []
     
-    // Try to fetch from platforms in parallel (limit to 6 concurrent)
-    const fetchPromises = allPlatformsToTry.slice(0, 6).map(async (platform) => {
+    // Select random platforms to try
+    const shuffledPlatforms = [...PLATFORM_LIST].sort(() => Math.random() - 0.5)
+    const platformsToTry = shuffledPlatforms.slice(0, 10)
+
+    // Fetch from platforms in parallel - try both API and web scraping
+    const fetchPromises = platformsToTry.map(async (platform) => {
+      const webUrl = deriveWebUrl(platform.api)
+      
+      // Try multiple methods to get data
       try {
-        const series = await tryFetchFromPlatform(platform.api)
-        if (series && series.length > 0) {
-          return series.map(s => ({
-            ...(s as object),
-            _sourceApi: platform.api,
-            _sourceWeb: deriveWebUrl(platform.api),
-          }))
+        // Method 1: Try web scraping first (most reliable for APX platforms)
+        const webPaths = ["/test-series/", "/test-series", "/courses/", "/"]
+        for (const path of webPaths) {
+          try {
+            const res = await fetchWithTimeout(`${webUrl}${path}`, { headers: HEADERS }, 5000)
+            if (res.ok) {
+              const html = await res.text()
+              const nextData = extractNextData(html)
+              if (nextData) {
+                const series = findTestSeries(nextData)
+                if (series.length > 0) {
+                  console.log(`[v0] Found ${series.length} series from ${webUrl}${path}`)
+                  return series.slice(0, 5).map(s => ({
+                    ...(s as object),
+                    _sourceApi: platform.api,
+                    _sourceWeb: webUrl,
+                    _platformName: platform.name,
+                    isSample: false,
+                  }))
+                }
+              }
+            }
+          } catch {
+            // Try next path
+          }
         }
-      } catch {
-        // Ignore failures
+        
+        // Method 2: Try API endpoints as fallback
+        const apiEndpoints = [
+          "/api/v1/test-series/?format=json",
+          "/api/v2/test-series/?format=json",
+          "/api/v1/courses/?format=json",
+        ]
+        for (const endpoint of apiEndpoints) {
+          try {
+            const res = await fetchWithTimeout(`${platform.api}${endpoint}`, { headers: HEADERS }, 5000)
+            if (res.ok) {
+              const json = await res.json()
+              const series = findTestSeries(json)
+              if (series.length > 0) {
+                console.log(`[v0] Found ${series.length} series from API ${platform.api}${endpoint}`)
+                return series.slice(0, 5).map(s => ({
+                  ...(s as object),
+                  _sourceApi: platform.api,
+                  _sourceWeb: webUrl,
+                  _platformName: platform.name,
+                  isSample: false,
+                }))
+              }
+            }
+          } catch {
+            // Try next endpoint
+          }
+        }
+      } catch (err) {
+        console.log(`[v0] Failed to fetch from ${platform.name}:`, err)
       }
       return []
     })
@@ -287,33 +294,30 @@ export async function GET(request: Request) {
     const results = await Promise.allSettled(fetchPromises)
     for (const result of results) {
       if (result.status === "fulfilled" && result.value.length > 0) {
-        allSeries.push(...result.value)
+        liveSeries.push(...result.value)
       }
     }
 
-    if (allSeries.length > 0) {
+    // If we got live data, clean and combine with samples
+    if (liveSeries.length > 0) {
+      const cleanedLive = cleanSeriesData(liveSeries)
       return NextResponse.json({
         success: true,
-        testSeries: cleanSeriesData(allSeries),
-        source: "bulk",
-        count: allSeries.length,
+        testSeries: [...cleanedLive, ...formattedSamples],
+        source: "apx-live",
+        count: cleanedLive.length + formattedSamples.length,
+        liveCount: cleanedLive.length,
       })
     }
 
-    // Fallback to sample tests with category-specific data
-    const sampleSeries = getSampleSeriesForCategory(category)
-    const fallbackSeries = sampleSeries.length > 0 ? sampleSeries : getAllSampleSeries()
+    // No live data, return samples only
     return NextResponse.json({
       success: true,
-      testSeries: fallbackSeries.map(s => ({
-        id: s.id, title: s.title, slug: s.slug,
-        description: s.description, total_tests: s.tests.length, 
-        total_questions: s.tests.reduce((acc, t) => acc + (t.questions?.length || 5), 0),
-        duration: 60, is_free: true, category: s.category || category,
-        isSample: true,
-      })),
+      testSeries: formattedSamples,
       source: "sample",
-      notice: "Showing practice tests from our library.",
+      count: formattedSamples.length,
+      liveCount: 0,
+      notice: "Showing practice tests",
     })
   }
 

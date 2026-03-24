@@ -369,15 +369,16 @@ const CATEGORY_ALIASES: Record<string, string[]> = {
 // Get sample series for a platform category
 export function getSampleSeriesForCategory(category: string): SampleSeries[] {
   const normalizedCat = category?.toLowerCase() || "general"
+  const allSeries = [...SAMPLE_SERIES, ...ADDITIONAL_SERIES]
   
   // Direct match first
-  const direct = SAMPLE_SERIES.filter(s => s.category === normalizedCat)
+  const direct = allSeries.filter(s => s.category === normalizedCat)
   if (direct.length > 0) return direct
   
   // Check aliases
   for (const [key, aliases] of Object.entries(CATEGORY_ALIASES)) {
     if (aliases.includes(normalizedCat) || normalizedCat === key) {
-      const aliasMatch = SAMPLE_SERIES.filter(s => 
+      const aliasMatch = allSeries.filter(s => 
         aliases.includes(s.category) || s.category === key
       )
       if (aliasMatch.length > 0) return aliasMatch
@@ -385,12 +386,148 @@ export function getSampleSeriesForCategory(category: string): SampleSeries[] {
   }
   
   // Return all as fallback
-  return SAMPLE_SERIES
+  return allSeries
 }
 
-// Get all sample series
+// Additional test series for each category (comprehensive coverage)
+const ADDITIONAL_SERIES: SampleSeries[] = [
+  // More SSC
+  { id: "ssc-chsl-1", slug: "ssc-chsl-mock", title: "SSC CHSL Complete Mock Series", description: "SSC CHSL Tier-1 preparation with GK, Reasoning & Maths", category: "ssc", tests: [
+    { id: "ssc-chsl-t1", title: "SSC CHSL Mock Test 1", duration: 60, total_questions: 25, questions: [] },
+    { id: "ssc-chsl-t2", title: "SSC CHSL Mock Test 2", duration: 60, total_questions: 25, questions: [] },
+  ]},
+  { id: "ssc-mts-1", slug: "ssc-mts-mock", title: "SSC MTS Full Mock Series", description: "SSC MTS preparation with reasoning & general awareness", category: "ssc", tests: [
+    { id: "ssc-mts-t1", title: "SSC MTS Mock Test 1", duration: 45, total_questions: 20, questions: [] },
+    { id: "ssc-mts-t2", title: "SSC MTS Mock Test 2", duration: 45, total_questions: 20, questions: [] },
+  ]},
+  { id: "ssc-gd-1", slug: "ssc-gd-constable", title: "SSC GD Constable Series", description: "SSC GD Constable with physical eligibility prep", category: "ssc", tests: [
+    { id: "ssc-gd-t1", title: "SSC GD Mock Test 1", duration: 60, total_questions: 25, questions: [] },
+  ]},
+  { id: "ssc-je-1", slug: "ssc-je-technical", title: "SSC JE Technical Series", description: "SSC Junior Engineer technical & general studies", category: "ssc", tests: [
+    { id: "ssc-je-t1", title: "SSC JE Technical Mock", duration: 120, total_questions: 50, questions: [] },
+  ]},
+  { id: "ssc-steno-1", slug: "ssc-stenographer", title: "SSC Stenographer Series", description: "SSC Stenographer Grade C & D preparation", category: "ssc", tests: [
+    { id: "ssc-steno-t1", title: "SSC Steno Mock Test", duration: 60, total_questions: 30, questions: [] },
+  ]},
+  
+  // More Banking
+  { id: "ibps-po-1", slug: "ibps-po-prelims", title: "IBPS PO Prelims Series", description: "IBPS PO Preliminary exam preparation", category: "banking", tests: [
+    { id: "ibps-po-t1", title: "IBPS PO Prelims Mock 1", duration: 60, total_questions: 30, questions: [] },
+    { id: "ibps-po-t2", title: "IBPS PO Prelims Mock 2", duration: 60, total_questions: 30, questions: [] },
+  ]},
+  { id: "ibps-clerk-1", slug: "ibps-clerk-prelims", title: "IBPS Clerk Prelims Series", description: "IBPS Clerk preparation with English, Quant & Reasoning", category: "banking", tests: [
+    { id: "ibps-clerk-t1", title: "IBPS Clerk Mock 1", duration: 60, total_questions: 30, questions: [] },
+  ]},
+  { id: "sbi-po-1", slug: "sbi-po-prelims", title: "SBI PO Prelims Series", description: "State Bank of India PO exam preparation", category: "banking", tests: [
+    { id: "sbi-po-t1", title: "SBI PO Mock Test 1", duration: 60, total_questions: 35, questions: [] },
+    { id: "sbi-po-t2", title: "SBI PO Mock Test 2", duration: 60, total_questions: 35, questions: [] },
+  ]},
+  { id: "sbi-clerk-1", slug: "sbi-clerk", title: "SBI Clerk Full Series", description: "SBI Clerk Junior Associate preparation", category: "banking", tests: [
+    { id: "sbi-clerk-t1", title: "SBI Clerk Mock 1", duration: 60, total_questions: 30, questions: [] },
+  ]},
+  { id: "rbi-assistant-1", slug: "rbi-assistant", title: "RBI Assistant Series", description: "Reserve Bank of India Assistant exam prep", category: "banking", tests: [
+    { id: "rbi-asst-t1", title: "RBI Assistant Mock", duration: 60, total_questions: 30, questions: [] },
+  ]},
+  { id: "nabard-1", slug: "nabard-grade-a", title: "NABARD Grade A/B Series", description: "NABARD Development Assistant preparation", category: "banking", tests: [
+    { id: "nabard-t1", title: "NABARD Mock Test", duration: 90, total_questions: 40, questions: [] },
+  ]},
+
+  // More Defence
+  { id: "cds-1", slug: "cds-mock", title: "CDS Mock Test Series", description: "Combined Defence Services exam preparation", category: "defence", tests: [
+    { id: "cds-t1", title: "CDS GK Mock Test", duration: 120, total_questions: 50, questions: [] },
+    { id: "cds-t2", title: "CDS English Mock", duration: 120, total_questions: 50, questions: [] },
+  ]},
+  { id: "afcat-1", slug: "afcat-mock", title: "AFCAT Mock Series", description: "Air Force Common Admission Test prep", category: "defence", tests: [
+    { id: "afcat-t1", title: "AFCAT Mock Test 1", duration: 120, total_questions: 50, questions: [] },
+  ]},
+  { id: "capf-1", slug: "capf-ac-mock", title: "CAPF AC Mock Series", description: "Central Armed Police Forces Assistant Commandant", category: "defence", tests: [
+    { id: "capf-t1", title: "CAPF AC Mock Test", duration: 120, total_questions: 50, questions: [] },
+  ]},
+  { id: "agniveer-1", slug: "agniveer-army", title: "Agniveer Army Series", description: "Indian Army Agniveer recruitment preparation", category: "defence", tests: [
+    { id: "agniveer-t1", title: "Agniveer GD Mock", duration: 60, total_questions: 30, questions: [] },
+    { id: "agniveer-t2", title: "Agniveer Technical Mock", duration: 60, total_questions: 30, questions: [] },
+  ]},
+  { id: "navy-aa-1", slug: "navy-aa-ssr", title: "Navy AA/SSR Series", description: "Indian Navy Artificer Apprentice & SSR", category: "defence", tests: [
+    { id: "navy-t1", title: "Navy AA Mock Test", duration: 60, total_questions: 30, questions: [] },
+  ]},
+
+  // More Railways
+  { id: "rrb-ntpc-1", slug: "rrb-ntpc-mock", title: "RRB NTPC CBT-1 Series", description: "Railway NTPC Computer Based Test preparation", category: "railways", tests: [
+    { id: "rrb-ntpc-t1", title: "RRB NTPC Mock 1", duration: 90, total_questions: 40, questions: [] },
+    { id: "rrb-ntpc-t2", title: "RRB NTPC Mock 2", duration: 90, total_questions: 40, questions: [] },
+  ]},
+  { id: "rrb-group-d-1", slug: "rrb-group-d", title: "RRB Group D Series", description: "Railway Group D Level 1 preparation", category: "railways", tests: [
+    { id: "rrb-gd-t1", title: "RRB Group D Mock 1", duration: 90, total_questions: 40, questions: [] },
+  ]},
+  { id: "rrb-alp-1", slug: "rrb-alp-technician", title: "RRB ALP & Technician", description: "Assistant Loco Pilot & Technician preparation", category: "railways", tests: [
+    { id: "rrb-alp-t1", title: "RRB ALP Mock Test", duration: 60, total_questions: 30, questions: [] },
+    { id: "rrb-alp-t2", title: "RRB Technician Mock", duration: 60, total_questions: 30, questions: [] },
+  ]},
+  { id: "rrb-je-1", slug: "rrb-je-cbt", title: "RRB JE CBT Series", description: "Railway Junior Engineer Computer Based Test", category: "railways", tests: [
+    { id: "rrb-je-t1", title: "RRB JE CBT-1 Mock", duration: 90, total_questions: 40, questions: [] },
+  ]},
+
+  // More UPSC
+  { id: "upsc-cse-1", slug: "upsc-cse-prelims", title: "UPSC CSE Prelims GS", description: "Civil Services Preliminary General Studies", category: "upsc", tests: [
+    { id: "upsc-gs-t1", title: "UPSC GS Paper 1 Mock", duration: 120, total_questions: 50, questions: [] },
+    { id: "upsc-gs-t2", title: "UPSC GS Paper 2 Mock", duration: 120, total_questions: 50, questions: [] },
+  ]},
+  { id: "upsc-csat-1", slug: "upsc-csat", title: "UPSC CSAT Series", description: "Civil Services Aptitude Test preparation", category: "upsc", tests: [
+    { id: "upsc-csat-t1", title: "UPSC CSAT Mock", duration: 120, total_questions: 40, questions: [] },
+  ]},
+  { id: "upsc-epfo-1", slug: "upsc-epfo", title: "UPSC EPFO Series", description: "Enforcement Officer/Accounts Officer exam", category: "upsc", tests: [
+    { id: "upsc-epfo-t1", title: "EPFO Mock Test", duration: 120, total_questions: 50, questions: [] },
+  ]},
+  { id: "upsc-capf-1", slug: "upsc-capf-ac", title: "UPSC CAPF AC Series", description: "Central Armed Police Forces Assistant Commandant", category: "upsc", tests: [
+    { id: "upsc-capf-t1", title: "CAPF AC Mock", duration: 120, total_questions: 50, questions: [] },
+  ]},
+
+  // More JEE/NEET
+  { id: "jee-main-1", slug: "jee-main-mock", title: "JEE Main Full Mock Series", description: "JEE Main Physics, Chemistry & Maths", category: "jee-neet", tests: [
+    { id: "jee-main-t1", title: "JEE Main Mock 1", duration: 180, total_questions: 75, questions: [] },
+    { id: "jee-main-t2", title: "JEE Main Mock 2", duration: 180, total_questions: 75, questions: [] },
+  ]},
+  { id: "jee-adv-1", slug: "jee-advanced-mock", title: "JEE Advanced Series", description: "JEE Advanced preparation for IITs", category: "jee-neet", tests: [
+    { id: "jee-adv-t1", title: "JEE Advanced Paper 1", duration: 180, total_questions: 60, questions: [] },
+  ]},
+  { id: "neet-ug-1", slug: "neet-ug-mock", title: "NEET UG Full Series", description: "NEET UG Physics, Chemistry & Biology", category: "jee-neet", tests: [
+    { id: "neet-t1", title: "NEET UG Mock 1", duration: 180, total_questions: 90, questions: [] },
+    { id: "neet-t2", title: "NEET UG Mock 2", duration: 180, total_questions: 90, questions: [] },
+  ]},
+  { id: "bitsat-1", slug: "bitsat-mock", title: "BITSAT Mock Series", description: "BITS Pilani Admission Test preparation", category: "jee-neet", tests: [
+    { id: "bitsat-t1", title: "BITSAT Mock Test", duration: 180, total_questions: 130, questions: [] },
+  ]},
+
+  // More Teaching
+  { id: "ctet-p1-1", slug: "ctet-paper-1", title: "CTET Paper-1 Series", description: "CTET for Primary Stage (Class 1-5)", category: "teaching", tests: [
+    { id: "ctet-p1-t1", title: "CTET Paper 1 Mock 1", duration: 150, total_questions: 75, questions: [] },
+    { id: "ctet-p1-t2", title: "CTET Paper 1 Mock 2", duration: 150, total_questions: 75, questions: [] },
+  ]},
+  { id: "ctet-p2-1", slug: "ctet-paper-2", title: "CTET Paper-2 Series", description: "CTET for Elementary Stage (Class 6-8)", category: "teaching", tests: [
+    { id: "ctet-p2-t1", title: "CTET Paper 2 Mock", duration: 150, total_questions: 75, questions: [] },
+  ]},
+  { id: "super-tet-1", slug: "super-tet-mock", title: "Super TET Series", description: "UP Super TET Teacher recruitment", category: "teaching", tests: [
+    { id: "super-tet-t1", title: "Super TET Mock 1", duration: 150, total_questions: 75, questions: [] },
+  ]},
+  { id: "kvs-1", slug: "kvs-pgt-tgt", title: "KVS PGT/TGT Series", description: "Kendriya Vidyalaya Sangathan Teacher exam", category: "teaching", tests: [
+    { id: "kvs-t1", title: "KVS TGT Mock Test", duration: 150, total_questions: 75, questions: [] },
+  ]},
+  { id: "dsssb-1", slug: "dsssb-teacher", title: "DSSSB Teacher Series", description: "Delhi SSSB Teacher recruitment exam", category: "teaching", tests: [
+    { id: "dsssb-t1", title: "DSSSB Teacher Mock", duration: 120, total_questions: 60, questions: [] },
+  ]},
+
+  // Police/State Exams
+  { id: "delhi-police-1", slug: "delhi-police-constable", title: "Delhi Police Constable", description: "Delhi Police recruitment preparation", category: "ssc", tests: [
+    { id: "dp-t1", title: "Delhi Police Mock 1", duration: 90, total_questions: 50, questions: [] },
+  ]},
+  { id: "up-police-1", slug: "up-police-constable", title: "UP Police Constable", description: "Uttar Pradesh Police recruitment", category: "ssc", tests: [
+    { id: "up-t1", title: "UP Police Mock 1", duration: 120, total_questions: 75, questions: [] },
+  ]},
+]
+
+// Get all sample series (original + additional)
 export function getAllSampleSeries(): SampleSeries[] {
-  return SAMPLE_SERIES
+  return [...SAMPLE_SERIES, ...ADDITIONAL_SERIES]
 }
 
 // Get sample questions for a test ID
