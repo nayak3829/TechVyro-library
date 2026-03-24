@@ -9,9 +9,8 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
   ArrowLeft, Loader2, BookOpen, Play, Clock, FileText,
-  ChevronDown, ChevronUp, AlertCircle
+  ChevronDown, ChevronUp, AlertCircle, GraduationCap
 } from "lucide-react"
-import Link from "next/link"
 
 interface Subject {
   id?: string | number
@@ -32,13 +31,29 @@ interface Test {
   slug?: string
 }
 
+// Clean title to remove any platform references
+function cleanTitle(title: string): string {
+  const patterns = [
+    /\s*by\s+\w+\s*(academy|classes|institute|coaching)?/gi,
+    /\s*-\s*\w+\s*(academy|classes|institute)?$/gi,
+    /^\w+\s*(academy|classes|institute)?\s*-\s*/gi,
+    /\(\w+\s*(app|academy|classes)?\)/gi,
+  ]
+  let cleaned = title
+  for (const pattern of patterns) {
+    cleaned = cleaned.replace(pattern, "")
+  }
+  return cleaned.trim() || title
+}
+
 function SeriesContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const slug = searchParams.get("slug") || ""
   const apiBase = searchParams.get("apiBase") || ""
   const webBase = searchParams.get("webBase") || ""
-  const seriesTitle = searchParams.get("title") || "Test Series"
+  const rawTitle = searchParams.get("title") || "Mock Test"
+  const seriesTitle = cleanTitle(rawTitle)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -48,7 +63,7 @@ function SeriesContent() {
 
   useEffect(() => {
     if (!slug || !apiBase) {
-      router.push("/extract")
+      router.push("/test-series")
       return
     }
     fetchData()
@@ -90,7 +105,7 @@ function SeriesContent() {
       title: test.title || test.name || "Test",
       duration: String(test.duration || test.time || 60),
     })
-    router.push(`/extract/play?${params}`)
+    router.push(`/test-series/play?${params}`)
   }
 
   const toggleSubject = (id: string) => {
@@ -145,7 +160,8 @@ function SeriesContent() {
                 {subjects.map((subj, idx) => {
                   const subjId = String(subj.id || idx)
                   const subjTests = subj.tests || []
-                  const name = subj.name || subj.title || `Subject ${idx + 1}`
+                  const rawName = subj.name || subj.title || `Subject ${idx + 1}`
+                  const name = cleanTitle(rawName)
 
                   return (
                     <Card key={subjId} className="overflow-hidden">
@@ -214,7 +230,8 @@ function SeriesContent() {
 }
 
 function TestRow({ test, onStart, loading }: { test: Test; onStart: () => void; loading: boolean }) {
-  const title = test.title || test.name || "Untitled Test"
+  const rawTitle = test.title || test.name || "Untitled Test"
+  const title = cleanTitle(rawTitle)
   const duration = test.duration || test.time
   const isFree = test.is_free
 

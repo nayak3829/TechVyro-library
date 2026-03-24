@@ -9,7 +9,7 @@ function deriveWebUrl(apiUrl: string): string {
   return apiUrl.replace(/^(https?:\/\/)api\./, "$1")
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 3000) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 8000) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), timeout)
   try {
@@ -69,6 +69,59 @@ function findTestSeries(data: unknown, depth = 0): unknown[] {
   return []
 }
 
+// Clean test series data to remove any platform identifiers
+function cleanSeriesData(series: unknown[]): unknown[] {
+  return series.map((item, idx) => {
+    const s = item as Record<string, unknown>
+    return {
+      id: s.id || s.slug || `series-${idx}`,
+      title: cleanTitle(String(s.title || s.name || `Test Series ${idx + 1}`)),
+      slug: s.slug || String(s.id || idx),
+      description: cleanDescription(String(s.description || s.subtitle || "")),
+      total_tests: s.total_tests || s.test_count || s.totalTests || 10,
+      total_questions: s.total_questions || s.totalQuestions || 0,
+      duration: s.duration || s.time || 60,
+      is_free: s.is_free ?? true,
+      subjects: s.subjects || [],
+      category: s.category || detectCategoryFromTitle(String(s.title || s.name || "")),
+    }
+  })
+}
+
+// Remove platform names from titles
+function cleanTitle(title: string): string {
+  // Remove common platform suffixes/prefixes
+  const platformPatterns = [
+    /\s*by\s+\w+\s*(academy|classes|institute|coaching|edu|education|online|learning)?/gi,
+    /\s*-\s*\w+\s*(academy|classes|institute|coaching|edu)?$/gi,
+    /^\w+\s*(academy|classes|institute|coaching)?\s*-\s*/gi,
+    /\(\w+\s*(app|academy|classes)?\)/gi,
+  ]
+  let cleaned = title
+  for (const pattern of platformPatterns) {
+    cleaned = cleaned.replace(pattern, "")
+  }
+  return cleaned.trim() || title
+}
+
+function cleanDescription(desc: string): string {
+  if (!desc) return "Complete preparation with practice tests and detailed solutions"
+  return desc.length > 200 ? desc.substring(0, 200) + "..." : desc
+}
+
+function detectCategoryFromTitle(title: string): string {
+  const t = title.toLowerCase()
+  if (t.includes("ssc") || t.includes("cgl") || t.includes("chsl") || t.includes("mts")) return "ssc"
+  if (t.includes("bank") || t.includes("ibps") || t.includes("sbi") || t.includes("rbi")) return "banking"
+  if (t.includes("nda") || t.includes("cds") || t.includes("defence") || t.includes("army")) return "defence"
+  if (t.includes("railway") || t.includes("rrb") || t.includes("ntpc")) return "railways"
+  if (t.includes("upsc") || t.includes("ias") || t.includes("pcs")) return "upsc"
+  if (t.includes("jee") || t.includes("neet") || t.includes("physics")) return "jee-neet"
+  if (t.includes("ctet") || t.includes("teacher") || t.includes("tet")) return "teaching"
+  if (t.includes("police") || t.includes("constable")) return "police"
+  return "general"
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const inputUrl = searchParams.get("url")?.trim()
@@ -100,7 +153,7 @@ export async function GET(request: Request) {
   let webUrl: string
 
   if (directApiUrl) {
-    // Direct API URL from appx.json — most reliable path
+    // Direct API URL from appx.json - most reliable path
     apiUrl = directApiUrl.replace(/\/$/, "")
     webUrl = deriveWebUrl(apiUrl)
   } else {
@@ -122,7 +175,7 @@ export async function GET(request: Request) {
   // Try all AppX API endpoints in parallel
   const tryEndpoint = async (url: string, type: "api" | "scrape"): Promise<{ series: unknown[]; type: string } | null> => {
     try {
-      const res = await fetchWithTimeout(url, { headers: HEADERS }, 3000)
+      const res = await fetchWithTimeout(url, { headers: HEADERS }, 8000)
       if (!res.ok) return null
       const text = await res.text()
       if (type === "api") {
@@ -146,6 +199,7 @@ export async function GET(request: Request) {
     tryEndpoint(`${apiUrl}/api/v1/test-series/?format=json`, "api"),
     tryEndpoint(`${apiUrl}/api/v2/test-series/?format=json`, "api"),
     tryEndpoint(`${apiUrl}/api/v1/test-series/`, "api"),
+    tryEndpoint(`${apiUrl}/api/v1/courses/?format=json`, "api"),
     tryEndpoint(`${webUrl}/test-series/`, "scrape"),
     tryEndpoint(`${webUrl}/courses/`, "scrape"),
   ]
@@ -154,8 +208,15 @@ export async function GET(request: Request) {
   for (const result of results) {
     if (result.status === "fulfilled" && result.value) {
       const { series, type } = result.value
-      console.log(`[Extract] Found ${(series as unknown[]).length} series via ${type}`)
-      return NextResponse.json({ success: true, testSeries: series, source: type, apiBase: apiUrl, webBase: webUrl })
+      const cleanedSeries = cleanSeriesData(series)
+      console.log(`[Extract] Found ${cleanedSeries.length} series via ${type}`)
+      return NextResponse.json({ 
+        success: true, 
+        testSeries: cleanedSeries, 
+        source: type, 
+        apiBase: apiUrl, 
+        webBase: webUrl 
+      })
     }
   }
 
@@ -170,7 +231,7 @@ export async function GET(request: Request) {
     id: s.id,
     title: s.title,
     slug: s.slug,
-    description: s.description + " (Sample)",
+    description: s.description,
     total_tests: s.tests.length,
     isSample: true,
   }))

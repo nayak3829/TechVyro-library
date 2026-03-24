@@ -24,6 +24,50 @@ function extractNextData(html: string): Record<string, unknown> | null {
   }
 }
 
+// Clean subject/folder names to remove platform identifiers
+function cleanSubjectName(name: string): string {
+  // Remove common platform patterns
+  const patterns = [
+    /\s*by\s+\w+/gi,
+    /\s*-\s*\w+\s*(academy|classes|institute)?$/gi,
+    /\(\w+\)/gi,
+  ]
+  let cleaned = name
+  for (const pattern of patterns) {
+    cleaned = cleaned.replace(pattern, "")
+  }
+  return cleaned.trim() || name
+}
+
+// Clean and normalize test data
+function cleanTestData(tests: unknown[]): unknown[] {
+  return tests.map((t, idx) => {
+    const test = t as Record<string, unknown>
+    return {
+      id: test.id || test.slug || `test-${idx}`,
+      title: cleanSubjectName(String(test.title || test.name || `Test ${idx + 1}`)),
+      slug: test.slug || String(test.id || idx),
+      duration: test.duration || test.time || 60,
+      total_questions: test.total_questions || test.question_count || test.totalQuestions || 25,
+      total_marks: test.total_marks || test.marks || 100,
+      is_free: test.is_free ?? true,
+    }
+  })
+}
+
+// Clean subjects data
+function cleanSubjectsData(subjects: unknown[]): unknown[] {
+  return subjects.map((s, idx) => {
+    const subj = s as Record<string, unknown>
+    const tests = subj.tests ? cleanTestData(subj.tests as unknown[]) : []
+    return {
+      id: subj.id || `subject-${idx}`,
+      name: cleanSubjectName(String(subj.name || subj.title || `Subject ${idx + 1}`)),
+      tests,
+    }
+  })
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const slug = searchParams.get("slug")
@@ -59,10 +103,11 @@ export async function GET(request: Request) {
     Accept: "application/json, text/html, */*",
   }
 
-  // Try API
+  // Try API endpoints
   const apiEndpoints = [
     `${apiBase}/api/v1/test-series/${slug}/?format=json`,
     `${apiBase}/api/v1/test-series/${slug}/`,
+    `${apiBase}/api/v2/test-series/${slug}/?format=json`,
     `${webBase}/api/v1/test-series/${slug}/?format=json`,
   ]
 
@@ -71,8 +116,8 @@ export async function GET(request: Request) {
       const res = await fetchWithTimeout(endpoint, { headers }, 10000)
       if (res.ok) {
         const json = await res.json()
-        const subjects = findSubjects(json)
-        const tests = findTests(json)
+        const subjects = cleanSubjectsData(findSubjects(json))
+        const tests = cleanTestData(findTests(json))
         if (subjects.length > 0 || tests.length > 0) {
           return NextResponse.json({ success: true, subjects, tests, source: "api" })
         }
@@ -90,7 +135,7 @@ export async function GET(request: Request) {
       if (nextData) {
         const props = (nextData as Record<string, unknown>)?.props
         const pageProps = (props as Record<string, unknown>)?.pageProps as Record<string, unknown>
-        const subjects: unknown[] = (pageProps?.subjects as unknown[]) || []
+        const rawSubjects: unknown[] = (pageProps?.subjects as unknown[]) || []
         const testsObj = pageProps?.tests || {}
 
         const flatTests: unknown[] = []
@@ -102,8 +147,8 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
           success: true,
-          subjects,
-          tests: flatTests,
+          subjects: cleanSubjectsData(rawSubjects),
+          tests: cleanTestData(flatTests),
           testSeries: pageProps?.testSeries,
           source: "scrape",
         })
@@ -116,7 +161,7 @@ export async function GET(request: Request) {
 
 function findSubjects(data: unknown): unknown[] {
   if (!data || typeof data !== "object") return []
-  for (const key of ["subjects", "sections"]) {
+  for (const key of ["subjects", "sections", "folders", "categories"]) {
     const val = (data as Record<string, unknown>)[key]
     if (Array.isArray(val)) return val
   }

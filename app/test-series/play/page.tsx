@@ -16,6 +16,21 @@ interface Question {
   explanation: string
 }
 
+// Clean title to remove any platform references
+function cleanTitle(title: string): string {
+  const patterns = [
+    /\s*by\s+\w+\s*(academy|classes|institute|coaching)?/gi,
+    /\s*-\s*\w+\s*(academy|classes|institute)?$/gi,
+    /^\w+\s*(academy|classes|institute)?\s*-\s*/gi,
+    /\(\w+\s*(app|academy|classes)?\)/gi,
+  ]
+  let cleaned = title
+  for (const pattern of patterns) {
+    cleaned = cleaned.replace(pattern, "")
+  }
+  return cleaned.trim() || title
+}
+
 function PlayContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -23,7 +38,8 @@ function PlayContent() {
 
   const testId = searchParams.get("testId") || ""
   const apiBase = searchParams.get("apiBase") || ""
-  const title = searchParams.get("title") || "Extracted Test"
+  const rawTitle = searchParams.get("title") || "Practice Test"
+  const title = cleanTitle(rawTitle)
   const duration = parseInt(searchParams.get("duration") || "60")
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -34,7 +50,7 @@ function PlayContent() {
 
   useEffect(() => {
     if (!testId || !apiBase) {
-      router.replace("/extract")
+      router.replace("/test-series")
       return
     }
 
@@ -47,7 +63,7 @@ function PlayContent() {
     // Live tests need auth
     if (authLoading) return
     if (!user) {
-      const currentUrl = `/extract/play?${searchParams.toString()}`
+      const currentUrl = `/test-series/play?${searchParams.toString()}`
       router.replace(`/login?redirect=${encodeURIComponent(currentUrl)}`)
       return
     }
