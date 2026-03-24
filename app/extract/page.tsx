@@ -371,29 +371,100 @@ const SERIES_LIBRARY: DisplaySeries[] = [
   },
 ]
 
-// ── Auto-fetch platforms ────────────────────────────────────────────────────
+// ── Helper functions for categorization ─────────────────────────────────────
+function detectCategory(title: string): string {
+  const t = title.toLowerCase()
+  if (t.includes("ssc") || t.includes("cgl") || t.includes("chsl") || t.includes("mts") || t.includes("gd") || t.includes("cpo") || t.includes("steno")) return "ssc"
+  if (t.includes("bank") || t.includes("ibps") || t.includes("sbi") || t.includes("rrb po") || t.includes("rrb clerk") || t.includes("rbi") || t.includes("lic") || t.includes("niacl")) return "banking"
+  if (t.includes("nda") || t.includes("cds") || t.includes("afcat") || t.includes("capf") || t.includes("agniveer") || t.includes("army") || t.includes("navy") || t.includes("air force") || t.includes("defence")) return "nda"
+  if (t.includes("railway") || t.includes("rrb") || t.includes("ntpc") || t.includes("group d") || t.includes("alp") || t.includes("je")) return "railways"
+  if (t.includes("upsc") || t.includes("ias") || t.includes("pcs") || t.includes("uppsc") || t.includes("bpsc") || t.includes("mpsc") || t.includes("rpsc") || t.includes("mppsc") || t.includes("ukpsc")) return "upsc"
+  if (t.includes("jee") || t.includes("neet") || t.includes("physics") || t.includes("chemistry") || t.includes("biology")) return "jee"
+  if (t.includes("ctet") || t.includes("tet") || t.includes("teacher") || t.includes("kvs") || t.includes("nvs") || t.includes("dsssb") || t.includes("super tet")) return "teaching"
+  if (t.includes("state") || t.includes("psc")) return "state"
+  if (t.includes("police") || t.includes("constable") || t.includes("si")) return "police"
+  return "all"
+}
+
+function extractExamTags(title: string): string[] {
+  const tags: string[] = []
+  const t = title.toLowerCase()
+  
+  // SSC exams
+  if (t.includes("ssc cgl")) tags.push("SSC CGL")
+  if (t.includes("ssc chsl")) tags.push("SSC CHSL")
+  if (t.includes("ssc mts")) tags.push("SSC MTS")
+  if (t.includes("ssc gd")) tags.push("SSC GD")
+  if (t.includes("ssc cpo")) tags.push("SSC CPO")
+  if (t.includes("ssc") && tags.length === 0) tags.push("SSC")
+  
+  // Banking
+  if (t.includes("ibps po")) tags.push("IBPS PO")
+  if (t.includes("ibps clerk")) tags.push("IBPS Clerk")
+  if (t.includes("sbi po")) tags.push("SBI PO")
+  if (t.includes("sbi clerk")) tags.push("SBI Clerk")
+  if (t.includes("rbi")) tags.push("RBI")
+  if (t.includes("bank") && tags.length === 0) tags.push("Banking")
+  
+  // Defence
+  if (t.includes("nda")) tags.push("NDA")
+  if (t.includes("cds")) tags.push("CDS")
+  if (t.includes("afcat")) tags.push("AFCAT")
+  if (t.includes("agniveer")) tags.push("Agniveer")
+  
+  // Railways
+  if (t.includes("rrb ntpc")) tags.push("RRB NTPC")
+  if (t.includes("rrb group d") || t.includes("group d")) tags.push("Group D")
+  if (t.includes("rrb je")) tags.push("RRB JE")
+  if (t.includes("rrb alp")) tags.push("RRB ALP")
+  if (t.includes("railway") && tags.length === 0) tags.push("Railways")
+  
+  // UPSC & State
+  if (t.includes("upsc")) tags.push("UPSC")
+  if (t.includes("bpsc")) tags.push("BPSC")
+  if (t.includes("uppsc")) tags.push("UPPSC")
+  if (t.includes("mpsc")) tags.push("MPSC")
+  
+  // JEE/NEET
+  if (t.includes("jee main")) tags.push("JEE Main")
+  if (t.includes("jee adv")) tags.push("JEE Advanced")
+  if (t.includes("neet")) tags.push("NEET")
+  
+  // Teaching
+  if (t.includes("ctet")) tags.push("CTET")
+  if (t.includes("uptet")) tags.push("UPTET")
+  if (t.includes("super tet")) tags.push("Super TET")
+  if (t.includes("kvs")) tags.push("KVS")
+  
+  // Police
+  if (t.includes("police")) tags.push("Police")
+  if (t.includes("constable")) tags.push("Constable")
+  
+  // Default tags based on common subjects
+  if (t.includes("gk") || t.includes("general knowledge")) tags.push("GK")
+  if (t.includes("reasoning")) tags.push("Reasoning")
+  if (t.includes("maths") || t.includes("mathematics") || t.includes("quant")) tags.push("Maths")
+  if (t.includes("english")) tags.push("English")
+  if (t.includes("current affairs")) tags.push("Current Affairs")
+  
+  return tags.length > 0 ? tags.slice(0, 3) : ["Practice"]
+}
+
+// ── Auto-fetch platforms (internal use only - names not displayed) ─────────
 const AUTO_PLATFORMS = [
-  { name: "Careerwill", api: "https://careerwillapi.classx.co.in", webBase: "https://careerwill.classx.co.in" },
-  { name: "Exampur",    api: "https://exampurapi.classx.co.in",    webBase: "https://exampur.classx.co.in" },
-  { name: "Adda247",   api: "https://adda247api.classx.co.in",    webBase: "https://adda247.classx.co.in" },
-  { name: "DronsStudy", api: "https://dronstudyapi.classx.co.in", webBase: "https://dronstudy.classx.co.in" },
-  { name: "Mahendras", api: "https://mahendrasapi.classx.co.in",  webBase: "https://mahendras.classx.co.in" },
+  { api: "https://careerwillapi.classx.co.in", webBase: "https://careerwill.classx.co.in" },
+  { api: "https://exampurapi.classx.co.in",    webBase: "https://exampur.classx.co.in" },
+  { api: "https://adda247api.classx.co.in",    webBase: "https://adda247.classx.co.in" },
+  { api: "https://dronstudyapi.classx.co.in",  webBase: "https://dronstudy.classx.co.in" },
+  { api: "https://mahendrasapi.classx.co.in",  webBase: "https://mahendras.classx.co.in" },
+  { api: "https://studyiqapi.classx.co.in",    webBase: "https://studyiq.classx.co.in" },
+  { api: "https://physicswallahapi.classx.co.in", webBase: "https://physicswallah.classx.co.in" },
+  { api: "https://khangsapi.classx.co.in",     webBase: "https://khangs.classx.co.in" },
+  { api: "https://testbookapi.classx.co.in",   webBase: "https://testbook.classx.co.in" },
 ]
 
-const POPULAR_PLATFORMS = [
-  { label: "CareerWill",    search: "Careerwill",   color: "#ef4444", emoji: "🎯" },
-  { label: "Physics Wallah", search: "Physicswallah", color: "#f97316", emoji: "⚡" },
-  { label: "ExamPur",       search: "Exampur",      color: "#3b82f6", emoji: "📚" },
-  { label: "Adda247",       search: "Adda247",      color: "#10b981", emoji: "🏆" },
-  { label: "Dron Study",    search: "Dronstudy",    color: "#8b5cf6", emoji: "🎓" },
-  { label: "StudyIQ",       search: "Studyiq",      color: "#06b6d4", emoji: "🧠" },
-  { label: "Mahendras",     search: "Mahendra",     color: "#ec4899", emoji: "✍️" },
-  { label: "Khan GS",       search: "Khangs",       color: "#f59e0b", emoji: "📝" },
-  { label: "Padhle IAS",    search: "Padhle",       color: "#6366f1", emoji: "⚖️" },
-  { label: "Unacademy",     search: "Unacademy",    color: "#14b8a6", emoji: "🌟" },
-  { label: "Testbook",      search: "Testbook",     color: "#3b82f6", emoji: "📖" },
-  { label: "Vivek Sir",     search: "Vivek",        color: "#ef4444", emoji: "🔥" },
-]
+// Popular exam quick-search tags for the hero section
+const QUICK_SEARCH_TAGS = ["SSC CGL", "IBPS PO", "NDA", "RRB NTPC", "UPSC", "JEE Main", "NEET", "CTET"]
 
 // ── Component ───────────────────────────────────────────────────────────────
 export default function ExtractPage() {
@@ -445,36 +516,38 @@ export default function ExtractPage() {
       setAutoFetching(true)
       const found: (DisplaySeries & { _apiBase: string; _webBase: string; _raw: unknown })[] = []
 
-      await Promise.allSettled(
-        AUTO_PLATFORMS.map(async (platform) => {
-          try {
-            const params = new URLSearchParams({ apiUrl: platform.api, url: platform.webBase })
+await Promise.allSettled(
+  AUTO_PLATFORMS.map(async (platform, idx) => {
+  try {
+  const params = new URLSearchParams({ apiUrl: platform.api, url: platform.webBase })
             const res = await fetch(`/api/extract?${params}`)
             if (!res.ok) return
             const data = await res.json()
-            if (!data.success || data.source === "sample" || !data.testSeries?.length) return
-            const catColor = "#8b5cf6"
-            const mapped = (data.testSeries as Array<{ id?: string | number; title?: string; name?: string; slug?: string; description?: string; total_tests?: number }>)
-              .slice(0, 4)
-              .map((s, i) => ({
-                id: `live-${platform.name}-${s.id || i}`,
-                title: s.title || s.name || `Test Series ${i + 1}`,
-                subtitle: `Live from ${platform.name}`,
-                category: "all" as const,
-                examTags: [platform.name, "LIVE"],
-                totalTests: s.total_tests || 10,
-                totalQuestions: (s.total_tests || 10) * 15,
-                duration: "60 min/test",
-                language: "Hindi + English",
-                slug: s.slug || String(s.id || i),
-                sampleCategory: "ssc-banking",
-                color: catColor,
-                icon: "🎓",
-                badge: "LIVE" as const,
-                _apiBase: data.apiBase || platform.api,
-                _webBase: data.webBase || platform.webBase,
-                _raw: s,
-              }))
+if (!data.success || data.source === "sample" || !data.testSeries?.length) return
+  const mapped = (data.testSeries as Array<{ id?: string | number; title?: string; name?: string; slug?: string; description?: string; total_tests?: number }>)
+  .slice(0, 4)
+  .map((s, i) => {
+  const detectedCat = detectCategory(s.title || s.name || "")
+  return {
+  id: `live-${idx}-${s.id || i}`,
+  title: s.title || s.name || `Test Series ${i + 1}`,
+  subtitle: s.description || "Complete preparation series with practice tests",
+  category: detectedCat,
+  examTags: extractExamTags(s.title || s.name || ""),
+  totalTests: s.total_tests || 10,
+  totalQuestions: (s.total_tests || 10) * 15,
+  duration: "60 min/test",
+  language: "Hindi + English",
+  slug: s.slug || String(s.id || i),
+  sampleCategory: "ssc-banking",
+  color: CAT_COLORS[detectedCat] || "#8b5cf6",
+  icon: "🎓",
+  badge: "LIVE" as const,
+_apiBase: data.apiBase || platform.api,
+  _webBase: data.webBase || platform.webBase,
+  _raw: s,
+  }
+  })
             if (!cancelled) found.push(...mapped)
           } catch { /* blocked/timeout — ignore */ }
         })
@@ -519,53 +592,55 @@ export default function ExtractPage() {
     debounceRef.current = setTimeout(() => searchPlatforms(val), 300)
   }
 
-  const loadPlatform = async (platform: SearchResult) => {
-    setShowDropdown(false)
-    setPlatformQuery(platform.name)
-    setPlatformName(platform.name)
-    setLoading(true)
-    setError("")
-    setNotice("")
-    setLiveSeries(null)
-    setSelectedCat("all")
-
-    try {
-      const params = new URLSearchParams({ apiUrl: platform.api, url: platform.webBase })
-      const res = await fetch(`/api/extract?${params}`)
-      if (!res.ok) throw new Error("Network error")
-      const data = await res.json()
-
-      if (!data.success) {
-        setError(data.error || "Could not extract from this platform.")
-        setLoading(false)
-        return
-      }
-
-      const rawSeries = (data.testSeries || []) as Array<{ id?: string | number; title?: string; name?: string; slug?: string; description?: string; total_tests?: number }>
-      if (data.source === "sample" || rawSeries.length === 0) {
-        setNotice(`Live extraction unavailable for ${platform.name}. Showing practice tests below.`)
-        setLiveSeries(null)
-      } else {
-        const mapped: DisplaySeries[] = rawSeries.map((s, i) => ({
-          id: String(s.id || i),
-          title: s.title || s.name || `Test Series ${i + 1}`,
-          subtitle: s.description || `Practice tests from ${platform.name}`,
-          category: "all",
-          examTags: [platform.name],
-          totalTests: s.total_tests || 10,
-          totalQuestions: (s.total_tests || 10) * 15,
-          duration: "60 min/test",
-          language: "Hindi + English",
-          slug: s.slug || String(s.id || i),
-          sampleCategory: "ssc-banking",
-          color: "#8b5cf6",
-          icon: "🎓",
-          _raw: s,
-          _apiBase: data.apiBase,
-          _webBase: data.webBase,
-        } as DisplaySeries & { _raw: typeof s; _apiBase: string; _webBase: string }))
-        setLiveSeries(mapped)
-      }
+const loadPlatform = async (platform: SearchResult) => {
+  setShowDropdown(false)
+  setPlatformQuery("")
+  setPlatformName("Loading Tests")
+  setLoading(true)
+  setError("")
+  setNotice("")
+  setLiveSeries(null)
+  setSelectedCat("all")
+  
+  try {
+  const params = new URLSearchParams({ apiUrl: platform.api, url: platform.webBase })
+  const res = await fetch(`/api/extract?${params}`)
+  if (!res.ok) throw new Error("Network error")
+  const data = await res.json()
+  
+  if (!data.success) {
+  setError("Could not load test series. Try another search.")
+  setLoading(false)
+  return
+  }
+  
+  const rawSeries = (data.testSeries || []) as Array<{ id?: string | number; title?: string; name?: string; slug?: string; description?: string; total_tests?: number }>
+  if (data.source === "sample" || rawSeries.length === 0) {
+  setNotice("Live extraction unavailable. Showing practice tests below.")
+  setLiveSeries(null)
+  } else {
+  const mapped: DisplaySeries[] = rawSeries.map((s, i) => ({
+  id: String(s.id || i),
+  title: s.title || s.name || `Test Series ${i + 1}`,
+  subtitle: s.description || "Complete preparation with mock tests",
+  category: detectCategory(s.title || s.name || ""),
+  examTags: extractExamTags(s.title || s.name || ""),
+  totalTests: s.total_tests || 10,
+  totalQuestions: (s.total_tests || 10) * 15,
+  duration: "60 min/test",
+  language: "Hindi + English",
+  slug: s.slug || String(s.id || i),
+  sampleCategory: "ssc-banking",
+  color: CAT_COLORS[detectCategory(s.title || s.name || "")] || "#8b5cf6",
+  icon: "🎓",
+  badge: "LIVE" as const,
+  _raw: s,
+  _apiBase: data.apiBase,
+  _webBase: data.webBase,
+  } as DisplaySeries & { _raw: typeof s; _apiBase: string; _webBase: string }))
+  setPlatformName(`${mapped.length} Test Series`)
+  setLiveSeries(mapped)
+  }
     } catch {
       setError("Network error. Please try again.")
     } finally {
@@ -671,7 +746,7 @@ export default function ExtractPage() {
             <div className="flex items-center gap-2 mb-3">
               <div className="flex items-center gap-1.5 bg-yellow-400/20 border border-yellow-400/30 rounded-full px-3 py-1">
                 <Zap className="h-3.5 w-3.5 text-yellow-300" />
-                <span className="text-xs font-bold text-yellow-200 uppercase tracking-wider">AppX Test Extractor</span>
+                <span className="text-xs font-bold text-yellow-200 uppercase tracking-wider">Free Test Series</span>
               </div>
             </div>
 
@@ -680,13 +755,13 @@ export default function ExtractPage() {
               <span className="text-yellow-300">.</span>
             </h1>
             <p className="text-violet-100 text-base md:text-lg mb-8 max-w-2xl">
-              Practice from 9,000+ coaching platform test series — SSC, Banking, NDA, Railways, UPSC, JEE/NEET & more. No login needed.
+              Practice unlimited mock tests for SSC, Banking, NDA, Railways, UPSC, JEE/NEET & more. No login needed for free tests.
             </p>
 
             {/* Stats row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
               {[
-                { icon: BookOpen, label: "9,000+ Platforms", value: "9K+" },
+                { icon: BookOpen, label: "Exam Categories", value: "10+" },
                 { icon: FileText, label: "Series Available", value: `${totalSeries}+` },
                 { icon: BarChart2, label: "Total Tests", value: `${totalTests}+` },
                 { icon: CheckCircle, label: "Free Access", value: "100%" },
@@ -712,7 +787,7 @@ export default function ExtractPage() {
                   value={platformQuery}
                   onChange={e => handlePlatformChange(e.target.value)}
                   onFocus={() => platformResults.length > 0 && setShowDropdown(true)}
-                  placeholder="Search AppX platform e.g. CareerWill, Adda247..."
+                  placeholder="Search for more test series (SSC, Banking, NDA...)"
                   className="pl-11 pr-10 h-13 text-base bg-white text-gray-900 border-0 shadow-xl rounded-xl"
                   style={{ height: "52px" }}
                   disabled={loading}
@@ -725,26 +800,26 @@ export default function ExtractPage() {
                   </button>
                 )}
               </div>
-              {showDropdown && platformResults.length > 0 && !loading && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
-                  {platformResults.map((r, i) => (
-                    <button
-                      key={i}
-                      className="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors border-b border-gray-100 last:border-0 flex items-center gap-3"
-                      onClick={() => loadPlatform(r)}
-                    >
-                      <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                        <GraduationCap className="h-4 w-4 text-violet-600" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm text-gray-800">{r.name}</p>
-                        <p className="text-xs text-gray-500">{r.webBase.replace("https://", "")}</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
-                    </button>
-                  ))}
-                </div>
-              )}
+{showDropdown && platformResults.length > 0 && !loading && (
+  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+  {platformResults.map((r, i) => (
+  <button
+  key={i}
+  className="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors border-b border-gray-100 last:border-0 flex items-center gap-3"
+  onClick={() => loadPlatform(r)}
+  >
+  <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+  <GraduationCap className="h-4 w-4 text-violet-600" />
+  </div>
+  <div>
+  <p className="font-semibold text-sm text-gray-800">Test Series Available</p>
+  <p className="text-xs text-gray-500">Click to load {platformResults.length > 1 ? `${i + 1} of ${platformResults.length}` : ''} tests</p>
+  </div>
+  <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
+  </button>
+  ))}
+  </div>
+  )}
               {showDropdown && platformQuery.length >= 2 && platformResults.length === 0 && !platformLoading && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-gray-400" />
@@ -776,7 +851,7 @@ export default function ExtractPage() {
                 <Loader2 className="h-5 w-5 text-violet-600 animate-spin flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-violet-700">Loading {platformName}...</p>
-                  <p className="text-sm text-violet-600">Fetching test series from AppX platform</p>
+                  <p className="text-sm text-violet-600">Loading test series...</p>
                 </div>
               </div>
             )}
@@ -801,22 +876,22 @@ export default function ExtractPage() {
           </div>
         )}
 
-        {/* ── Platform header when live data loaded ── */}
-        {platformName && liveSeries && (
-          <div className="max-w-6xl mx-auto px-4 mt-4 flex items-center justify-between bg-violet-50 border border-violet-200 rounded-xl p-4">
-            <div>
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-violet-600" />
-                {platformName} Test Series
-                <span className="text-xs font-normal text-green-600 bg-green-100 border border-green-200 rounded-full px-2 py-0.5">LIVE</span>
-              </h2>
-              <p className="text-sm text-muted-foreground">{liveSeries.length} series found</p>
-            </div>
-            <button onClick={clearPlatform} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors border border-border rounded-lg px-3 py-1.5 bg-background">
-              <X className="h-3.5 w-3.5" /> Clear
-            </button>
-          </div>
-        )}
+{/* ── Live data header ── */}
+  {liveSeries && liveSeries.length > 0 && (
+  <div className="max-w-6xl mx-auto px-4 mt-4 flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-4">
+  <div>
+  <h2 className="text-lg font-bold flex items-center gap-2">
+  <GraduationCap className="h-5 w-5 text-green-600" />
+  Live Test Series Found
+  <span className="text-xs font-normal text-green-600 bg-green-100 border border-green-200 rounded-full px-2 py-0.5">LIVE</span>
+  </h2>
+  <p className="text-sm text-muted-foreground">{liveSeries.length} test series available</p>
+  </div>
+  <button onClick={clearPlatform} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors border border-border rounded-lg px-3 py-1.5 bg-background">
+  <X className="h-3.5 w-3.5" /> Clear Search
+  </button>
+  </div>
+  )}
 
         {/* ── Recently Viewed ── */}
         {recentlyViewed.length > 0 && !liveSeries && !searchQuery && (
@@ -921,7 +996,7 @@ export default function ExtractPage() {
           {autoFetching && !liveSeries && (
             <div className="flex items-center gap-2 mb-4 px-1 text-sm text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />
-              <span>Checking live AppX platforms...</span>
+              <span>Loading more test series...</span>
             </div>
           )}
           {!autoFetching && autoLiveSeries.length > 0 && !liveSeries && (
@@ -968,52 +1043,22 @@ export default function ExtractPage() {
           )}
         </div>
 
-        {/* ── Popular Platforms Quick Access ── */}
-        {!liveSeries && !platformName && (
+        {/* ── How it Works Section ── */}
+        {!liveSeries && (
           <section className="bg-muted/30 border-t border-border py-10 px-4 mt-2">
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center gap-2 mb-2">
                 <Flame className="h-5 w-5 text-orange-500" />
-                <h2 className="text-xl font-bold">Popular AppX Platforms</h2>
-                <span className="ml-auto text-sm text-muted-foreground">9,000+ platforms available</span>
+                <h2 className="text-xl font-bold">How to Practice</h2>
               </div>
-              <p className="text-sm text-muted-foreground mb-5">Click any platform to instantly load their live test series</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {POPULAR_PLATFORMS.map(p => (
-                  <button
-                    key={p.label}
-                    onClick={async () => {
-                      setPlatformQuery(p.label)
-                      try {
-                        const res = await fetch(`/api/extract/search?q=${encodeURIComponent(p.search)}`)
-                        if (!res.ok) throw new Error("failed")
-                        const data = await res.json()
-                        const first = data.results?.[0]
-                        if (first) loadPlatform(first)
-                      } catch {
-                        setError(`Could not load ${p.label}. Try searching manually.`)
-                      }
-                    }}
-                    disabled={loading}
-                    className="flex items-center gap-2.5 p-3 rounded-xl border border-border bg-background hover:shadow-lg transition-all text-left group hover:border-transparent hover:-translate-y-0.5 duration-200"
-                  >
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg shadow-sm"
-                      style={{ backgroundColor: `${p.color}15`, border: `1.5px solid ${p.color}30` }}
-                    >
-                      {p.emoji}
-                    </div>
-                    <span className="text-sm font-semibold truncate group-hover:text-violet-600 transition-colors">{p.label}</span>
-                  </button>
-                ))}
-              </div>
-
+              <p className="text-sm text-muted-foreground mb-5">Start practicing with our vast collection of mock tests</p>
+              
               {/* How it works */}
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { step: "1", icon: Search, title: "Search Platform", desc: "Type any coaching platform name or click a popular one above" },
-                  { step: "2", icon: FileText, title: "Pick a Series", desc: "Browse their test series and click Attempt Now" },
-                  { step: "3", icon: Zap, title: "Start Practicing", desc: "Questions load instantly — no login required for sample tests" },
+                  { step: "1", icon: BookOpen, title: "Select Category", desc: "Choose from SSC, Banking, Railways, NDA, UPSC and more exam categories" },
+                  { step: "2", icon: FileText, title: "Pick a Test Series", desc: "Browse test series and click Attempt Now to start" },
+                  { step: "3", icon: Zap, title: "Start Practicing", desc: "Questions load instantly — practice as much as you want!" },
                 ].map(s => (
                   <div key={s.step} className="flex gap-3 p-4 rounded-xl bg-background border border-border">
                     <div className="w-8 h-8 rounded-full bg-violet-600 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">

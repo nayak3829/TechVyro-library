@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true, testSeries, source: "sample",
       apiBase: directApiUrl, webBase: inputUrl || "",
-      notice: "Showing sample practice tests for this platform.",
+      notice: "Showing sample practice tests.",
     })
   }
 
@@ -181,6 +181,6 @@ export async function GET(request: Request) {
     source: "sample",
     apiBase: `sample:${category}`,
     webBase: webUrl,
-    notice: "Live extraction unavailable for this platform. Showing sample practice tests.",
+    notice: "Showing sample practice tests.",
   })
 }

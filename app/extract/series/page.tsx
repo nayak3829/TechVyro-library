@@ -202,7 +202,7 @@ function SeriesContent() {
               <div className="text-center py-16">
                 <FileText className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
                 <p className="text-lg font-medium">No tests found</p>
-                <p className="text-muted-foreground text-sm">This test series may require authentication on the source website.</p>
+                <p className="text-muted-foreground text-sm">This test series is currently unavailable. Try another series.</p>
               </div>
             )}
           </>

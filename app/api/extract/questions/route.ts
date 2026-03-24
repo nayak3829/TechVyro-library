@@ -224,7 +224,7 @@ export async function GET(request: Request) {
       success: true,
       questions: fallbackTest.questions,
       total: fallbackTest.questions.length,
-      notice: "Sample questions shown — actual questions require login on the source platform.",
+      notice: "Showing sample practice questions.",
     })
   }
 

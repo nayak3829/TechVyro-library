@@ -69,7 +69,7 @@ function PlayContent() {
       }
 
       if (!data.questions || data.questions.length === 0) {
-        setError("No questions found. This test may be empty or require login on the source platform.")
+        setError("No questions found. This test may be empty or under maintenance.")
         return
       }
 
@@ -115,7 +115,7 @@ function PlayContent() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-6">
-            Note: Some tests require authentication on the source website and cannot be extracted.
+            Note: Some tests may be temporarily unavailable. Please try another test.
           </p>
         </div>
       </div>
