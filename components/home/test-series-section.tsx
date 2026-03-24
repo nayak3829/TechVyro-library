@@ -27,6 +27,7 @@ interface TestSeries {
   isSample?: boolean
   _sourceApi?: string
   _sourceWeb?: string
+  _platformName?: string
 }
 
 const CATEGORIES = [
@@ -34,8 +35,10 @@ const CATEGORIES = [
   { id: "banking", label: "Banking", icon: TrendingUp, color: "#10b981" },
   { id: "defence", label: "Defence", icon: Shield, color: "#ef4444" },
   { id: "railways", label: "Railways", icon: Train, color: "#f97316" },
-  { id: "upsc", label: "UPSC", icon: BookOpen, color: "#8b5cf6" },
+  { id: "upsc", label: "UPSC/PCS", icon: BookOpen, color: "#8b5cf6" },
   { id: "jee-neet", label: "JEE/NEET", icon: Atom, color: "#06b6d4" },
+  { id: "teaching", label: "CTET/TET", icon: GraduationCap, color: "#ec4899" },
+  { id: "agriculture", label: "Agriculture", icon: GraduationCap, color: "#84cc16" },
 ]
 
 // Fallback data when API fails
@@ -82,35 +85,28 @@ export function TestSeriesSection() {
   const fetchTestSeries = useCallback(async () => {
     setLoading(true)
     try {
-      // Fetch from multiple categories in parallel for home page overview
-      const categories = ["ssc", "banking", "defence", "railways"]
-      const results = await Promise.allSettled(
-        categories.map(cat => 
-          fetch(`/api/extract?bulk=true&category=${cat}`)
-            .then(r => r.json())
-            .then(data => ({ category: cat, series: data.testSeries || [] }))
-        )
-      )
-
-      const allSeries: TestSeries[] = []
-      const counts: Record<string, number> = {}
-
-      for (const result of results) {
-        if (result.status === "fulfilled" && result.value.series.length > 0) {
-          counts[result.value.category] = result.value.series.length
-          // Take top 2 from each category for home page
-          allSeries.push(...result.value.series.slice(0, 2).map((s: TestSeries) => ({
-            ...s,
-            category: result.value.category,
-          })))
+      // Fetch ALL test series from all platforms
+      const res = await fetch(`/api/extract?bulk=true&category=all`)
+      const data = await res.json()
+      
+      if (data.success && data.testSeries?.length > 0) {
+        // Get unique categories and count series per category
+        const counts: Record<string, number> = {}
+        const allSeries = data.testSeries as TestSeries[]
+        
+        for (const series of allSeries) {
+          const cat = series.category || "general"
+          counts[cat] = (counts[cat] || 0) + 1
         }
-      }
-
-      if (allSeries.length > 0) {
-        setTestSeries(allSeries.slice(0, 4)) // Show max 4 on home page
+        
+        // Take top 8 series for home page (mix of live and sample)
+        const liveSeries = allSeries.filter((s: TestSeries) => !s.isSample).slice(0, 6)
+        const sampleSeries = allSeries.filter((s: TestSeries) => s.isSample).slice(0, 2)
+        
+        setTestSeries([...liveSeries, ...sampleSeries].slice(0, 8))
         setCategoryCounts(counts)
       } else {
-        // Use fallback if no live data
+        // Use fallback if no data
         setTestSeries(FALLBACK_SERIES)
         setCategoryCounts({ ssc: 6, banking: 7, defence: 5, railways: 4, upsc: 4, "jee-neet": 3 })
       }
@@ -180,8 +176,8 @@ export function TestSeriesSection() {
 
         {/* Loading State */}
         {loading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-            {[1, 2, 3, 4].map(i => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
               <Card key={i} className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <Skeleton className="h-10 w-10 rounded-xl" />
@@ -197,7 +193,7 @@ export function TestSeriesSection() {
 
         {/* Test Series Grid */}
         {!loading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
             {testSeries.map((series, idx) => {
               const color = getCategoryColor(series.category)
               const Icon = getCategoryIcon(series.category)
@@ -223,21 +219,32 @@ export function TestSeriesSection() {
                         >
                           {series.category?.toUpperCase() || "GENERAL"}
                         </Badge>
-                        {series.isSample && (
+                        {series.isSample ? (
                           <Badge className="text-[9px] sm:text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20 py-0.5 px-1.5">
                             SAMPLE
+                          </Badge>
+                        ) : (
+                          <Badge className="text-[9px] sm:text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20 py-0.5 px-1.5">
+                            LIVE
                           </Badge>
                         )}
                       </div>
                     </div>
 
                     {/* Title */}
-                    <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 group-hover:text-violet-600 transition-colors mb-1.5 sm:mb-2">
+                    <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 group-hover:text-violet-600 transition-colors mb-1">
                       {series.title}
                     </h3>
+                    
+                    {/* Platform Name */}
+                    {series._platformName && (
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground truncate mb-1.5">
+                        {series._platformName}
+                      </p>
+                    )}
 
                     {/* Description */}
-                    {series.description && (
+                    {series.description && !series._platformName && (
                       <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2 mb-2">
                         {series.description}
                       </p>

@@ -100,14 +100,17 @@ function cleanDescription(desc: string): string {
 
 function detectCategoryFromTitle(title: string): string {
   const t = title.toLowerCase()
-  if (t.includes("ssc") || t.includes("cgl") || t.includes("chsl") || t.includes("mts")) return "ssc"
-  if (t.includes("bank") || t.includes("ibps") || t.includes("sbi") || t.includes("rbi")) return "banking"
-  if (t.includes("nda") || t.includes("cds") || t.includes("defence") || t.includes("army")) return "defence"
-  if (t.includes("railway") || t.includes("rrb") || t.includes("ntpc")) return "railways"
-  if (t.includes("upsc") || t.includes("ias") || t.includes("pcs")) return "upsc"
-  if (t.includes("jee") || t.includes("neet") || t.includes("physics")) return "jee-neet"
-  if (t.includes("ctet") || t.includes("teacher") || t.includes("tet")) return "teaching"
-  if (t.includes("police") || t.includes("constable")) return "police"
+  if (t.includes("ssc") || t.includes("cgl") || t.includes("chsl") || t.includes("mts") || t.includes("gd") || t.includes("stenographer")) return "ssc"
+  if (t.includes("bank") || t.includes("ibps") || t.includes("sbi") || t.includes("rbi") || t.includes("clerk") || t.includes("po exam")) return "banking"
+  if (t.includes("nda") || t.includes("cds") || t.includes("defence") || t.includes("army") || t.includes("navy") || t.includes("airforce") || t.includes("agniveer")) return "defence"
+  if (t.includes("railway") || t.includes("rrb") || t.includes("ntpc") || t.includes("alp") || t.includes("group d")) return "railways"
+  if (t.includes("upsc") || t.includes("ias") || t.includes("pcs") || t.includes("civil service") || t.includes("mpsc") || t.includes("bpsc") || t.includes("uppsc")) return "upsc"
+  if (t.includes("jee") || t.includes("neet") || t.includes("physics") || t.includes("chemistry") || t.includes("biology") || t.includes("medical") || t.includes("engineering entrance")) return "jee-neet"
+  if (t.includes("ctet") || t.includes("teacher") || t.includes("tet") || t.includes("b.ed") || t.includes("bed") || t.includes("kvs") || t.includes("nvs") || t.includes("dsssb")) return "teaching"
+  if (t.includes("police") || t.includes("constable") || t.includes("si exam") || t.includes("sub inspector")) return "police"
+  if (t.includes("agriculture") || t.includes("agri") || t.includes("krishi") || t.includes("farming")) return "agriculture"
+  if (t.includes("gate") || t.includes("ese") || t.includes("isro") || t.includes("drdo")) return "engineering"
+  if (t.includes("law") || t.includes("clat") || t.includes("judiciary") || t.includes("legal")) return "law"
   return "general"
 }
 
@@ -195,11 +198,10 @@ export async function GET(request: Request) {
   const category = searchParams.get("category")?.trim()
 
   // Bulk mode: fetch from APX platforms and return test series
-  if (bulkMode && category) {
+  if (bulkMode) {
     // Get sample series for this category as base
-    const sampleSeries = getSampleSeriesForCategory(category)
-    const allSampleSeries = getAllSampleSeries()
-    const baseSeries = sampleSeries.length > 0 ? sampleSeries : allSampleSeries
+    const sampleSeries = category ? getSampleSeriesForCategory(category) : getAllSampleSeries()
+    const baseSeries = sampleSeries.length > 0 ? sampleSeries : getAllSampleSeries()
     
     // Format sample series
     const formattedSamples = baseSeries.map(s => ({
@@ -211,19 +213,19 @@ export async function GET(request: Request) {
       total_questions: s.tests.reduce((acc, t) => acc + (t.questions?.length || 5), 0),
       duration: s.tests[0]?.duration || 60,
       is_free: true,
-      category: s.category || category,
+      category: s.category || category || "general",
       isSample: true,
       _sourceApi: `sample:${s.category}`,
       _sourceWeb: "",
     }))
 
-    // Try to fetch LIVE data from APX platforms by scraping their websites
+    // Try to fetch LIVE data from ALL APX platforms
     // APX platforms use Next.js and store data in __NEXT_DATA__ script tag
     const liveSeries: unknown[] = []
     
-    // Select random platforms to try
+    // Fetch from MORE platforms (30-50) for better coverage
     const shuffledPlatforms = [...PLATFORM_LIST].sort(() => Math.random() - 0.5)
-    const platformsToTry = shuffledPlatforms.slice(0, 10)
+    const platformsToTry = shuffledPlatforms.slice(0, 50) // Increased to 50 platforms
 
     // Fetch from platforms in parallel - try both API and web scraping
     const fetchPromises = platformsToTry.map(async (platform) => {
@@ -235,15 +237,15 @@ export async function GET(request: Request) {
         const webPaths = ["/test-series/", "/test-series", "/courses/", "/"]
         for (const path of webPaths) {
           try {
-            const res = await fetchWithTimeout(`${webUrl}${path}`, { headers: HEADERS }, 5000)
+            const res = await fetchWithTimeout(`${webUrl}${path}`, { headers: HEADERS }, 4000)
             if (res.ok) {
               const html = await res.text()
               const nextData = extractNextData(html)
               if (nextData) {
                 const series = findTestSeries(nextData)
                 if (series.length > 0) {
-                  console.log(`[v0] Found ${series.length} series from ${webUrl}${path}`)
-                  return series.slice(0, 5).map(s => ({
+                  // Return all series (up to 10 per platform)
+                  return series.slice(0, 10).map(s => ({
                     ...(s as object),
                     _sourceApi: platform.api,
                     _sourceWeb: webUrl,
@@ -266,13 +268,12 @@ export async function GET(request: Request) {
         ]
         for (const endpoint of apiEndpoints) {
           try {
-            const res = await fetchWithTimeout(`${platform.api}${endpoint}`, { headers: HEADERS }, 5000)
+            const res = await fetchWithTimeout(`${platform.api}${endpoint}`, { headers: HEADERS }, 4000)
             if (res.ok) {
               const json = await res.json()
               const series = findTestSeries(json)
               if (series.length > 0) {
-                console.log(`[v0] Found ${series.length} series from API ${platform.api}${endpoint}`)
-                return series.slice(0, 5).map(s => ({
+                return series.slice(0, 10).map(s => ({
                   ...(s as object),
                   _sourceApi: platform.api,
                   _sourceWeb: webUrl,
@@ -285,8 +286,8 @@ export async function GET(request: Request) {
             // Try next endpoint
           }
         }
-      } catch (err) {
-        console.log(`[v0] Failed to fetch from ${platform.name}:`, err)
+      } catch {
+        // Failed to fetch
       }
       return []
     })
@@ -298,15 +299,27 @@ export async function GET(request: Request) {
       }
     }
 
-    // If we got live data, clean and combine with samples
-    if (liveSeries.length > 0) {
-      const cleanedLive = cleanSeriesData(liveSeries)
+    // Clean and filter by category if specified
+    let cleanedLive = cleanSeriesData(liveSeries)
+    
+    // Filter by category if specified (not "all")
+    if (category && category !== "all") {
+      cleanedLive = cleanedLive.filter((s: unknown) => {
+        const series = s as { category?: string; title?: string }
+        return series.category === category || 
+               detectCategoryFromTitle(series.title || "") === category
+      })
+    }
+
+    // If we got live data, combine with samples
+    if (cleanedLive.length > 0) {
       return NextResponse.json({
         success: true,
         testSeries: [...cleanedLive, ...formattedSamples],
         source: "apx-live",
         count: cleanedLive.length + formattedSamples.length,
         liveCount: cleanedLive.length,
+        platformsChecked: platformsToTry.length,
       })
     }
 
