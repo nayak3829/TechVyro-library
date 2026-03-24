@@ -11,6 +11,7 @@ import {
   Shield, Train, TrendingUp, Atom, Users, CheckCircle,
   ChevronDown, SlidersHorizontal, Award, BarChart2,
   Flame, ArrowUpDown, History, RefreshCw, AlertCircle,
+  Shuffle, Target, Trophy, Sparkles, Filter,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -502,10 +503,27 @@ const AUTO_PLATFORMS = [
 // Popular exam quick-search tags for the hero section
 const QUICK_SEARCH_TAGS = ["SSC CGL", "IBPS PO", "NDA", "RRB NTPC", "UPSC", "JEE Main", "NEET", "CTET"]
 
+// ── Animated counter hook ────────────────────────────────────────────────────
+function useCountUp(target: number, duration = 1500) {
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    let start = 0
+    const step = Math.ceil(target / (duration / 16))
+    const timer = setInterval(() => {
+      start += step
+      if (start >= target) { setCount(target); clearInterval(timer) }
+      else setCount(start)
+    }, 16)
+    return () => clearInterval(timer)
+  }, [target, duration])
+  return count
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 export default function ExtractPage() {
   const router = useRouter()
   const [selectedCat, setSelectedCat] = useState("all")
+  const [difficultyFilter, setDifficultyFilter] = useState<"all" | "Easy" | "Medium" | "Hard">("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState<"default" | "tests" | "questions" | "difficulty">("default")
   const [platformQuery, setPlatformQuery] = useState("")
@@ -522,15 +540,19 @@ export default function ExtractPage() {
   const [showAll, setShowAll] = useState(false)
   const [recentlyViewed, setRecentlyViewed] = useState<DisplaySeries[]>([])
   const [chunkError, setChunkError] = useState(false)
+  const [attemptedMap, setAttemptedMap] = useState<Record<string, number>>({})
+  const [showRandomModal, setShowRandomModal] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  // Load recently viewed from localStorage
+  // Load recently viewed + attempted map from localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem("techvyro_recently_viewed")
       if (stored) setRecentlyViewed(JSON.parse(stored).slice(0, 6))
+      const attempted = localStorage.getItem("techvyro_attempted")
+      if (attempted) setAttemptedMap(JSON.parse(attempted))
     } catch { /* ignore */ }
   }, [])
 
@@ -709,12 +731,16 @@ const loadPlatform = async (platform: SearchResult) => {
   }
 
   const goToSeries = (series: DisplaySeries & { _raw?: unknown; _apiBase?: string; _webBase?: string }) => {
-    // Save to recently viewed
+    // Save to recently viewed + track attempts
     try {
       const stored = JSON.parse(localStorage.getItem("techvyro_recently_viewed") || "[]") as DisplaySeries[]
       const updated = [series, ...stored.filter(s => s.id !== series.id)].slice(0, 6)
       localStorage.setItem("techvyro_recently_viewed", JSON.stringify(updated))
       setRecentlyViewed(updated)
+      const attempted = JSON.parse(localStorage.getItem("techvyro_attempted") || "{}")
+      attempted[series.id] = (attempted[series.id] || 0) + 1
+      localStorage.setItem("techvyro_attempted", JSON.stringify(attempted))
+      setAttemptedMap({ ...attempted })
     } catch { /* ignore */ }
 
     if (series._raw && series._apiBase) {
@@ -758,7 +784,8 @@ const loadPlatform = async (platform: SearchResult) => {
     const catMatch = selectedCat === "all" || s.category === selectedCat
     const qMatch = !searchQuery || s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.examTags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
-    return catMatch && qMatch
+    const diffMatch = difficultyFilter === "all" || s.difficulty === difficultyFilter
+    return catMatch && qMatch && diffMatch
   })
 
   const sorted = [...filtered].sort((a, b) => {
@@ -777,6 +804,19 @@ const loadPlatform = async (platform: SearchResult) => {
   // Stats
   const totalTests = SERIES_LIBRARY.reduce((s, x) => s + x.totalTests, 0)
   const totalSeries = SERIES_LIBRARY.length
+  const catCount = useCountUp(10)
+  const seriesCount = useCountUp(totalSeries + autoLiveSeries.length)
+  const testsCount = useCountUp(totalTests)
+
+  // Pick a random series
+  const pickRandomSeries = () => {
+    const pool = sorted.length > 0 ? sorted : SERIES_LIBRARY
+    const random = pool[Math.floor(Math.random() * pool.length)]
+    if (random) goToSeries(random as DisplaySeries & { _raw?: unknown; _apiBase?: string; _webBase?: string })
+  }
+
+  // Featured series (badge=HOT or POPULAR)
+  const featuredSeries = SERIES_LIBRARY.filter(s => s.badge === "HOT" || s.badge === "POPULAR").slice(0, 4)
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -818,18 +858,18 @@ const loadPlatform = async (platform: SearchResult) => {
               Practice unlimited mock tests for SSC, Banking, NDA, Railways, UPSC, JEE/NEET & more. No login needed for free tests.
             </p>
 
-            {/* Stats row */}
+            {/* Stats row - animated counters */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
               {[
-                { icon: BookOpen, label: "Exam Categories", value: "10+" },
-                { icon: FileText, label: "Series Available", value: `${totalSeries}+` },
-                { icon: BarChart2, label: "Total Tests", value: `${totalTests}+` },
-                { icon: CheckCircle, label: "Free Access", value: "100%" },
-              ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 backdrop-blur-sm">
+                { icon: BookOpen, label: "Exam Categories", value: `${catCount}+`, color: "text-yellow-300" },
+                { icon: FileText, label: "Series Available", value: `${seriesCount}+`, color: "text-green-300" },
+                { icon: BarChart2, label: "Total Tests", value: `${testsCount}+`, color: "text-blue-300" },
+                { icon: CheckCircle, label: "Free Access", value: "100%", color: "text-pink-300" },
+              ].map(({ icon: Icon, label, value, color }) => (
+                <div key={label} className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 backdrop-blur-sm hover:bg-white/15 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
-                    <Icon className="h-4 w-4 text-yellow-300" />
-                    <span className="text-xl font-bold">{value}</span>
+                    <Icon className={`h-4 w-4 ${color}`} />
+                    <span className="text-xl font-bold tabular-nums">{value}</span>
                   </div>
                   <p className="text-xs text-violet-200">{label}</p>
                 </div>
@@ -1034,28 +1074,58 @@ const loadPlatform = async (platform: SearchResult) => {
 
           {/* Category tabs */}
           {!liveSeries && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-1">
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => { setSelectedCat(cat.id); setShowAll(false) }}
-                  className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border ${
-                    selectedCat === cat.id
-                      ? "text-white border-transparent shadow-md"
-                      : "bg-background text-foreground border-border hover:border-violet-400 hover:text-violet-600"
-                  }`}
-                  style={selectedCat === cat.id ? { backgroundColor: cat.color, boxShadow: `0 4px 14px ${cat.color}40` } : {}}
-                >
-                  <span>{cat.icon}</span>
-                  <span>{cat.label}</span>
-                  {selectedCat === cat.id && (
-                    <span className="text-[10px] bg-white/25 rounded-full px-1.5 py-0.5">
-                      {SERIES_LIBRARY.filter(s => cat.id === "all" || s.category === cat.id).length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
+                {CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => { setSelectedCat(cat.id); setShowAll(false) }}
+                    className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border ${
+                      selectedCat === cat.id
+                        ? "text-white border-transparent shadow-md"
+                        : "bg-background text-foreground border-border hover:border-violet-400 hover:text-violet-600"
+                    }`}
+                    style={selectedCat === cat.id ? { backgroundColor: cat.color, boxShadow: `0 4px 14px ${cat.color}40` } : {}}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    {selectedCat === cat.id && (
+                      <span className="text-[10px] bg-white/25 rounded-full px-1.5 py-0.5">
+                        {SERIES_LIBRARY.filter(s => cat.id === "all" || s.category === cat.id).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {/* Difficulty filter row */}
+              <div className="flex items-center gap-2 mb-5 flex-wrap">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mr-1">
+                  <Filter className="h-3.5 w-3.5" />
+                  <span>Difficulty:</span>
+                </div>
+                {(["all", "Easy", "Medium", "Hard"] as const).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => { setDifficultyFilter(d); setShowAll(false) }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                      difficultyFilter === d
+                        ? d === "all" ? "bg-violet-600 text-white border-violet-600"
+                          : d === "Easy" ? "bg-green-600 text-white border-green-600"
+                          : d === "Medium" ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-red-500 text-white border-red-500"
+                        : "bg-background border-border text-muted-foreground hover:border-violet-400"
+                    }`}
+                  >
+                    {d === "all" ? "All Levels" : d}
+                  </button>
+                ))}
+                {difficultyFilter !== "all" && (
+                  <span className="text-xs text-muted-foreground ml-1">
+                    {sorted.length} results
+                  </span>
+                )}
+              </div>
+            </>
           )}
 
           {/* Auto-fetch status */}
@@ -1072,26 +1142,98 @@ const loadPlatform = async (platform: SearchResult) => {
             </div>
           )}
 
+          {/* Recently Viewed section */}
+          {!liveSeries && recentlyViewed.length > 0 && !searchQuery && (
+            <div className="mb-7">
+              <div className="flex items-center gap-2 mb-3">
+                <History className="h-4 w-4 text-violet-500" />
+                <h2 className="text-sm font-bold text-foreground">Recently Viewed</h2>
+              </div>
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {recentlyViewed.map(s => {
+                  const catColor = CAT_COLORS[s.category] || s.color || "#8b5cf6"
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => goToSeries(s as DisplaySeries & { _raw?: unknown; _apiBase?: string; _webBase?: string })}
+                      className="shrink-0 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-card hover:shadow-md hover:border-violet-300 transition-all text-left min-w-[200px] max-w-[240px]"
+                    >
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-lg" style={{ backgroundColor: `${catColor}15` }}>
+                        {s.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold line-clamp-1 text-foreground">{s.title}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{s.totalTests} tests · {s.difficulty}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Featured / Trending section */}
+          {!liveSeries && selectedCat === "all" && !searchQuery && difficultyFilter === "all" && featuredSeries.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <Trophy className="h-4 w-4 text-amber-500" />
+                <h2 className="text-sm font-bold text-foreground">Trending Series</h2>
+                <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-semibold">TOP PICKS</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {featuredSeries.map(series => {
+                  const catColor = CAT_COLORS[series.category] || series.color || "#8b5cf6"
+                  return (
+                    <button
+                      key={series.id}
+                      onClick={() => goToSeries(series)}
+                      className="group text-left p-3.5 rounded-xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">{series.icon}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                          {series.badge === "HOT" ? "🔥 HOT" : "⭐ POPULAR"}
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold line-clamp-2 group-hover:text-violet-600 transition-colors" style={{ color: catColor }}>{series.title}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{series.totalTests} tests · {series.duration}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Series grid */}
           {!loading && sorted.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <BookOpen className="h-16 w-16 text-muted-foreground/30 mb-4" />
               <p className="text-lg font-semibold">No mock tests found</p>
-              <p className="text-muted-foreground text-sm mt-1">Try a different category or search term</p>
-              <button onClick={() => { setSearchQuery(""); setSelectedCat("all") }} className="mt-4 text-sm text-violet-600 underline">Clear filters</button>
+              <p className="text-muted-foreground text-sm mt-1">Try a different category, difficulty, or search term</p>
+              <button onClick={() => { setSearchQuery(""); setSelectedCat("all"); setDifficultyFilter("all") }} className="mt-4 text-sm text-violet-600 underline">Clear all filters</button>
             </div>
           )}
 
           {!loading && visible.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visible.map((series) => (
-                <SeriesCard
-                  key={series.id}
-                  series={series}
-                  searchQuery={searchQuery}
-                  onStart={() => goToSeries(series as DisplaySeries & { _raw?: unknown; _apiBase?: string; _webBase?: string })}
-                />
-              ))}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="h-4 w-4 text-violet-500" />
+                <h2 className="text-sm font-bold text-foreground">
+                  {searchQuery ? `Results for "${searchQuery}"` : selectedCat !== "all" ? `${CATEGORIES.find(c => c.id === selectedCat)?.label} Series` : "All Mock Test Series"}
+                </h2>
+                <span className="text-xs text-muted-foreground ml-auto">{sorted.length} series</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {visible.map((series) => (
+                  <SeriesCard
+                    key={series.id}
+                    series={series}
+                    searchQuery={searchQuery}
+                    attempted={attemptedMap[series.id] || 0}
+                    onStart={() => goToSeries(series as DisplaySeries & { _raw?: unknown; _apiBase?: string; _webBase?: string })}
+                  />
+                ))}
+              </div>
             </div>
           )}
 
@@ -1141,16 +1283,30 @@ const loadPlatform = async (platform: SearchResult) => {
           </section>
         )}
       </main>
+
+      {/* Floating "Pick Random Test" button */}
+      {!loading && (
+        <button
+          onClick={pickRandomSeries}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-full bg-violet-600 text-white text-sm font-bold shadow-2xl hover:bg-violet-700 active:scale-95 transition-all duration-200 group"
+          style={{ boxShadow: "0 8px 32px rgba(139,92,246,0.4)" }}
+        >
+          <Shuffle className="h-4 w-4 group-hover:rotate-180 transition-transform duration-300" />
+          <span className="hidden sm:inline">Random Test</span>
+        </button>
+      )}
+
       <Footer />
     </div>
   )
 }
 
-// ── Series Card ────────────�����────────────────────────────────────────────────
-function SeriesCard({ series, onStart, searchQuery }: {
+// ── Series Card ────────────────────────────────────────────────────────────────
+function SeriesCard({ series, onStart, searchQuery, attempted = 0 }: {
   series: DisplaySeries
   onStart: () => void
   searchQuery?: string
+  attempted?: number
 }) {
   const catColor = CAT_COLORS[series.category] || series.color || "#8b5cf6"
   const catIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -1249,14 +1405,44 @@ function SeriesCard({ series, onStart, searchQuery }: {
           </span>
         </div>
 
+        {/* Attempted progress bar */}
+        {attempted > 0 && (
+          <div className="mt-1">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Target className="h-2.5 w-2.5" />
+                Attempted {attempted}x
+              </span>
+              <span className="text-[10px] font-semibold" style={{ color: catColor }}>
+                {Math.min(Math.round((attempted / series.totalTests) * 100), 100)}%
+              </span>
+            </div>
+            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${Math.min((attempted / series.totalTests) * 100, 100)}%`, backgroundColor: catColor }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* CTA */}
         <button
           onClick={onStart}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98] shadow-sm"
           style={{ background: `linear-gradient(135deg, ${catColor}, ${catColor}bb)` }}
         >
-          Attempt Now
-          <ChevronRight className="h-4 w-4" />
+          {attempted > 0 ? (
+            <>
+              <Target className="h-4 w-4" />
+              Practice Again
+            </>
+          ) : (
+            <>
+              Attempt Now
+              <ChevronRight className="h-4 w-4" />
+            </>
+          )}
         </button>
       </div>
     </div>
