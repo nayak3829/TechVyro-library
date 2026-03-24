@@ -13,9 +13,9 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger
 } from "@/components/ui/drawer"
 import {
-  Clock, FileText, Play, BookOpen, ArrowRight, Search,
-  Trophy, X, Zap, Target, Flame, ChevronRight,
-  Brain, Sparkles, ListFilter, Lock, SlidersHorizontal,
+  Clock, FileText, Play, BookOpen, Search,
+  X, Zap, Target, Flame, 
+  Brain, Sparkles, Lock, SlidersHorizontal,
   ChevronDown, Shield, Train, TrendingUp, Atom,
   GraduationCap, Loader2, RefreshCw, Globe
 } from "lucide-react"
@@ -98,24 +98,8 @@ function TestSeriesContent() {
     
     try {
       const cat = category || selectedCategory
-      
-      // Try Supabase first (cached APX data)
-      let data = null
-      try {
-        const supabaseRes = await fetch(`/api/apx/sync?category=${cat === "all" ? "" : cat}&limit=50`)
-        const supabaseData = await supabaseRes.json()
-        if (supabaseData.success && supabaseData.testSeries?.length > 0) {
-          data = supabaseData
-        }
-      } catch {
-        // Supabase failed, will try live APX
-      }
-      
-      // Fall back to live APX fetch if Supabase has no data
-      if (!data || !data.testSeries?.length) {
-        const res = await fetch(`/api/extract?bulk=true&category=${cat === "all" ? "ssc" : cat}`)
-        data = await res.json()
-      }
+      const res = await fetch(`/api/extract?bulk=true&category=${cat === "all" ? "ssc" : cat}`)
+      const data = await res.json()
       
       if (data.success && data.testSeries && data.testSeries.length > 0) {
         setTestSeries(data.testSeries.map((s: TestSeries, idx: number) => ({
@@ -123,7 +107,7 @@ function TestSeriesContent() {
           id: s.id || `series-${idx}`,
           category: s.category || cat,
         })))
-        setFetchError(data.source === "supabase" ? "" : (data.notice || ""))
+        setFetchError(data.notice || "")
       } else {
         setTestSeries([])
         setFetchError(data.notice || "No test series found")
@@ -207,7 +191,6 @@ function TestSeriesContent() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
-      {/* Hero Banner */}
       <section className="relative overflow-hidden bg-gradient-to-br from-violet-500/10 via-primary/5 to-background border-b border-border/50">
         <div className="absolute inset-0 opacity-[0.025]" style={{
           backgroundImage: "radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)",
@@ -222,10 +205,7 @@ function TestSeriesContent() {
               Mock Test Series
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight mb-3 text-foreground text-balance">
-              Practice{" "}
-              <span className="bg-gradient-to-r from-violet-600 to-primary bg-clip-text text-transparent">
-                Mock Tests
-              </span>
+              Practice <span className="bg-gradient-to-r from-violet-600 to-primary bg-clip-text text-transparent">Mock Tests</span>
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground max-w-xl leading-relaxed">
               Free unlimited mock tests for SSC, Banking, NDA, Railways & more competitive exams
@@ -258,12 +238,9 @@ function TestSeriesContent() {
         </div>
       </section>
 
-      {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
-        {/* Sticky Filter Bar */}
         <div className="sticky top-[57px] z-20 bg-background/95 backdrop-blur-sm pb-3 pt-1 -mx-4 px-4 border-b border-border/40 mb-5">
           <div className="flex gap-2 items-center">
-            {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <input
@@ -276,16 +253,12 @@ function TestSeriesContent() {
                 autoComplete="off"
               />
               {searchRaw && (
-                <button
-                  onClick={() => setSearchRaw("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
+                <button onClick={() => setSearchRaw("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Filters drawer */}
             <Drawer open={filterDrawerOpen} onOpenChange={setFilterDrawerOpen}>
               <DrawerTrigger asChild>
                 <button className="relative h-10 sm:h-11 px-3 sm:px-4 rounded-xl border border-border/60 bg-background flex items-center gap-1.5 sm:gap-2 text-sm font-medium hover:bg-muted/60 transition-colors shrink-0">
@@ -365,7 +338,6 @@ function TestSeriesContent() {
               </DrawerContent>
             </Drawer>
 
-            {/* Refresh button */}
             <button
               onClick={() => fetchTestSeries(true)}
               disabled={loading}
@@ -376,7 +348,6 @@ function TestSeriesContent() {
             </button>
           </div>
 
-          {/* Category chips */}
           <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
             {CATEGORIES.map(cat => {
               const Icon = cat.icon
@@ -405,7 +376,6 @@ function TestSeriesContent() {
           </div>
         </div>
 
-        {/* Loading State */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-16 sm:py-24">
             <Loader2 className="h-8 w-8 animate-spin text-violet-600 mb-4" />
@@ -413,7 +383,6 @@ function TestSeriesContent() {
           </div>
         )}
 
-        {/* Error/Notice State */}
         {!loading && fetchError && testSeries.length === 0 && (
           <div className="text-center py-8 mb-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm">
@@ -423,10 +392,8 @@ function TestSeriesContent() {
           </div>
         )}
 
-        {/* Test Series Grid */}
         {!loading && filtered.length > 0 && (
           <>
-            {/* Results count */}
             {hasAnyFilter && (
               <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <span className="text-xs text-muted-foreground">Showing {filtered.length} results</span>
@@ -452,7 +419,6 @@ function TestSeriesContent() {
                     className="group overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/50 hover:border-violet-400/40 flex flex-col"
                   >
                     <div className="p-4 flex flex-col flex-1">
-                      {/* Header */}
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div 
                           className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -475,19 +441,16 @@ function TestSeriesContent() {
                         </div>
                       </div>
 
-                      {/* Title */}
                       <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-violet-600 transition-colors mb-2">
                         {series.title}
                       </h3>
 
-                      {/* Description */}
                       {series.description && (
                         <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
                           {series.description}
                         </p>
                       )}
                       
-                      {/* Stats */}
                       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-4 mt-auto">
                         <div className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
@@ -501,7 +464,6 @@ function TestSeriesContent() {
                         )}
                       </div>
                       
-                      {/* CTA */}
                       <Button 
                         onClick={() => handleStartSeries(series)}
                         size="sm" 
@@ -519,7 +481,6 @@ function TestSeriesContent() {
               })}
             </div>
 
-            {/* Load More */}
             {hasMore && (
               <div className="flex justify-center mt-8">
                 <Button
@@ -535,7 +496,6 @@ function TestSeriesContent() {
           </>
         )}
 
-        {/* Empty state */}
         {!loading && filtered.length === 0 && testSeries.length > 0 && (
           <div className="text-center py-16">
             <Search className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
