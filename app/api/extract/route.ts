@@ -194,36 +194,43 @@ export async function GET(request: Request) {
   const bulkMode = searchParams.get("bulk") === "true"
   const category = searchParams.get("category")?.trim()
 
-  // Bulk mode: fetch from multiple APX platforms and filter by category
+  // Bulk mode: return sample test series for the category
   if (bulkMode && category) {
-    // Keywords to filter test series TITLES by category
-    const categoryTitleKeywords: Record<string, string[]> = {
-      ssc: ["ssc", "cgl", "chsl", "mts", "gd", "staff selection", "ssc je", "stenographer"],
-      banking: ["bank", "ibps", "sbi", "rbi", "clerk", "po ", "probationary", "finance", "nabard"],
-      defence: ["nda", "cds", "defence", "army", "navy", "airforce", "capf", "agniveer", "military", "afcat"],
-      railways: ["railway", "rrb", "ntpc", "group d", "technician", "loco pilot", "alp", "je railway"],
-      upsc: ["upsc", "ias", "civil service", "prelims", "mains", "cse", "epfo", "capf ac"],
-      teaching: ["ctet", "tet", "teacher", "kvs", "nvs", "dsssb", "super tet", "b.ed"],
-      police: ["police", "constable", "si ", "sub inspector", "delhi police", "up police"],
-      "jee-neet": ["jee", "neet", "physics", "chemistry", "biology", "engineering", "iit", "aiims", "bitsat"],
-    }
-
-    const filterKeywords = categoryTitleKeywords[category] || []
+    // Get sample series for this category
+    const sampleSeries = getSampleSeriesForCategory(category)
+    const allSampleSeries = getAllSampleSeries()
     
-    // Randomly select platforms from the full list to get variety
+    // Use category-specific samples if available, otherwise use all
+    const seriesToReturn = sampleSeries.length > 0 ? sampleSeries : allSampleSeries
+    
+    // Map to API response format
+    const formattedSeries = seriesToReturn.map(s => ({
+      id: s.id,
+      title: s.title,
+      slug: s.slug,
+      description: s.description,
+      total_tests: s.tests.length,
+      total_questions: s.tests.reduce((acc, t) => acc + (t.questions?.length || 5), 0),
+      duration: s.tests[0]?.duration || 60,
+      is_free: true,
+      category: s.category || category,
+      isSample: true,
+      _sourceApi: `sample:${s.category}`,
+      _sourceWeb: "",
+    }))
+
+    // Also try to fetch from a few APX platforms for live data
     const shuffledPlatforms = [...PLATFORM_LIST].sort(() => Math.random() - 0.5)
-    const platformsToTry = shuffledPlatforms.slice(0, 15)
+    const platformsToTry = shuffledPlatforms.slice(0, 5)
 
-    console.log(`[v0] Fetching from ${platformsToTry.length} random APX platforms for category ${category}`)
-
-    const allSeries: unknown[] = []
+    const liveSeries: unknown[] = []
     
-    // Try to fetch from platforms in parallel (limit to 8 concurrent)
-    const fetchPromises = platformsToTry.slice(0, 8).map(async (platform) => {
+    // Quick parallel fetch from a few platforms (short timeout)
+    const fetchPromises = platformsToTry.map(async (platform) => {
       try {
         const series = await tryFetchFromPlatform(platform.api)
         if (series && series.length > 0) {
-          return series.map(s => ({
+          return series.slice(0, 3).map(s => ({
             ...(s as object),
             _sourceApi: platform.api,
             _sourceWeb: deriveWebUrl(platform.api),
@@ -239,59 +246,25 @@ export async function GET(request: Request) {
     const results = await Promise.allSettled(fetchPromises)
     for (const result of results) {
       if (result.status === "fulfilled" && result.value.length > 0) {
-        allSeries.push(...result.value)
+        liveSeries.push(...result.value)
       }
     }
 
-    console.log(`[v0] Fetched ${allSeries.length} total series from APX platforms`)
-
-    // Filter by category if we have keywords, otherwise return all
-    let filteredSeries = allSeries
-    if (filterKeywords.length > 0 && category !== "all") {
-      filteredSeries = allSeries.filter(item => {
-        const s = item as Record<string, unknown>
-        const title = String(s.title || s.name || "").toLowerCase()
-        const desc = String(s.description || s.subtitle || "").toLowerCase()
-        return filterKeywords.some(kw => title.includes(kw) || desc.includes(kw))
-      })
-      console.log(`[v0] Filtered to ${filteredSeries.length} series matching ${category}`)
+    // Combine live data with sample data - samples first for reliability
+    const combinedSeries = [...formattedSeries]
+    
+    // Add any live data that was successfully fetched
+    if (liveSeries.length > 0) {
+      const cleanedLive = cleanSeriesData(liveSeries)
+      combinedSeries.push(...cleanedLive.map(s => ({ ...s, isSample: false })))
     }
 
-    if (filteredSeries.length > 0) {
-      return NextResponse.json({
-        success: true,
-        testSeries: cleanSeriesData(filteredSeries),
-        source: "apx-bulk",
-        count: filteredSeries.length,
-        totalFetched: allSeries.length,
-      })
-    }
-
-    // If filtering removed everything but we had data, return unfiltered
-    if (allSeries.length > 0) {
-      return NextResponse.json({
-        success: true,
-        testSeries: cleanSeriesData(allSeries.slice(0, 20)),
-        source: "apx-bulk",
-        count: Math.min(allSeries.length, 20),
-        notice: `Showing all available test series (no ${category} specific found)`,
-      })
-    }
-
-    // Fallback to sample tests with category-specific data
-    const sampleSeries = getSampleSeriesForCategory(category)
-    const fallbackSeries = sampleSeries.length > 0 ? sampleSeries : getAllSampleSeries()
     return NextResponse.json({
       success: true,
-      testSeries: fallbackSeries.map(s => ({
-        id: s.id, title: s.title, slug: s.slug,
-        description: s.description, total_tests: s.tests.length, 
-        total_questions: s.tests.reduce((acc, t) => acc + (t.questions?.length || 5), 0),
-        duration: 60, is_free: true, category: s.category || category,
-        isSample: true,
-      })),
-      source: "sample",
-      notice: "APX platforms unavailable. Showing practice tests.",
+      testSeries: combinedSeries,
+      source: liveSeries.length > 0 ? "mixed" : "sample",
+      count: combinedSeries.length,
+      liveCount: liveSeries.length,
     })
   }
 
