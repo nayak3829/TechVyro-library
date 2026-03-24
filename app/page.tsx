@@ -6,6 +6,7 @@ import { StatsSection } from "@/components/home/stats-section"
 import { FeaturedSection } from "@/components/home/featured-section"
 import { CategoriesSection } from "@/components/home/categories-section"
 import { QuizSection } from "@/components/home/quiz-section"
+import { TestSeriesSection } from "@/components/home/test-series-section"
 import { TestimonialsSection } from "@/components/home/testimonials-section"
 import { RecentlyViewedSection } from "@/components/home/recently-viewed-section"
 import { SubjectsSection } from "@/components/home/subjects-section"
@@ -156,6 +157,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
         {/* 5. QUIZ SECTION */}
         <QuizSection />
+
+        {/* 5.5. TEST SERIES SECTION */}
+        <TestSeriesSection />
 
         {/* 6. ALL PDFs GRID */}
         <section id="content" className="py-14 sm:py-18 lg:py-22 bg-background relative overflow-hidden">

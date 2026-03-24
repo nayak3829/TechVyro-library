@@ -991,17 +991,17 @@ const loadPlatform = async (platform: SearchResult) => {
         )}
 
         {/* ── Main content area ── */}
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
 
-          {/* Search + Sort bar */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          {/* Search + Sort bar - mobile optimized */}
+          <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={e => { setSearchQuery(e.target.value); setShowAll(false) }}
-                placeholder="Search mock tests, exam name..."
-                className="pl-9 pr-8 h-10"
+                placeholder="Search tests..."
+                className="pl-9 pr-8 h-9 sm:h-10 text-sm"
                 suppressHydrationWarning
               />
               {searchQuery && (
@@ -1010,46 +1010,44 @@ const loadPlatform = async (platform: SearchResult) => {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              {/* Sort dropdown */}
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value as typeof sortBy)}
-                  className="h-10 pl-8 pr-3 text-sm border border-border rounded-lg bg-background appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400"
-                >
-                  <option value="default">Default</option>
-                  <option value="tests">Most Tests</option>
-                  <option value="questions">Most Questions</option>
-                  <option value="difficulty">By Difficulty</option>
-                </select>
-                <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              </div>
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground border border-border rounded-lg px-3 h-10">
-                <SlidersHorizontal className="h-4 w-4" />
-                <span>{sorted.length}</span>
-              </div>
+            {/* Sort dropdown - compact on mobile */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                className="h-9 sm:h-10 pl-7 sm:pl-8 pr-2 sm:pr-3 text-xs sm:text-sm border border-border rounded-lg bg-background appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400"
+              >
+                <option value="default">Sort</option>
+                <option value="tests">Tests</option>
+                <option value="questions">Questions</option>
+                <option value="difficulty">Difficulty</option>
+              </select>
+              <ArrowUpDown className="absolute left-2 sm:left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground pointer-events-none" />
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground border border-border rounded-lg px-3 h-10">
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>{sorted.length}</span>
             </div>
           </div>
 
-          {/* Category tabs */}
+          {/* Category tabs - mobile optimized with smaller touch targets */}
           {!liveSeries && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-1">
+            <div className="flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar mb-4 sm:mb-6 pb-1 -mx-1 px-1">
               {CATEGORIES.map(cat => (
                 <button
                   key={cat.id}
                   onClick={() => { setSelectedCat(cat.id); setShowAll(false) }}
-                  className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border ${
+                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 border ${
                     selectedCat === cat.id
                       ? "text-white border-transparent shadow-md"
                       : "bg-background text-foreground border-border hover:border-violet-400 hover:text-violet-600"
                   }`}
                   style={selectedCat === cat.id ? { backgroundColor: cat.color, boxShadow: `0 4px 14px ${cat.color}40` } : {}}
                 >
-                  <span>{cat.icon}</span>
+                  <span className="text-xs sm:text-sm">{cat.icon}</span>
                   <span>{cat.label}</span>
                   {selectedCat === cat.id && (
-                    <span className="text-[10px] bg-white/25 rounded-full px-1.5 py-0.5">
+                    <span className="text-[9px] sm:text-[10px] bg-white/25 rounded-full px-1 sm:px-1.5 py-0.5">
                       {SERIES_LIBRARY.filter(s => cat.id === "all" || s.category === cat.id).length}
                     </span>
                   )}
@@ -1083,7 +1081,7 @@ const loadPlatform = async (platform: SearchResult) => {
           )}
 
           {!loading && visible.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {visible.map((series) => (
                 <SeriesCard
                   key={series.id}
