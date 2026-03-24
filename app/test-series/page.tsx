@@ -328,12 +328,9 @@ export default function TestSeriesPage() {
       </div>
 
       {/* Auth Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        title="Login Required"
-        description="Please login to access this test series"
-      />
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
     </div>
   )
 }
