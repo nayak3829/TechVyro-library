@@ -11,6 +11,7 @@ channel = "stable-25_05"
 NEXT_PUBLIC_SUPABASE_URL = "https://ggszntmesnjceytrcfhd.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_SAv-nm0GgKxnp-kxTHk_-w_x_fqY6Wf"
 NEXT_PUBLIC_SITE_URL = "https://3820f656-b2c8-4101-81ab-071dfcf7cf19-00-1lyf716lm95q7.janeway.replit.dev"
+ADMIN_PASSWORD = "Akansh@123"
 
 [workflows]
 runButton = "Project"
