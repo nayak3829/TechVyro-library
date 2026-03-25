@@ -49,6 +49,20 @@ const nextConfig = {
     }
     return config
   },
+  async redirects() {
+    return [
+      {
+        source: "/leaderboard",
+        destination: "/quiz/leaderboard",
+        permanent: true,
+      },
+      {
+        source: "/resources",
+        destination: "/quiz",
+        permanent: false,
+      },
+    ]
+  },
   async headers() {
     return [
       {
