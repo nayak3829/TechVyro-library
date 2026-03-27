@@ -9,11 +9,15 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
   const supabaseRef = useRef<SupabaseClient | null>(null)
 
-  if (!supabaseRef.current) {
-    supabaseRef.current = createClient()
-  }
-
   useEffect(() => {
+    try {
+      if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+      }
+    } catch {
+      setLoading(false)
+      return
+    }
     const supabase = supabaseRef.current!
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -31,7 +35,8 @@ export function useAuth() {
   }, [])
 
   async function signOut() {
-    const supabase = supabaseRef.current!
+    const supabase = supabaseRef.current
+    if (!supabase) return
     await supabase.auth.signOut()
     window.location.href = "/"
   }

@@ -57,6 +57,7 @@ function SeriesContent() {
   const apiBase = searchParams.get("apiBase") || ""
   const webBase = searchParams.get("webBase") || ""
   const rawTitle = searchParams.get("title") || "Mock Test"
+  const isFreeSeries = searchParams.get("isFree") === "true"
   const seriesTitle = cleanTitle(rawTitle)
 
   const [loading, setLoading] = useState(true)
@@ -66,6 +67,7 @@ function SeriesContent() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const isSample = apiBase.startsWith("sample:")
+  const allowGuestAccess = isSample || isFreeSeries
 
   useEffect(() => {
     if (!slug || !apiBase) {
@@ -105,13 +107,14 @@ function SeriesContent() {
 
   const startTest = (test: Test) => {
     // Check if user is logged in for non-sample tests
-    if (!isSample && !user && !authLoading) {
+    if (!allowGuestAccess && !user && !authLoading) {
       const testId = String(test.id || test.slug || "")
       const params = new URLSearchParams({
         testId,
         apiBase,
         title: test.title || test.name || "Test",
         duration: String(test.duration || test.time || 60),
+        isFree: String(isFreeSeries),
       })
       router.push(`/login?redirect=${encodeURIComponent(`/test-series/play?${params}`)}`)
       return
@@ -123,6 +126,7 @@ function SeriesContent() {
       apiBase,
       title: test.title || test.name || "Test",
       duration: String(test.duration || test.time || 60),
+      isFree: String(isFreeSeries),
     })
     router.push(`/test-series/play?${params}`)
   }
@@ -154,7 +158,7 @@ function SeriesContent() {
           </div>
           
           {/* Login prompt for non-sample tests */}
-          {!isSample && !user && !authLoading && (
+          {!allowGuestAccess && !user && !authLoading && (
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               <Lock className="h-4 w-4 text-amber-600" />
               <span className="text-xs sm:text-sm text-amber-700">

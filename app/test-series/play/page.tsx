@@ -41,12 +41,14 @@ function PlayContent() {
   const rawTitle = searchParams.get("title") || "Practice Test"
   const title = cleanTitle(rawTitle)
   const duration = parseInt(searchParams.get("duration") || "60")
+  const isFreeParam = searchParams.get("isFree") === "true"
 
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   const isSample = apiBase.startsWith("sample:")
+  const allowGuestAccess = isSample || isFreeParam
 
   useEffect(() => {
     if (!testId || !apiBase) {
@@ -55,7 +57,7 @@ function PlayContent() {
     }
 
     // Sample tests are free — skip auth check entirely
-    if (isSample) {
+    if (allowGuestAccess) {
       fetchQuestions()
       return
     }
@@ -69,7 +71,7 @@ function PlayContent() {
     }
 
     fetchQuestions()
-  }, [authLoading, user, testId, apiBase])
+  }, [allowGuestAccess, authLoading, user, testId, apiBase, router, searchParams])
 
   const fetchQuestions = async () => {
     setLoading(true)
@@ -97,7 +99,7 @@ function PlayContent() {
     }
   }
 
-  if (!isSample && (authLoading || (!user && !error))) {
+  if (!allowGuestAccess && (authLoading || (!user && !error))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

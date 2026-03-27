@@ -147,7 +147,8 @@ export default function TestSeriesPage() {
   }, [filteredSeries])
 
   const handleStartSeries = (series: TestSeries) => {
-    if (!series.isSample && !user && !authLoading) {
+    const isFree = Boolean(series.is_free || series.isSample)
+    if (!isFree && !user && !authLoading) {
       setShowAuthModal(true)
       return
     }
@@ -156,6 +157,7 @@ export default function TestSeriesPage() {
       apiBase: series._sourceApi || `sample:${series.category}`,
       webBase: series._sourceWeb || "",
       title: series.title,
+      isFree: String(isFree),
     })
     router.push(`/test-series/series?${params}`)
   }
