@@ -3,9 +3,8 @@
 import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { QuizPlayer } from "@/components/quiz/quiz-player"
-import { Loader2, AlertCircle, ArrowLeft } from "lucide-react"
+import { AlertCircle, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/hooks/use-auth"
 
 interface Question {
   qid: string
@@ -34,7 +33,6 @@ function cleanTitle(title: string): string {
 function PlayContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
 
   const testId = searchParams.get("testId") || ""
   const apiBase = searchParams.get("apiBase") || ""
@@ -46,30 +44,13 @@ function PlayContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  const isSample = apiBase.startsWith("sample:")
-
   useEffect(() => {
     if (!testId || !apiBase) {
       router.replace("/test-series")
       return
     }
-
-    // Sample tests are free — skip auth check entirely
-    if (isSample) {
-      fetchQuestions()
-      return
-    }
-
-    // Live tests need auth
-    if (authLoading) return
-    if (!user) {
-      const currentUrl = `/test-series/play?${searchParams.toString()}`
-      router.replace(`/login?redirect=${encodeURIComponent(currentUrl)}`)
-      return
-    }
-
     fetchQuestions()
-  }, [authLoading, user, testId, apiBase])
+  }, [testId, apiBase, router])
 
   const fetchQuestions = async () => {
     setLoading(true)
@@ -95,14 +76,6 @@ function PlayContent() {
     } finally {
       setLoading(false)
     }
-  }
-
-  if (!isSample && (authLoading || (!user && !error))) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    )
   }
 
   if (loading) {
@@ -138,19 +111,12 @@ function PlayContent() {
     )
   }
 
-  const userName = user
-    ? (user.user_metadata?.full_name as string | undefined)
-      || (user.user_metadata?.name as string | undefined)
-      || user.email?.split("@")[0]
-      || ""
-    : ""
-
   return (
     <QuizPlayer
       title={title}
       questions={questions}
       timeLimit={duration}
-      userName={userName}
+      userName=""
     />
   )
 }

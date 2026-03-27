@@ -9,10 +9,8 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
   ArrowLeft, Loader2, BookOpen, Play, Clock, FileText,
-  ChevronDown, ChevronUp, AlertCircle, Lock
+  ChevronDown, ChevronUp, AlertCircle
 } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
-import Link from "next/link"
 
 interface Subject {
   id?: string | number
@@ -51,12 +49,12 @@ function cleanTitle(title: string): string {
 function SeriesContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
   
   const slug = searchParams.get("slug") || ""
   const apiBase = searchParams.get("apiBase") || ""
   const webBase = searchParams.get("webBase") || ""
   const rawTitle = searchParams.get("title") || "Mock Test"
+  const isFreeSeries = searchParams.get("isFree") === "true"
   const seriesTitle = cleanTitle(rawTitle)
 
   const [loading, setLoading] = useState(true)
@@ -104,25 +102,13 @@ function SeriesContent() {
   }
 
   const startTest = (test: Test) => {
-    // Check if user is logged in for non-sample tests
-    if (!isSample && !user && !authLoading) {
-      const testId = String(test.id || test.slug || "")
-      const params = new URLSearchParams({
-        testId,
-        apiBase,
-        title: test.title || test.name || "Test",
-        duration: String(test.duration || test.time || 60),
-      })
-      router.push(`/login?redirect=${encodeURIComponent(`/test-series/play?${params}`)}`)
-      return
-    }
-
     const testId = String(test.id || test.slug || "")
     const params = new URLSearchParams({
       testId,
       apiBase,
       title: test.title || test.name || "Test",
       duration: String(test.duration || test.time || 60),
+      isFree: String(isFreeSeries),
     })
     router.push(`/test-series/play?${params}`)
   }
@@ -152,16 +138,6 @@ function SeriesContent() {
             <h1 className="text-2xl sm:text-3xl font-bold">{seriesTitle}</h1>
             <p className="text-muted-foreground mt-1 text-sm sm:text-base">Select a test to start playing</p>
           </div>
-          
-          {/* Login prompt for non-sample tests */}
-          {!isSample && !user && !authLoading && (
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              <Lock className="h-4 w-4 text-amber-600" />
-              <span className="text-xs sm:text-sm text-amber-700">
-                <Link href="/login" className="font-semibold underline">Login</Link> to save progress
-              </span>
-            </div>
-          )}
         </div>
 
         {loading && (
@@ -228,7 +204,6 @@ function SeriesContent() {
                               onStart={() => startTest(test)} 
                               loading={false}
                               isSample={isSample}
-                              isLoggedIn={!!user}
                             />
                           ))}
                         </div>
@@ -259,7 +234,6 @@ function SeriesContent() {
                       onStart={() => startTest(test)} 
                       loading={false}
                       isSample={isSample}
-                      isLoggedIn={!!user}
                     />
                   ))}
                 </Card>
@@ -288,12 +262,11 @@ function SeriesContent() {
   )
 }
 
-function TestRow({ test, onStart, loading, isSample, isLoggedIn }: { 
+function TestRow({ test, onStart, loading, isSample }: { 
   test: Test; 
   onStart: () => void; 
   loading: boolean;
   isSample: boolean;
-  isLoggedIn: boolean;
 }) {
   const rawTitle = test.title || test.name || "Untitled Test"
   const title = cleanTitle(rawTitle)

@@ -28,16 +28,26 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
+  const [authEnabled, setAuthEnabled] = useState(true)
 
   const supabaseRef = useRef<SupabaseClient | null>(null)
-  if (!supabaseRef.current) supabaseRef.current = createClient()
-  const supabase = supabaseRef.current
 
   useEffect(() => {
+    try {
+      if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+      }
+      setAuthEnabled(true)
+    } catch {
+      setAuthEnabled(false)
+      return
+    }
+    const supabase = supabaseRef.current
+    if (!supabase) return
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) router.replace(redirectTo)
     })
-  }, [])
+  }, [router, redirectTo])
 
   const getRedirectURL = () => {
     if (typeof window === "undefined") return ""
@@ -56,6 +66,11 @@ function LoginPageContent() {
   }
 
   async function handleGoogleSignIn() {
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      toast.error("Authentication is not configured.")
+      return
+    }
     setGoogleLoading(true)
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -78,6 +93,11 @@ function LoginPageContent() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      toast.error("Authentication is not configured.")
+      return
+    }
     if (!email.trim() || !password.trim()) return
     setLoading(true)
     try {
@@ -105,6 +125,11 @@ function LoginPageContent() {
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      toast.error("Authentication is not configured.")
+      return
+    }
     if (!email.trim() || !password.trim() || !name.trim()) return
     if (password.length < 6) {
       toast.error("Password must be at least 6 characters")
@@ -142,6 +167,11 @@ function LoginPageContent() {
 
   async function handleForgot(e: React.FormEvent) {
     e.preventDefault()
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      toast.error("Authentication is not configured.")
+      return
+    }
     if (!email.trim()) return
     setLoading(true)
     try {
@@ -303,7 +333,7 @@ function LoginPageContent() {
                       <button
                         type="button"
                         onClick={handleGoogleSignIn}
-                        disabled={googleLoading || loading}
+                        disabled={googleLoading || loading || !authEnabled}
                         className="w-full h-12 flex items-center justify-center gap-3 rounded-xl border border-border/70 bg-background hover:bg-muted/50 transition-colors text-sm font-medium text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {googleLoading ? (
@@ -408,7 +438,7 @@ function LoginPageContent() {
 
                     <Button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || !authEnabled}
                       className="w-full h-12 rounded-xl gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity font-semibold text-sm mt-2"
                     >
                       {loading ? (

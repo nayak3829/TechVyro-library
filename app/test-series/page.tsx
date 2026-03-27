@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAuth } from "@/hooks/use-auth"
-import { AuthModal } from "@/components/auth-modal"
 import {
   Search, X, FileText, Clock, Play, Loader2, Lock, ChevronDown,
   Target, TrendingUp, Shield, Train, BookOpen, Atom, GraduationCap, Globe,
@@ -57,14 +55,12 @@ function getCategoryIcon(category: string) {
 
 export default function TestSeriesPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
   
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [testSeries, setTestSeries] = useState<TestSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [fetchError, setFetchError] = useState("")
-  const [showAuthModal, setShowAuthModal] = useState(false)
   const [liveCount, setLiveCount] = useState(0)
   const [platformsChecked, setPlatformsChecked] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -147,15 +143,13 @@ export default function TestSeriesPage() {
   }, [filteredSeries])
 
   const handleStartSeries = (series: TestSeries) => {
-    if (!series.isSample && !user && !authLoading) {
-      setShowAuthModal(true)
-      return
-    }
+    const isFree = Boolean(series.is_free || series.isSample)
     const params = new URLSearchParams({
       slug: series.slug || series.id,
       apiBase: series._sourceApi || `sample:${series.category}`,
       webBase: series._sourceWeb || "",
       title: series.title,
+      isFree: String(isFree),
     })
     router.push(`/test-series/series?${params}`)
   }
@@ -390,7 +384,7 @@ export default function TestSeriesPage() {
                       >
                         <Play className="h-3.5 w-3.5" />
                         Start Now
-                        {!series.isSample && !user && !authLoading && (
+                        {!series.isSample && (
                           <Lock className="h-3 w-3 ml-0.5 opacity-70" />
                         )}
                       </Button>
@@ -414,10 +408,6 @@ export default function TestSeriesPage() {
         )}
       </div>
 
-      {/* Auth Modal */}
-      {showAuthModal && (
-        <AuthModal onClose={() => setShowAuthModal(false)} />
-      )}
     </div>
   )
 }

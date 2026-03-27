@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { X, Mail, Lock, User, Eye, EyeOff, LogIn, UserPlus, Loader2 } from "lucide-react"
@@ -20,12 +20,20 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
+  const [authEnabled, setAuthEnabled] = useState(true)
 
   const supabaseRef = useRef<SupabaseClient | null>(null)
-  if (!supabaseRef.current) {
-    supabaseRef.current = createClient()
-  }
-  const supabase = supabaseRef.current
+
+  useEffect(() => {
+    try {
+      if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+      }
+      setAuthEnabled(true)
+    } catch {
+      setAuthEnabled(false)
+    }
+  }, [])
 
   const getRedirectURL = () => {
     const origin = typeof window !== "undefined" ? window.location.origin : ""
@@ -34,6 +42,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      toast.error("Authentication is not configured.")
+      return
+    }
     if (!email.trim() || !password.trim()) return
     setLoading(true)
     try {
@@ -60,6 +73,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      toast.error("Authentication is not configured.")
+      return
+    }
     if (!email.trim() || !password.trim() || !name.trim()) return
     if (password.length < 6) {
       toast.error("Password must be at least 6 characters")
@@ -96,6 +114,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
   async function handleForgot(e: React.FormEvent) {
     e.preventDefault()
+    const supabase = supabaseRef.current
+    if (!supabase) {
+      toast.error("Authentication is not configured.")
+      return
+    }
     if (!email.trim()) return
     setLoading(true)
     try {
@@ -237,7 +260,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !authEnabled}
                 className="w-full h-11 rounded-xl gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 font-semibold"
               >
                 {loading ? (
