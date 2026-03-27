@@ -7,13 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/hooks/use-auth"
 import { AuthModal } from "@/components/auth-modal"
 import {
   Search, X, FileText, Clock, Play, Loader2,
   Target, TrendingUp, Shield, Train, BookOpen, Atom, GraduationCap, Globe,
   Zap, RefreshCw, Building2, ExternalLink, Database, ChevronDown,
-  Trophy, Users, Layers, CheckCircle
+  Trophy, Users, Layers, CheckCircle, Shuffle, List, LayoutGrid, SortAsc,
+  Star, History, ChevronRight, BookMarked, Flame
 } from "lucide-react"
 
 interface MockTest {
@@ -59,6 +61,33 @@ function getCategoryIcon(cat?: string) {
   return CATEGORIES.find(c => c.id === cat)?.icon || GraduationCap
 }
 
+const POPULAR_PLATFORMS = [
+  { name: "Parmar Academy", api: "https://parmaracademyapi.classx.co.in", web: "https://parmaracademy.classx.co.in", category: "defence" },
+  { name: "SSC Pinnacle", api: "https://ssccglpinnacleapi.classx.co.in", web: "https://ssccglpinnacle.classx.co.in", category: "ssc" },
+  { name: "Oliveboard", api: "https://oliveboardapi.classx.co.in", web: "https://oliveboard.classx.co.in", category: "banking" },
+  { name: "Adda247", api: "https://achieversadda247api.classx.co.in", web: "https://achieversadda247.classx.co.in", category: "ssc" },
+  { name: "Wifistudy SSC", api: "https://cccwifistudyapi.classx.co.in", web: "https://cccwifistudy.classx.co.in", category: "ssc" },
+  { name: "Testbook", api: "https://etestseriescompetitiveexamstestbookapi.classx.co.in", web: "https://etestseriestestbook.classx.co.in", category: "ssc" },
+  { name: "Drishti IAS", api: "https://drishtipediaapi.classx.co.in", web: "https://drishtipedia.classx.co.in", category: "upsc" },
+  { name: "Divya Drishti", api: "https://divyadrishticlassesapi.classx.co.in", web: "https://divyadrishticlasses.classx.co.in", category: "defence" },
+]
+
+const ATTEMPT_KEY = "techvyro_test_attempts"
+const RECENT_PLATFORMS_KEY = "techvyro_recent_platforms"
+
+interface RecentPlatform {
+  name: string; api: string; web: string; visitedAt: string
+}
+
+function saveRecentPlatform(platform: { name: string; api: string; web: string }) {
+  try {
+    const existing: RecentPlatform[] = JSON.parse(localStorage.getItem(RECENT_PLATFORMS_KEY) || "[]")
+    const filtered = existing.filter(p => p.api !== platform.api)
+    const updated = [{ ...platform, visitedAt: new Date().toISOString() }, ...filtered].slice(0, 5)
+    localStorage.setItem(RECENT_PLATFORMS_KEY, JSON.stringify(updated))
+  } catch {}
+}
+
 export default function TestSeriesPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -70,6 +99,9 @@ export default function TestSeriesPage() {
   const [fetchError, setFetchError] = useState("")
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [liveCount, setLiveCount] = useState(0)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [sortBy, setSortBy] = useState<"default" | "duration" | "questions">("default")
+  const [recentPlatforms, setRecentPlatforms] = useState<RecentPlatform[]>([])
 
   // Platform search
   const [platformQuery, setPlatformQuery] = useState("")
@@ -86,6 +118,10 @@ export default function TestSeriesPage() {
     const params = new URLSearchParams(window.location.search)
     const cat = params.get("category")
     if (cat && CATEGORIES.some(c => c.id === cat)) setSelectedCategory(cat)
+    try {
+      const recent = JSON.parse(localStorage.getItem(RECENT_PLATFORMS_KEY) || "[]")
+      setRecentPlatforms(recent)
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -132,6 +168,11 @@ export default function TestSeriesPage() {
     setPlatformQuery(platform.name)
     setShowPlatformDropdown(false)
     fetchPlatformTests(platform)
+    saveRecentPlatform(platform)
+    try {
+      const recent = JSON.parse(localStorage.getItem(RECENT_PLATFORMS_KEY) || "[]")
+      setRecentPlatforms(recent)
+    } catch {}
   }
 
   const clearPlatform = () => { setSelectedPlatform(null); setPlatformQuery(""); setPlatformTests([]) }
@@ -169,7 +210,7 @@ export default function TestSeriesPage() {
   }
 
   const filteredTests = useMemo(() => {
-    let list = mockTests
+    let list = [...mockTests]
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(t =>
@@ -178,8 +219,10 @@ export default function TestSeriesPage() {
         t.category?.toLowerCase().includes(q)
       )
     }
+    if (sortBy === "duration") list.sort((a, b) => (a.duration || 999) - (b.duration || 999))
+    if (sortBy === "questions") list.sort((a, b) => (b.total_questions || 0) - (a.total_questions || 0))
     return list
-  }, [mockTests, search])
+  }, [mockTests, search, sortBy])
 
   const openQuiz = useCallback((test: MockTest) => {
     const params = new URLSearchParams({
@@ -304,6 +347,53 @@ export default function TestSeriesPage() {
 
   const totalDisplayed = selectedPlatform ? platformTests.length : filteredTests.length
 
+  const quickPractice = () => {
+    const samples = mockTests.filter(t => t.isSample)
+    const pool = samples.length > 0 ? samples : mockTests
+    if (pool.length === 0) return
+    const random = pool[Math.floor(Math.random() * pool.length)]
+    openQuiz(random)
+  }
+
+  const renderMockListItem = (test: MockTest, idx: number) => {
+    const color = getCategoryColor(test.category)
+    const Icon = getCategoryIcon(test.category)
+    const isLive = !test.isSample
+    return (
+      <Card
+        key={`list_${idx}_${(test.slug || test.id || "").slice(0, 12)}`}
+        className="flex items-center gap-3 px-4 py-3 border-border/50 hover:border-violet-400/40 hover:bg-muted/20 transition-all"
+      >
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}15` }}>
+          <Icon className="h-4 w-4" style={{ color }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-medium text-sm truncate">{test.title}</p>
+            {isLive
+              ? <Badge className="text-[9px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30 shrink-0">LIVE</Badge>
+              : <Badge className="text-[9px] bg-amber-500/10 text-amber-600 border-amber-500/30 shrink-0">PRACTICE</Badge>
+            }
+          </div>
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            {test._platformName && <span className="text-[10px] text-muted-foreground">{test._platformName}</span>}
+            {test.total_tests && test.total_tests > 0 ? <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Layers className="h-2.5 w-2.5" />{test.total_tests} tests</span> : null}
+            {test.duration && test.duration > 0 ? <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{test.duration}m</span> : null}
+            {test.total_questions && test.total_questions > 0 ? <span className="text-[10px] text-muted-foreground flex items-center gap-1"><FileText className="h-2.5 w-2.5" />{test.total_questions} Qs</span> : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button size="sm" onClick={() => openQuiz(test)} className="h-8 px-3 text-xs gap-1" style={{ backgroundColor: color }}>
+            <Play className="h-3 w-3 fill-current" /> Start
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => browseSeries(test)} className="h-8 w-8 p-0 border-border/60">
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24">
 
@@ -317,15 +407,27 @@ export default function TestSeriesPage() {
                 {loading ? "Loading tests from live platforms..." : `${totalDisplayed} mock tests · 9,686+ platforms`}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-white hover:bg-white/20"
-              onClick={() => fetchMockTests(selectedCategory)}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              {!loading && mockTests.length > 0 && (
+                <Button
+                  size="sm"
+                  onClick={quickPractice}
+                  className="bg-white/20 hover:bg-white/30 text-white border-0 gap-1.5 text-xs hidden sm:flex"
+                >
+                  <Shuffle className="h-3.5 w-3.5" />
+                  Quick Practice
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-white hover:bg-white/20"
+                onClick={() => fetchMockTests(selectedCategory)}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
           </div>
 
           {/* Stats bar */}
@@ -433,6 +535,33 @@ export default function TestSeriesPage() {
                 <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-background to-transparent" />
               </div>
             )}
+
+            {/* Sort + View toggle (bulk mode only) */}
+            {!selectedPlatform && (
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                    <SelectTrigger className="h-8 w-[140px] text-xs gap-1 border-border/50">
+                      <SortAsc className="h-3 w-3 text-muted-foreground" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="duration">Short Duration First</SelectItem>
+                      <SelectItem value="questions">Most Questions</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex rounded-lg border border-border/50 overflow-hidden">
+                  <button onClick={() => setViewMode("grid")} className={`p-1.5 transition-colors ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`} title="Grid view">
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => setViewMode("list")} className={`p-1.5 transition-colors ${viewMode === "list" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`} title="List view">
+                    <List className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -484,6 +613,58 @@ export default function TestSeriesPage() {
         {/* Bulk mode */}
         {!selectedPlatform && (
           <>
+            {/* Popular Platforms (shown when not loading and no search) */}
+            {!loading && !search && (
+              <div className="mb-6 space-y-3">
+                {/* Recent platforms */}
+                {recentPlatforms.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <History className="h-4 w-4 text-violet-500" />
+                      <span className="text-sm font-semibold">Recently Visited</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recentPlatforms.map((p, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handlePlatformSelect(p)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-violet-300/60 bg-violet-50/60 hover:bg-violet-100/80 text-violet-700 transition-colors"
+                        >
+                          <History className="h-3 w-3" />
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Popular platforms */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Flame className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm font-semibold">Popular Platforms</span>
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Quick Access</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {POPULAR_PLATFORMS.map((p, i) => {
+                      const color = getCategoryColor(p.category)
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handlePlatformSelect(p)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all hover:shadow-sm"
+                          style={{ borderColor: `${color}40`, color, backgroundColor: `${color}10` }}
+                        >
+                          <Database className="h-3 w-3" />
+                          {p.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {loading && (
               <div>
                 <div className="flex items-center gap-2 mb-5 text-sm text-muted-foreground">
@@ -548,9 +729,15 @@ export default function TestSeriesPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredTests.map((t, i) => renderMockCard(t, i))}
-                </div>
+                {viewMode === "grid" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredTests.map((t, i) => renderMockCard(t, i))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredTests.map((t, i) => renderMockListItem(t, i))}
+                  </div>
+                )}
               </>
             )}
 

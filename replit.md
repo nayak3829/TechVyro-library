@@ -161,6 +161,25 @@ Components that fetch from API:
 - **Tags display**: Tags shown in the PDF row for at-a-glance info
 - **Description preview**: First line of description visible in the list
 
+### Test-Series Powerful Enhancements (March 2026)
+- **`/test-series`** — Main page major improvements:
+  - **Quick Practice button**: Randomly pick and launch a practice test with one click
+  - **Sort controls**: Sort by Default / Shortest Duration / Most Questions
+  - **Grid/List toggle**: Switch between card grid and compact list view
+  - **Popular Platforms**: Quick-access chips for Parmar Academy, SSC Pinnacle, Oliveboard, Adda247, Wifistudy, Testbook, Drishti IAS, etc.
+  - **Recently Visited**: localStorage-based recent platform chips for quick re-access
+  - `saveRecentPlatform()` — saves to `techvyro_recent_platforms` in localStorage
+- **`/test-series/series`** — Complete redesign matching quiz UI/UX:
+  - **Gradient hero header**: Series stats (tests, subjects, questions, free count, attempted count)
+  - **Progress bar**: Visual completion % based on localStorage attempt tracking
+  - **Sticky controls bar**: Search tests, Free/Paid filter, Sort by (Default/Shortest/Longest/Most Questions), Grid/List toggle
+  - **Expand all / Collapse all**: One-click expand for all subject accordions
+  - **TestCard (grid view)**: Rich card showing title, free badge, attempt count, duration, questions, marks
+  - **TestRow (list view)**: Compact row with attempted checkmark, "Retry" vs "Start" button
+  - **Attempt tracking**: Uses `techvyro_test_attempts` localStorage key — counts per testId
+  - **Start First Test button** in header for instant access
+  - **Login prompt** for non-sample (live) test series
+
 ### Key Components
 - `app/admin/page.tsx` — Admin dashboard with tabs (now includes Power Tools)
 - `components/admin/tools-manager.tsx` — Power Tools: AI batch, health dashboard, export, bulk visibility
