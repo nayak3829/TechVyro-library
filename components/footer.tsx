@@ -60,9 +60,10 @@ export function Footer() {
 
   const quickLinks = [
     { name: "Home", href: "/" },
+    { name: "Browse PDFs", href: "/browse" },
     { name: "Quiz Portal", href: "/quiz" },
+    { name: "Mock Tests", href: "/test-series" },
     { name: "About Us", href: "/about" },
-    { name: "Admin Panel", href: "/admin" },
     { name: "Main Website", href: s.mainWebsite, external: true },
   ]
 
@@ -87,7 +88,7 @@ export function Footer() {
               </div>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Your go-to destination for educational PDFs. Free downloads with watermark protection. Quality content curated for learners.
+              Free PDFs, quiz portal, and mock tests — all in one place. Quality educational content curated for competitive exam aspirants.
             </p>
             <div className="flex gap-2 pt-1">
               {socialLinks.map((social) => (

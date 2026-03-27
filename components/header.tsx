@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation"
 import {
   FileText, Settings, Home, Search, X, Sparkles, Clock, TrendingUp, Filter,
   ChevronDown, Flame, Download, Star, BookOpen, FolderOpen, User, LogOut,
-  Info, MessageCircle, Trophy, Zap, GraduationCap, Layers, ArrowRight,
-  LayoutGrid, Send
+  Info, Trophy, Zap, GraduationCap, Layers, ArrowRight,
+  LayoutGrid
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,11 +61,9 @@ export function Header() {
   const [searching, setSearching] = useState(false)
   const [whatsappUrl, setWhatsappUrl] = useState(DEFAULT_WHATSAPP)
   const [browseOpen, setBrowseOpen] = useState(false)
-  const [resourcesOpen, setResourcesOpen] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
   const browseRef = useRef<HTMLDivElement>(null)
-  const resourcesRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -114,7 +112,6 @@ export function Header() {
         setSearchQuery("")
         setShowSuggestions(false)
         setBrowseOpen(false)
-        setResourcesOpen(false)
       }
     }
     window.addEventListener("keydown", handleKeyDown)
@@ -128,9 +125,6 @@ export function Header() {
       }
       if (browseRef.current && !browseRef.current.contains(e.target as Node)) {
         setBrowseOpen(false)
-      }
-      if (resourcesRef.current && !resourcesRef.current.contains(e.target as Node)) {
-        setResourcesOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -327,7 +321,7 @@ export function Header() {
               <span className="text-[#ef4444]">Tech</span>
               <span className="text-foreground">Vyro</span>
             </span>
-            <span className="text-[9px] sm:text-[10px] text-muted-foreground -mt-0.5 hidden sm:block font-medium">PDF Library</span>
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground -mt-0.5 hidden sm:block font-medium">Study Platform</span>
           </div>
         </Link>
 
@@ -418,7 +412,7 @@ export function Header() {
           {/* Browse Dropdown */}
           <div className="relative hidden lg:block" ref={browseRef}>
             <button
-              onClick={() => { setBrowseOpen(!browseOpen); setResourcesOpen(false) }}
+              onClick={() => setBrowseOpen(!browseOpen)}
               className={`flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${browseOpen ? "bg-primary/10 text-primary" : "text-foreground/80"}`}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -505,82 +499,20 @@ export function Header() {
             )}
           </div>
 
-          {/* Resources Dropdown */}
-          <div className="relative hidden lg:block" ref={resourcesRef}>
-            <button
-              onClick={() => { setResourcesOpen(!resourcesOpen); setBrowseOpen(false) }}
-              className={`flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${resourcesOpen ? "bg-primary/10 text-primary" : "text-foreground/80"}`}
-            >
-              <Zap className="h-4 w-4" />
-              Resources
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${resourcesOpen ? "rotate-180" : ""}`} />
-            </button>
+          {/* Quiz Portal - direct link */}
+          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-amber-500/10 hover:text-amber-600 text-sm font-medium">
+            <Link href="/quiz"><Trophy className="h-4 w-4" />Quiz Portal</Link>
+          </Button>
 
-            {resourcesOpen && (
-              <div className="absolute top-full left-0 mt-2 w-64 bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
-                <div className="p-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Resources</p>
-                  <div className="space-y-0.5">
-                    {[
-                      { href: "/quiz", icon: Trophy, label: "Quiz Portal", desc: "Test your knowledge", color: "text-amber-500", bg: "bg-amber-500/10" },
-                      { href: "/test-series", icon: Zap, label: "Mock Test", desc: "Practice unlimited mock tests", color: "text-violet-500", bg: "bg-violet-500/10" },
-                      { href: "/about", icon: Info, label: "About Us", desc: "Learn about TechVyro", color: "text-blue-500", bg: "bg-blue-500/10" },
-                    ].map(item => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setResourcesOpen(false)}
-                        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/60 transition-all group"
-                      >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.bg}`}>
-                          <item.icon className={`h-4 w-4 ${item.color}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
-                          <p className="text-[11px] text-muted-foreground">{item.desc}</p>
-                        </div>
-                      </Link>
-                    ))}
+          {/* Mock Tests - direct link */}
+          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-violet-500/10 hover:text-violet-600 text-sm font-medium">
+            <Link href="/test-series"><Zap className="h-4 w-4" />Mock Tests</Link>
+          </Button>
 
-                    <div className="h-px bg-border/50 my-1" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">Get Updates</p>
-
-                    <a
-                      href={whatsappUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setResourcesOpen(false)}
-                      className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#25D366]/10 transition-all group"
-                    >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#25D366]/10">
-                        <MessageCircle className="h-4 w-4 text-[#25D366]" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground group-hover:text-[#25D366] transition-colors">WhatsApp Channel</p>
-                        <p className="text-[11px] text-muted-foreground">Join for latest PDFs</p>
-                      </div>
-                    </a>
-
-                    <a
-                      href="https://t.me"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setResourcesOpen(false)}
-                      className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#229ED9]/10 transition-all group"
-                    >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#229ED9]/10">
-                        <Send className="h-4 w-4 text-[#229ED9]" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground group-hover:text-[#229ED9] transition-colors">Telegram Channel</p>
-                        <p className="text-[11px] text-muted-foreground">Instant notifications</p>
-                      </div>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* About - compact */}
+          <Button variant="ghost" size="sm" asChild className="hidden xl:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
+            <Link href="/about"><Info className="h-4 w-4" />About</Link>
+          </Button>
 
           <ThemeToggle />
 
