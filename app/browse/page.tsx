@@ -342,9 +342,9 @@ export default function BrowsePage() {
             </div>
 
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {[...Array(9)].map((_, i) => (
-                  <div key={i} className="rounded-2xl border border-border/50 bg-muted/30 p-5 animate-pulse h-40" />
+              <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="rounded-xl sm:rounded-2xl border border-border/50 bg-muted/30 p-4 sm:p-5 animate-pulse h-36 sm:h-40" />
                 ))}
               </div>
             ) : (
@@ -371,7 +371,7 @@ export default function BrowsePage() {
                         <Badge variant="secondary" className="text-[10px]">{filteredPdfs.length}</Badge>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                       {filteredPdfs.map(pdf => {
                         const color = pdf.category?.color || CATEGORY_COLORS[pdf.category?.name || ""] || "#6366f1"
                         const isNew = (Date.now() - new Date(pdf.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000

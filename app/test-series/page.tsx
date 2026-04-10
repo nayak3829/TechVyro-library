@@ -708,7 +708,7 @@ export default function TestSeriesPage() {
                   <p className="text-sm text-muted-foreground mb-5">
                     <span className="font-semibold text-foreground">{platformTests.length}</span> mock tests found
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                     {platformTests.map((t, i) => renderGridCard(t, i))}
                   </div>
                 </>
@@ -779,8 +779,8 @@ export default function TestSeriesPage() {
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     Fetching live mock tests from TechVyro platforms...
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {Array.from({ length: 16 }).map((_, i) => <SkeletonCard key={i} />)}
+                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                    {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
                   </div>
                 </div>
               )}
@@ -822,7 +822,7 @@ export default function TestSeriesPage() {
                   </div>
 
                   {viewMode === "grid" ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                       {filteredTests.map((t, i) => renderGridCard(t, i))}
                     </div>
                   ) : (
