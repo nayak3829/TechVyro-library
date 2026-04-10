@@ -16,7 +16,8 @@ export async function GET() {
       .single()
 
     const res = NextResponse.json({ folders: data?.value ?? [] })
-    res.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120")
+    // Short cache but allow revalidation - important for uploads
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate")
     return res
   } catch {
     return NextResponse.json({ folders: [] })

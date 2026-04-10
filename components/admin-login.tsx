@@ -33,11 +33,15 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
 
       if (response.ok && data.token) {
         onLogin(data.token)
+      } else if (response.status === 500 && data.error === "Admin not configured") {
+        setError("Admin password is not configured. Please set ADMIN_PASSWORD environment variable.")
+      } else if (response.status === 429) {
+        setError(data.error || "Too many login attempts. Please wait and try again.")
       } else {
         setError(data.error || "Invalid password")
       }
     } catch (error) {
-      setError("An error occurred. Please try again.")
+      setError("Could not connect to server. Please check your connection and try again.")
     } finally {
       setIsLoading(false)
     }

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { 
   Folder, ChevronRight, ChevronDown, Layers, FileText, FolderOpen,
-  BookOpen, Code, Calculator, FlaskConical, Globe, Briefcase, Zap, Database
+  BookOpen, Code, Calculator, FlaskConical, Globe, Briefcase, Zap, Database,
+  Loader2, AlertCircle, RefreshCw
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,35 +30,51 @@ interface StructureSelectorProps {
   onChange: (value: { folderId: string; categoryId: string; sectionId: string }) => void
   placeholder?: string
   className?: string
+  onCreateStructure?: () => void
 }
 
-export function StructureSelector({ value, onChange, placeholder = "Select location", className }: StructureSelectorProps) {
+export function StructureSelector({ value, onChange, placeholder = "Select location", className, onCreateStructure }: StructureSelectorProps) {
   const [folders, setFolders] = useState<ContentFolder[]>([])
   const [open, setOpen] = useState(false)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchFolders = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/folders")
+      if (!res.ok) throw new Error("Failed to load folders")
+      const data = await res.json()
+      if (Array.isArray(data.folders)) {
+        const sorted = [...data.folders]
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(folder => ({
+            ...folder,
+            categories: [...(folder.categories || [])]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(category => ({
+                ...category,
+                sections: [...(category.sections || [])].sort((a, b) => a.name.localeCompare(b.name))
+              }))
+          }))
+        setFolders(sorted)
+      } else {
+        setFolders([])
+      }
+    } catch (err) {
+      setError("Could not load content structure. Please try again.")
+      setFolders([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
-    fetch("/api/folders")
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data.folders)) {
-          const sorted = [...data.folders]
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map(folder => ({
-              ...folder,
-              categories: [...folder.categories]
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map(category => ({
-                  ...category,
-                  sections: [...category.sections].sort((a, b) => a.name.localeCompare(b.name))
-                }))
-            }))
-          setFolders(sorted)
-        }
-      })
-      .catch(() => {})
+    fetchFolders()
   }, [open])
 
   const toggleFolder = (id: string) => {
@@ -137,11 +154,29 @@ export function StructureSelector({ value, onChange, placeholder = "Select locat
         </div>
         
         <ScrollArea className="h-[300px]">
-          {folders.length === 0 ? (
+          {isLoading ? (
+            <div className="p-8 text-center">
+              <Loader2 className="h-6 w-6 mx-auto text-primary animate-spin mb-2" />
+              <p className="text-xs text-muted-foreground">Loading content structure...</p>
+            </div>
+          ) : error ? (
+            <div className="p-4 text-center">
+              <AlertCircle className="h-8 w-8 mx-auto text-destructive/60 mb-2" />
+              <p className="text-xs text-destructive mb-2">{error}</p>
+              <Button variant="outline" size="sm" onClick={fetchFolders} className="gap-1.5">
+                <RefreshCw className="h-3 w-3" /> Retry
+              </Button>
+            </div>
+          ) : folders.length === 0 ? (
             <div className="p-4 text-center">
               <FolderOpen className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
               <p className="text-xs text-muted-foreground">No content structure yet</p>
-              <p className="text-[10px] text-muted-foreground">Create folders in the Structure tab</p>
+              <p className="text-[10px] text-muted-foreground mb-3">Create folders in the Structure tab first</p>
+              {onCreateStructure && (
+                <Button variant="outline" size="sm" onClick={() => { setOpen(false); onCreateStructure(); }} className="gap-1.5">
+                  <Folder className="h-3 w-3" /> Go to Structure Tab
+                </Button>
+              )}
             </div>
           ) : (
             <div className="p-2 space-y-1">

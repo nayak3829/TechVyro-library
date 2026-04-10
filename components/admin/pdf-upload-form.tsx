@@ -218,15 +218,29 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
   const replaceTargetIdRef = useRef<string | null>(null)
 
   // ── Self-fetch categories with auto-refresh ──────────────────────
+  const [categoriesError, setCategoriesError] = useState<string | null>(null)
+  
   useEffect(() => {
     let mounted = true
     async function fetchCategories() {
       try {
         const res = await fetch("/api/categories")
-        if (!res.ok) return
+        if (!res.ok) {
+          if (mounted) setCategoriesError("Could not load categories")
+          return
+        }
         const data = await res.json()
-        if (mounted && data.categories?.length > 0) setCategoriesList(data.categories)
-      } catch {}
+        if (mounted) {
+          setCategoriesError(null)
+          if (data.categories?.length > 0) {
+            setCategoriesList(data.categories)
+          } else {
+            setCategoriesList([])
+          }
+        }
+      } catch {
+        if (mounted) setCategoriesError("Could not load categories")
+      }
     }
     fetchCategories()
     const interval = setInterval(fetchCategories, 2 * 60 * 1000)
@@ -715,6 +729,19 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
         </div>
       )}
 
+      {/* Setup Tip - Show when no categories exist */}
+      {categoriesList.length === 0 && entries.length === 0 && (
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-400/50 bg-amber-500/5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Tip: Set up your content structure first</p>
+            <p className="text-xs text-muted-foreground">Create folders, categories and sections to organize your PDFs better. You can still upload without them.</p>
+          </div>
+        </div>
+      )}
+
       {/* Drop Zone */}
       <div
         className={`relative border-2 border-dashed rounded-xl sm:rounded-2xl p-4 sm:p-10 text-center transition-all duration-300 cursor-pointer group ${
@@ -782,19 +809,30 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
                     <Label className="text-sm font-medium flex items-center gap-2">
                       <FolderPlus className="h-4 w-4 text-muted-foreground" /> Category
                     </Label>
-                    <Select value={globalCategory} onValueChange={setGlobalCategory}>
-                      <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <Select value={globalCategory} onValueChange={setGlobalCategory} disabled={categoriesList.length === 0}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder={categoriesList.length === 0 ? "No categories available" : "Select category"} />
+                      </SelectTrigger>
                       <SelectContent>
-                        {[...categoriesList].sort((a, b) => a.name.localeCompare(b.name)).map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            <span className="flex items-center gap-2">
-                              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                              {cat.name}
-                            </span>
-                          </SelectItem>
-                        ))}
+                        {categoriesList.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-muted-foreground">
+                            No categories yet. Create them in the Structure section below.
+                          </div>
+                        ) : (
+                          [...categoriesList].sort((a, b) => a.name.localeCompare(b.name)).map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              <span className="flex items-center gap-2">
+                                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                                {cat.name}
+                              </span>
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
+                    {categoriesList.length === 0 && (
+                      <p className="text-[10px] text-amber-600">Tip: Categories are optional but help organize your PDFs</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium flex items-center gap-2">

@@ -20,7 +20,10 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch categories" }, { status: 500 })
     }
 
-    return NextResponse.json({ categories: data })
+    // Prevent caching to ensure fresh data
+    const response = NextResponse.json({ categories: data })
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate")
+    return response
   } catch (error) {
     console.error("[v0] Categories GET error:", error)
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })

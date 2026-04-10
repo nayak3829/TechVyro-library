@@ -58,6 +58,14 @@ function LoginPageContent() {
   async function handleGoogleSignIn() {
     setGoogleLoading(true)
     try {
+      // Check if Supabase is configured
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (!supabaseUrl) {
+        toast.error("Authentication is not configured. Please contact admin.")
+        setGoogleLoading(false)
+        return
+      }
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -68,7 +76,13 @@ function LoginPageContent() {
           },
         },
       })
-      if (error) toast.error(error.message)
+      if (error) {
+        if (error.message.toLowerCase().includes("provider") || error.message.toLowerCase().includes("oauth")) {
+          toast.error("Google sign-in is not configured. Please use email/password or contact admin.")
+        } else {
+          toast.error(error.message)
+        }
+      }
     } catch {
       toast.error("Could not connect to authentication service. Please try again.")
     } finally {
@@ -81,6 +95,14 @@ function LoginPageContent() {
     if (!email.trim() || !password.trim()) return
     setLoading(true)
     try {
+      // Check if Supabase is configured
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (!supabaseUrl) {
+        toast.error("Authentication is not configured. Please contact admin.")
+        setLoading(false)
+        return
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -90,6 +112,8 @@ function LoginPageContent() {
           toast.error("Invalid email or password")
         } else if (error.message.toLowerCase().includes("email not confirmed")) {
           toast.error("Please verify your email first. Check your inbox.")
+        } else if (error.message.toLowerCase().includes("fetch") || error.message.toLowerCase().includes("network")) {
+          toast.error("Could not connect to server. Please check your connection.")
         } else {
           toast.error(error.message)
         }
@@ -98,6 +122,8 @@ function LoginPageContent() {
         router.push(redirectTo)
         router.refresh()
       }
+    } catch {
+      toast.error("Something went wrong. Please try again.")
     } finally {
       setLoading(false)
     }

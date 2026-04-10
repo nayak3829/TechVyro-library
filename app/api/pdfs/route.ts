@@ -38,7 +38,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch PDFs" }, { status: 500 })
     }
 
-    return NextResponse.json({ pdfs: data || [] })
+    // Prevent caching to ensure fresh data after uploads
+    const response = NextResponse.json({ pdfs: data || [] })
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate")
+    return response
   } catch (error) {
     console.error("[pdfs] PDFs GET error:", error)
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
