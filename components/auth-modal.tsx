@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { X, Mail, Lock, User, Eye, EyeOff, LogIn, UserPlus, Loader2 } from "lucide-react"
@@ -10,9 +11,11 @@ import { toast } from "sonner"
 
 interface AuthModalProps {
   onClose: () => void
+  redirectTo?: string
 }
 
-export function AuthModal({ onClose }: AuthModalProps) {
+export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
+  const router = useRouter()
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -28,9 +31,13 @@ export function AuthModal({ onClose }: AuthModalProps) {
   }
   const supabase = supabaseRef.current
 
+  // Get the redirect URL - stays on current page after login
   const getRedirectURL = () => {
     if (typeof window === "undefined") return ""
-    return `${window.location.origin}/auth/callback`
+    const origin = window.location.origin
+    const currentPath = redirectTo || window.location.pathname + window.location.search
+    const next = currentPath !== "/" ? `?next=${encodeURIComponent(currentPath)}` : ""
+    return `${origin}/auth/callback${next}`
   }
 
   async function handleGoogleSignIn() {
@@ -76,6 +83,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
       } else {
         toast.success("Welcome back!")
         onClose()
+        router.refresh()
       }
     } finally {
       setLoading(false)
@@ -112,6 +120,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
       } else {
         toast.success("Account created! You are now logged in.")
         onClose()
+        router.refresh()
       }
     } finally {
       setLoading(false)

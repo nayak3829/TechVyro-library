@@ -207,11 +207,11 @@ function SeriesContent() {
       <main className="flex-1 w-full">
 
         {/* Hero Header */}
-        <div className="bg-gradient-to-br from-violet-600 via-violet-700 to-indigo-800 text-white">
+        <div className="bg-gradient-to-br from-primary via-primary/90 to-accent text-primary-foreground">
           <div className="max-w-5xl mx-auto px-4 pt-6 pb-5">
             <button
               onClick={() => router.back()}
-              className="flex items-center gap-1.5 text-violet-200 hover:text-white text-sm mb-4 transition-colors"
+              className="flex items-center gap-1.5 text-primary-foreground/70 hover:text-primary-foreground text-sm mb-4 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" /> Back to Tests
             </button>
@@ -219,14 +219,14 @@ function SeriesContent() {
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
               <div className="flex-1">
                 <h1 className="text-xl sm:text-2xl font-bold leading-tight">{seriesTitle}</h1>
-                <p className="text-violet-200 text-sm mt-1">
+                <p className="text-primary-foreground/70 text-sm mt-1">
                   {loading ? "Loading test series..." : `${allRawTests.length} tests available`}
                 </p>
               </div>
               {!loading && !error && allRawTests.length > 0 && (
                 <Button
                   size="sm"
-                  className="bg-white text-violet-700 hover:bg-violet-50 font-semibold gap-2 shrink-0"
+                  className="bg-white text-primary hover:bg-white/90 font-semibold gap-2 shrink-0"
                   onClick={() => { const t = allRawTests.find(t => t.is_free || isSample) || allRawTests[0]; if (t) startTest(t) }}
                 >
                   <Play className="h-4 w-4 fill-current" /> Start First Test
@@ -271,19 +271,19 @@ function SeriesContent() {
                 {/* Progress bar (if attempts exist) */}
                 {attemptedCount > 0 && (
                   <div className="mt-4 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-violet-200">
+                    <div className="flex items-center justify-between text-xs text-primary-foreground/70">
                       <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Your Progress</span>
                       <span>{attemptedCount}/{allRawTests.length} tests attempted ({completionPct}%)</span>
                     </div>
-                    <Progress value={completionPct} className="h-1.5 bg-white/20" />
+                    <Progress value={completionPct} className="h-1.5 bg-primary-foreground/20" />
                   </div>
                 )}
 
                 {/* Login prompt for non-sample */}
-                {!isSample && (
-                  <div className="mt-3 flex items-center gap-2 bg-amber-400/20 border border-amber-400/30 rounded-lg px-3 py-2 text-xs">
-                    <Lock className="h-3.5 w-3.5 text-yellow-200 shrink-0" />
-                    <span className="text-yellow-100">
+                {!isSample && !user && (
+                  <div className="mt-3 flex items-center gap-2 bg-primary-foreground/10 border border-primary-foreground/20 rounded-lg px-3 py-2 text-xs">
+                    <Lock className="h-3.5 w-3.5 text-primary-foreground/70 shrink-0" />
+                    <span className="text-primary-foreground/90">
                       <Link href="/login" className="font-semibold underline">Login</Link> to save your progress and access all tests
                     </span>
                   </div>
@@ -360,7 +360,7 @@ function SeriesContent() {
 
           {loading && (
             <div className="flex flex-col items-center justify-center py-24 gap-3">
-              <Loader2 className="h-10 w-10 animate-spin text-violet-600" />
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Fetching test series...</p>
             </div>
           )}
@@ -394,7 +394,7 @@ function SeriesContent() {
                     </p>
                     <button
                       onClick={() => { setSearchQuery(""); setFilterFree("all"); setSortBy("default") }}
-                      className="text-xs text-violet-600 hover:underline flex items-center gap-1"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
                       <X className="h-3 w-3" /> Clear filters
                     </button>
@@ -427,12 +427,12 @@ function SeriesContent() {
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center justify-between">
                         <h2 className="text-base font-semibold flex items-center gap-2">
-                          <BookOpen className="h-5 w-5 text-violet-600" />
+                          <BookOpen className="h-5 w-5 text-primary" />
                           Subjects ({subjects.length})
                         </h2>
                         <button
                           onClick={toggleExpandAll}
-                          className="text-xs text-violet-600 hover:underline flex items-center gap-1"
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
                         >
                           {expandAll ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                           {expandAll ? "Collapse all" : "Expand all"}
@@ -457,8 +457,8 @@ function SeriesContent() {
                               onClick={() => setExpanded(prev => ({ ...prev, [subjId]: !prev[subjId] }))}
                             >
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
-                                  <BookOpen className="h-4 w-4 text-violet-600" />
+                                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                  <BookOpen className="h-4 w-4 text-primary" />
                                 </div>
                                 <div className="min-w-0">
                                   <span className="font-medium text-sm">{name}</span>
@@ -468,7 +468,7 @@ function SeriesContent() {
                                       <Badge className="text-[10px] h-4 px-1.5 bg-green-500/10 text-green-600 border-green-500/20">{freeInSubj} free</Badge>
                                     )}
                                     {attemptedInSubj > 0 && (
-                                      <Badge className="text-[10px] h-4 px-1.5 bg-violet-500/10 text-violet-600 border-violet-500/20">
+                                      <Badge className="text-[10px] h-4 px-1.5 bg-primary/10 text-primary border-primary/20">
                                         <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
                                         {attemptedInSubj}/{rawSubjTests.length}
                                       </Badge>
@@ -515,7 +515,7 @@ function SeriesContent() {
                   {tests.length > 0 && (
                     <div className="space-y-3">
                       <h2 className="text-base font-semibold flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-violet-600" />
+                        <FileText className="h-5 w-5 text-primary" />
                         All Tests ({tests.length})
                       </h2>
                       {viewMode === "grid" ? (
@@ -601,7 +601,7 @@ function TestRow({ test, isSample, attempt, onStart }: {
         className={`gap-1.5 shrink-0 h-9 px-4 text-xs font-semibold transition-all ${
           attempted
             ? "bg-emerald-600 hover:bg-emerald-700"
-            : "bg-violet-600 hover:bg-violet-700"
+            : "bg-gradient-to-r from-primary to-accent hover:opacity-90"
         }`}
       >
         <Play className="h-3.5 w-3.5 fill-current" />
@@ -622,7 +622,7 @@ function TestCard({ test, isSample, attempt, onStart }: {
 
   return (
     <div className={`relative rounded-xl border p-4 flex flex-col gap-3 hover:shadow-md transition-all ${
-      attempted ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/60 hover:border-violet-400/40 bg-card"
+      attempted ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/60 hover:border-primary/40 bg-card"
     }`}>
       {attempted && (
         <div className="absolute top-3 right-3">
@@ -649,7 +649,7 @@ function TestCard({ test, isSample, attempt, onStart }: {
         size="sm"
         onClick={onStart}
         className={`w-full h-9 gap-1.5 text-xs font-semibold ${
-          attempted ? "bg-emerald-600 hover:bg-emerald-700" : "bg-violet-600 hover:bg-violet-700"
+          attempted ? "bg-emerald-600 hover:bg-emerald-700" : "bg-gradient-to-r from-primary to-accent hover:opacity-90"
         }`}
       >
         <Play className="h-3.5 w-3.5 fill-current" />
@@ -663,7 +663,7 @@ export default function SeriesPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     }>
       <SeriesContent />
