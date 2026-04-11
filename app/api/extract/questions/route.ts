@@ -149,17 +149,73 @@ export async function GET(request: Request) {
 
   // Short-circuit: sample tests — skip all live API calls
   if (apiBase.startsWith("sample:")) {
+    // First try direct test ID match
     const sampleQ = getSampleQuestions(testId)
     if (sampleQ && sampleQ.length > 0) {
       return NextResponse.json({ success: true, questions: sampleQ, total: sampleQ.length })
     }
+    
+    // Find the test or series to get its category for fallback
+    let testCategory = "ssc-banking"
+    let foundQuestions: typeof sampleQ = null
+    
     for (const series of getAllSampleSeries()) {
-      const matched = series.tests.find(t => t.id === testId)
-      if (matched) {
-        return NextResponse.json({ success: true, questions: matched.questions, total: matched.questions.length })
+      // Check if testId matches a test ID
+      const matchedTest = series.tests.find(t => t.id === testId)
+      if (matchedTest) {
+        testCategory = series.category
+        if (matchedTest.questions && matchedTest.questions.length > 0) {
+          foundQuestions = matchedTest.questions
+        }
+        break
+      }
+      
+      // Check if testId matches series slug or series ID (clicking on series card)
+      if (series.slug === testId || series.id === testId) {
+        testCategory = series.category
+        // Find first test in this series with questions
+        const testWithQuestions = series.tests.find(t => t.questions && t.questions.length > 0)
+        if (testWithQuestions) {
+          foundQuestions = testWithQuestions.questions
+        }
+        break
       }
     }
-    return NextResponse.json({ error: "Sample test not found", testId }, { status: 404 })
+    
+    if (foundQuestions && foundQuestions.length > 0) {
+      return NextResponse.json({ success: true, questions: foundQuestions, total: foundQuestions.length })
+    }
+    
+    // Fallback: get sample questions from same category
+    const categorySeries = getSampleSeriesForCategory(testCategory)
+    for (const series of categorySeries) {
+      for (const test of series.tests) {
+        if (test.questions && test.questions.length > 0) {
+          return NextResponse.json({ 
+            success: true, 
+            questions: test.questions, 
+            total: test.questions.length,
+            notice: "Showing practice questions from this category."
+          })
+        }
+      }
+    }
+    
+    // Ultimate fallback: get any available sample questions
+    for (const series of getAllSampleSeries()) {
+      for (const test of series.tests) {
+        if (test.questions && test.questions.length > 0) {
+          return NextResponse.json({ 
+            success: true, 
+            questions: test.questions, 
+            total: test.questions.length,
+            notice: "Showing sample practice questions."
+          })
+        }
+      }
+    }
+    
+    return NextResponse.json({ error: "No sample questions available", testId }, { status: 404 })
   }
 
   const errors: string[] = []
