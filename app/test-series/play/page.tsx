@@ -272,34 +272,15 @@ function PlayContent() {
             </ul>
           </div>
 
-          {/* Login gate or Start */}
-          {!localUser && !isSample ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl p-4">
-                <Lock className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Login Required</p>
-                  <p className="text-xs text-muted-foreground">Sign in to attempt tests and save your progress</p>
-                </div>
-              </div>
-              <Button
-                onClick={() => setShowAuthModal(true)}
-                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 gap-2"
-              >
-                <Lock className="h-5 w-5" />
-                Login to Start Test
-              </Button>
-            </div>
-          ) : (
-            <Button
-              onClick={handleStart}
-              disabled={loading}
-              className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 gap-2 shadow-lg"
-            >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
-              {loading ? "Loading Questions..." : "Start Test Now"}
-            </Button>
-          )}
+          {/* Start Test Button - same UI for logged in and logged out */}
+          <Button
+            onClick={handleStart}
+            disabled={loading}
+            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 gap-2 shadow-lg"
+          >
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
+            {loading ? "Loading Questions..." : "Start Test Now"}
+          </Button>
 
           <p className="text-center text-xs text-muted-foreground mt-4">
             All tests run inside TechVyro - no external websites
