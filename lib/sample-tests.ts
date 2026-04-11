@@ -356,14 +356,15 @@ export const SAMPLE_SERIES: SampleSeries[] = [
 
 // Category alias mapping for better matching
 const CATEGORY_ALIASES: Record<string, string[]> = {
-  "ssc": ["ssc-banking", "ssc", "ssc-cgl", "ssc-chsl"],
-  "banking": ["ssc-banking", "banking", "ibps", "sbi"],
-  "defence": ["nda", "defence", "cds", "army"],
-  "railways": ["railways", "rrb", "ntpc"],
-  "upsc": ["upsc", "ias", "pcs"],
-  "jee-neet": ["jee-neet", "jee", "neet", "physics"],
-  "teaching": ["teaching", "ctet", "tet"],
-  "general": ["general", "all"],
+  "ssc": ["ssc-banking", "ssc", "ssc-cgl", "ssc-chsl", "police"],
+  "banking": ["ssc-banking", "banking", "ibps", "sbi", "rbi"],
+  "defence": ["nda", "defence", "cds", "army", "navy", "airforce", "afcat"],
+  "railways": ["railways", "rrb", "ntpc", "alp"],
+  "upsc": ["upsc", "ias", "pcs", "epfo", "capf"],
+  "jee-neet": ["jee-neet", "jee", "neet", "physics", "chemistry", "biology", "medical"],
+  "teaching": ["teaching", "ctet", "tet", "kvs", "dsssb", "super-tet"],
+  "agriculture": ["agriculture", "icar", "nabard", "fci", "iffco", "kisan"],
+  "general": ["general", "all", "other"],
 }
 
 // Get sample series for a platform category
