@@ -66,10 +66,12 @@ function LoginPageContent() {
         return
       }
       
+      console.log("[v0] Starting Google OAuth flow...")
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: getRedirectURL(),
+          skipBrowserRedirect: false,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -77,13 +79,15 @@ function LoginPageContent() {
         },
       })
       if (error) {
+        console.log("[v0] OAuth Error:", error)
         if (error.message.toLowerCase().includes("provider") || error.message.toLowerCase().includes("oauth")) {
           toast.error("Google sign-in is not configured. Please use email/password or contact admin.")
         } else {
           toast.error(error.message)
         }
       }
-    } catch {
+    } catch (err) {
+      console.log("[v0] OAuth Exception:", err)
       toast.error("Could not connect to authentication service. Please try again.")
     } finally {
       setGoogleLoading(false)
