@@ -54,14 +54,17 @@ function extractNextData(html: string): Record<string, unknown> | null {
 function findTestSeries(data: unknown): unknown[] {
   if (!data || typeof data !== "object") return []
   const obj = data as Record<string, unknown>
+  const props = obj.props as Record<string, unknown> | undefined
+  const pageProps = props?.pageProps as Record<string, unknown> | undefined
+  const pagePropsData = pageProps?.data as Record<string, unknown> | undefined
   
   // Check common paths
   const paths = [
-    obj.props?.pageProps?.testSeries,
-    obj.props?.pageProps?.data?.testSeries,
-    obj.props?.pageProps?.courses,
-    obj.props?.pageProps?.data?.courses,
-    obj.props?.pageProps?.data,
+    pageProps?.testSeries,
+    pagePropsData?.testSeries,
+    pageProps?.courses,
+    pagePropsData?.courses,
+    pagePropsData,
     obj.testSeries,
     obj.courses,
     obj.data,
