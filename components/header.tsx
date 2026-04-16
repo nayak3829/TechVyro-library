@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
+import { useAdmin } from "@/hooks/use-admin"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,7 @@ interface LiveResult {
 export function Header() {
   const router = useRouter()
   const { user, loading: authLoading, signOut } = useAuth()
+  const { isAdmin, isLoading: adminLoading } = useAdmin()
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isScrolled, setIsScrolled] = useState(false)
@@ -586,12 +588,14 @@ export function Header() {
               </Button>
             )}
 
-          <Button variant="outline" size="sm" asChild className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300">
-            <Link href="/admin">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Admin</span>
-            </Link>
-          </Button>
+          {!adminLoading && isAdmin && (
+            <Button variant="outline" size="sm" asChild className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-primary/30 hover:border-destructive/50 hover:bg-destructive/5 transition-all duration-300">
+              <Link href="/admin">
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            </Button>
+          )}
         </nav>
       </div>
 

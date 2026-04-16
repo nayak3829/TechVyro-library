@@ -1,32 +1,73 @@
 import { createHmac, timingSafeEqual } from "crypto"
+import { Redis } from "@upstash/redis"
 
 const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
-// In-memory rate limiting (resets on server restart, good enough for single-instance)
-const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+// Redis-based rate limiting (persists across serverless instances)
+const RATE_LIMIT_WINDOW_SECONDS = 15 * 60 // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 10
 
-export function checkRateLimit(ip: string): { allowed: boolean; retryAfterMs: number } {
-  const now = Date.now()
-  const entry = loginAttempts.get(ip)
+function getRedis(): Redis | null {
+  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    return null
+  }
+  return new Redis({
+    url: process.env.KV_REST_API_URL,
+    token: process.env.KV_REST_API_TOKEN,
+  })
+}
 
-  if (!entry || now - entry.firstAttempt > RATE_LIMIT_WINDOW_MS) {
-    loginAttempts.set(ip, { count: 1, firstAttempt: now })
+function getRateLimitKey(ip: string): string {
+  return `admin_rate_limit:${ip}`
+}
+
+export async function checkRateLimit(ip: string): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const redis = getRedis()
+  
+  // Fallback to allow if Redis is not configured (development mode)
+  if (!redis) {
+    console.warn("[v0] Redis not configured, rate limiting disabled")
     return { allowed: true, retryAfterMs: 0 }
   }
 
-  if (entry.count >= RATE_LIMIT_MAX_ATTEMPTS) {
-    const retryAfterMs = RATE_LIMIT_WINDOW_MS - (now - entry.firstAttempt)
-    return { allowed: false, retryAfterMs }
+  const key = getRateLimitKey(ip)
+  
+  try {
+    // Get current attempt count
+    const currentCount = await redis.get<number>(key)
+    
+    if (currentCount === null) {
+      // First attempt - set count to 1 with expiration
+      await redis.set(key, 1, { ex: RATE_LIMIT_WINDOW_SECONDS })
+      return { allowed: true, retryAfterMs: 0 }
+    }
+    
+    if (currentCount >= RATE_LIMIT_MAX_ATTEMPTS) {
+      // Get TTL to calculate retry time
+      const ttl = await redis.ttl(key)
+      const retryAfterMs = ttl > 0 ? ttl * 1000 : 0
+      return { allowed: false, retryAfterMs }
+    }
+    
+    // Increment attempt count (keeps existing TTL)
+    await redis.incr(key)
+    return { allowed: true, retryAfterMs: 0 }
+  } catch (error) {
+    console.error("[v0] Redis rate limit error:", error)
+    // Fail open - allow request if Redis errors
+    return { allowed: true, retryAfterMs: 0 }
   }
-
-  entry.count++
-  return { allowed: true, retryAfterMs: 0 }
 }
 
-export function resetRateLimit(ip: string) {
-  loginAttempts.delete(ip)
+export async function resetRateLimit(ip: string): Promise<void> {
+  const redis = getRedis()
+  if (!redis) return
+  
+  try {
+    await redis.del(getRateLimitKey(ip))
+  } catch (error) {
+    console.error("[v0] Redis reset rate limit error:", error)
+  }
 }
 
 function computeHmac(adminPassword: string, timestamp: string): string {

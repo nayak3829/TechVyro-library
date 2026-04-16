@@ -3,7 +3,7 @@ import { createAdminToken, checkRateLimit, resetRateLimit, getClientIp } from "@
 
 export async function POST(request: Request) {
   const ip = getClientIp(request)
-  const rateCheck = checkRateLimit(ip)
+  const rateCheck = await checkRateLimit(ip)
 
   if (!rateCheck.allowed) {
     const retryAfterSecs = Math.ceil(rateCheck.retryAfterMs / 1000)
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid password" }, { status: 401 })
     }
 
-    resetRateLimit(ip)
+    await resetRateLimit(ip)
     const token = createAdminToken(adminPassword)
     return NextResponse.json({ token })
   } catch {
