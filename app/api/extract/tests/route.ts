@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server"
-import { SAMPLE_SERIES } from "@/lib/sample-tests"
+import type { SampleSeries } from "@/lib/sample-tests"
+
+// Lazy load sample tests only when needed (saves ~215KB from initial bundle)
+async function getSampleSeries(): Promise<SampleSeries[]> {
+  const { SAMPLE_SERIES } = await import("@/lib/sample-tests")
+  return SAMPLE_SERIES
+}
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 15000) {
   const controller = new AbortController()
@@ -78,8 +84,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "slug and apiBase required" }, { status: 400 })
   }
 
-  // Handle sample series
+  // Handle sample series (lazy loaded)
   if (apiBase.startsWith("sample:")) {
+    const SAMPLE_SERIES = await getSampleSeries()
     const series = SAMPLE_SERIES.find(s => s.slug === slug || s.id === slug)
     if (series) {
       const subjects = [{
@@ -156,8 +163,9 @@ export async function GET(request: Request) {
     }
   } catch {}
 
-  // Fallback: return sample tests for the category detected from slug/URL
-  const category = detectCategory(slug, webBase, apiBase)
+  // Fallback: return sample tests for the category detected from slug/URL (lazy loaded)
+  const SAMPLE_SERIES = await getSampleSeries()
+  const category = detectCategory(slug, webBase || "", apiBase)
   const sampleSeries = SAMPLE_SERIES.filter(s => 
     s.category === category || s.slug.includes(category)
   )

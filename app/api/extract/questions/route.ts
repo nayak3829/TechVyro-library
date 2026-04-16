@@ -1,5 +1,16 @@
 import { NextResponse } from "next/server"
-import { getSampleQuestions, getAllSampleSeries, getSampleSeriesForCategory, mapUrlToCategory } from "@/lib/sample-tests"
+import type { SampleQuestion, SampleSeries } from "@/lib/sample-tests"
+
+// Lazy load sample test helpers only when needed (saves ~215KB from initial bundle)
+async function loadSampleHelpers() {
+  const module = await import("@/lib/sample-tests")
+  return {
+    getSampleQuestions: module.getSampleQuestions,
+    getAllSampleSeries: module.getAllSampleSeries,
+    getSampleSeriesForCategory: module.getSampleSeriesForCategory,
+    mapUrlToCategory: module.mapUrlToCategory,
+  }
+}
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 3000) {
   const controller = new AbortController()
@@ -147,8 +158,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "testId and apiBase required" }, { status: 400 })
   }
 
-  // Short-circuit: sample tests — skip all live API calls
+  // Short-circuit: sample tests — skip all live API calls (lazy loaded)
   if (apiBase.startsWith("sample:")) {
+    const { getSampleQuestions, getAllSampleSeries, getSampleSeriesForCategory } = await loadSampleHelpers()
+    
     // First try direct test ID match
     const sampleQ = getSampleQuestions(testId)
     if (sampleQ && sampleQ.length > 0) {
@@ -157,7 +170,7 @@ export async function GET(request: Request) {
     
     // Find the test or series to get its category for fallback
     let testCategory = "ssc-banking"
-    let foundQuestions: typeof sampleQ = null
+    let foundQuestions: SampleQuestion[] | null = null
     
     for (const series of getAllSampleSeries()) {
       // Check if testId matches a test ID
@@ -256,7 +269,9 @@ export async function GET(request: Request) {
     }
   }
 
-  // Check if this is a sample test ID
+  // Check if this is a sample test ID (lazy load helpers)
+  const { getSampleQuestions, getAllSampleSeries, getSampleSeriesForCategory, mapUrlToCategory } = await loadSampleHelpers()
+  
   const sampleQuestions = getSampleQuestions(testId)
   if (sampleQuestions && sampleQuestions.length > 0) {
     return NextResponse.json({ success: true, questions: sampleQuestions, total: sampleQuestions.length })
