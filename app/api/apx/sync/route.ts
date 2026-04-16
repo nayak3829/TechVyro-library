@@ -115,6 +115,13 @@ export async function POST(request: NextRequest) {
     const { category, limit = 10 } = await request.json()
     const supabase = await createClient()
     
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: "Database connection not available",
+      }, { status: 503 })
+    }
+    
     // Select random platforms to sync
     const shuffled = [...PLATFORM_LIST].sort(() => Math.random() - 0.5)
     const platformsToSync = shuffled.slice(0, limit)
@@ -205,6 +212,14 @@ export async function GET(request: NextRequest) {
   
   try {
     const supabase = await createClient()
+    
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: "Database connection not available",
+        testSeries: [],
+      }, { status: 503 })
+    }
     
     let query = supabase
       .from("apx_test_series")
