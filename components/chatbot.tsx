@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
+import { sanitizeChatbotHtml } from "@/lib/sanitize"
 
 interface Message {
   id: string
@@ -114,7 +115,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       nodes.push(
         <div key={k++} className="flex gap-1.5 mt-0.5">
           <span className="text-violet-500 dark:text-violet-400 shrink-0 font-bold mt-px leading-tight">•</span>
-          <span className="leading-relaxed text-[11px]" dangerouslySetInnerHTML={{ __html: inlineFormat(trimmed.replace(/^[-•*]\s+/, "")) }} />
+          <span className="leading-relaxed text-[11px]" dangerouslySetInnerHTML={{ __html: sanitizeChatbotHtml(inlineFormat(trimmed.replace(/^[-•*]\s+/, ""))) }} />
         </div>
       )
       i++; continue
@@ -126,7 +127,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       nodes.push(
         <div key={k++} className="flex gap-1.5 mt-0.5">
           <span className="text-violet-600 dark:text-violet-400 shrink-0 font-bold text-[10px] min-w-[14px] mt-0.5 leading-tight">{numMatch[1]}.</span>
-          <span className="leading-relaxed text-[11px]" dangerouslySetInnerHTML={{ __html: inlineFormat(numMatch[2]) }} />
+          <span className="leading-relaxed text-[11px]" dangerouslySetInnerHTML={{ __html: sanitizeChatbotHtml(inlineFormat(numMatch[2])) }} />
         </div>
       )
       i++; continue
@@ -134,7 +135,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
 
     // Regular paragraph
     nodes.push(
-      <p key={k++} className="mt-0.5 leading-relaxed text-[11px]" dangerouslySetInnerHTML={{ __html: inlineFormat(trimmed) }} />
+      <p key={k++} className="mt-0.5 leading-relaxed text-[11px]" dangerouslySetInnerHTML={{ __html: sanitizeChatbotHtml(inlineFormat(trimmed)) }} />
     )
     i++
   }

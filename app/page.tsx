@@ -15,6 +15,7 @@ import { Chatbot } from "@/components/chatbot"
 import { PDFGrid } from "@/components/pdf-grid"
 import { Footer } from "@/components/footer"
 import { Skeleton } from "@/components/ui/skeleton"
+import { sanitizeHtml } from "@/lib/sanitize"
 import type { PDF, Category } from "@/lib/types"
 
 export const revalidate = 60
@@ -239,7 +240,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                     <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Learning?</span>
                   </>
                 ) : (
-                  <span dangerouslySetInnerHTML={{ __html: hp.ctaTitle }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(hp.ctaTitle) }} />
                 )}
               </h3>
 
