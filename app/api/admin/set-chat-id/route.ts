@@ -21,9 +21,13 @@ export async function GET(request: Request) {
   const supabase = createAdminClient()
 
   // Try to create table first (in case it doesn't exist)
-  await supabase.rpc("exec_sql", {
-    sql: `CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value JSONB NOT NULL DEFAULT '{}', updated_at TIMESTAMPTZ DEFAULT NOW()); ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;`
-  }).catch(() => {})
+  try {
+    await supabase.rpc("exec_sql", {
+      sql: `CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value JSONB NOT NULL DEFAULT '{}', updated_at TIMESTAMPTZ DEFAULT NOW()); ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;`
+    })
+  } catch {
+    // Ignore errors - table may already exist or exec_sql may not be available
+  }
 
   const { error } = await supabase
     .from("site_settings")
