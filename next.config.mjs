@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   allowedDevOrigins: ["*.janeway.replit.dev", "*.replit.dev", "*.repl.co"],
   images: {
