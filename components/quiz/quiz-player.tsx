@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { saveQuizHistory } from "@/components/quiz-history-section"
+import { sanitizeHtml } from "@/lib/sanitize"
 
 interface Question {
   qid: string
@@ -924,7 +925,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
               {/* Question Text */}
               <div 
                 className={`p-3 sm:p-4 rounded-lg mb-4 sm:mb-6 border-l-4 border-primary text-xs sm:text-base leading-relaxed ${darkMode ? "bg-gray-700" : "bg-muted/50"}`}
-                dangerouslySetInnerHTML={{ __html: currentQuestion.question }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentQuestion.question) }}
               />
 
               {/* Options */}
@@ -969,7 +970,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
                       </div>
                       <span 
                         className="flex-1 leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: option }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(option) }}
                       />
                       {reviewMode && showAsCorrect && (
                         <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 shrink-0" />
@@ -988,7 +989,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
                   <summary className="cursor-pointer font-bold text-primary text-xs sm:text-sm">View Solution</summary>
                   <div 
                     className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-border text-xs sm:text-sm"
-                    dangerouslySetInnerHTML={{ __html: currentQuestion.explanation }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentQuestion.explanation) }}
                   />
                 </details>
               )}

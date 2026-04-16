@@ -82,9 +82,9 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.png',
   },
-  verification: {
-    google: 'your-google-verification-code',
-  },
+  verification: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION_CODE 
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION_CODE }
+    : undefined,
 }
 
 export default function RootLayout({
