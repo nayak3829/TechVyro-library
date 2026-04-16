@@ -47,6 +47,7 @@ export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
         provider: "google",
         options: {
           redirectTo: getRedirectURL(),
+          skipBrowserRedirect: false,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -54,9 +55,11 @@ export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
         },
       })
       if (error) {
+        console.log("[v0] OAuth Error:", error)
         toast.error(error.message)
       }
-    } catch {
+    } catch (err) {
+      console.log("[v0] OAuth Exception:", err)
       toast.error("Could not connect to Google. Please try email login.")
     } finally {
       setGoogleLoading(false)
