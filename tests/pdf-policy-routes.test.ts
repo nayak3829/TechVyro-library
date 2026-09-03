@@ -148,7 +148,10 @@ describe("PDF route privacy policy", () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
-      pdfs: [{ id: "public", title: "Public", visibility: "public", publish_status: "published" }],
+      pdfs: [{
+        id: "public", title: "Public", visibility: "public", publish_status: "published",
+        thumbnail_url: "/api/pdfs/public/thumbnail",
+      }],
     })
     expect(state.listingFilters).toContainEqual(["visibility", "public"])
     expect(state.listingFilters).toContainEqual(["publish_status", "published"])
@@ -162,9 +165,9 @@ describe("PDF route privacy policy", () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
       pdfs: [
-        { id: "public", title: "Public", visibility: "public" },
-        { id: "unlisted", title: "Unlisted", visibility: "unlisted" },
-        { id: "private", title: "Private", visibility: "private" },
+        { id: "public", title: "Public", visibility: "public", thumbnail_url: "/api/pdfs/public/thumbnail" },
+        { id: "unlisted", title: "Unlisted", visibility: "unlisted", thumbnail_url: "/api/pdfs/unlisted/thumbnail" },
+        { id: "private", title: "Private", visibility: "private", thumbnail_url: "/api/pdfs/private/thumbnail" },
       ],
     })
     expect(state.listingFilters).not.toContainEqual(["visibility", "public"])

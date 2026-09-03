@@ -9,6 +9,8 @@ interface RouteProps {
   params: Promise<{ id: string }>
 }
 
+const MAX_INLINE_WATERMARK_BYTES = 15 * 1024 * 1024
+
 export async function GET(request: Request, { params }: RouteProps) {
   try {
     const { id } = await params
@@ -65,36 +67,40 @@ export async function GET(request: Request, { params }: RouteProps) {
     const originalPdfBytes = await fileData.arrayBuffer()
 
     let responseBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(originalPdfBytes)
-    if (watermark.enabled) {
-      const pdfDoc = await PDFDocument.load(originalPdfBytes, {
-        ignoreEncryption: true,
-        updateMetadata: false,
-      })
-      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
-      for (const page of pdfDoc.getPages()) {
-        const { width, height } = page.getSize()
-        const fontSize = Math.min(width, height) * 0.08
-        const textWidth = helveticaFont.widthOfTextAtSize(watermark.text, fontSize)
-        const x = Math.max(15, (width - textWidth) / 2)
-        const y = watermark.position === "header"
-          ? height - fontSize - 20
-          : watermark.position === "footer"
-            ? 20
-            : height / 2
-        page.drawText(watermark.text, {
-          x,
-          y,
-          size: fontSize,
-          font: helveticaFont,
-          color: rgb(0.55, 0.55, 0.55),
-          opacity: watermark.opacity,
-          rotate: watermark.position === "diagonal" ? degrees(-35) : degrees(0),
+    if (watermark.enabled && originalPdfBytes.byteLength <= MAX_INLINE_WATERMARK_BYTES) {
+      try {
+        const pdfDoc = await PDFDocument.load(originalPdfBytes, {
+          ignoreEncryption: true,
+          updateMetadata: false,
         })
+        const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
+        for (const page of pdfDoc.getPages()) {
+          const { width, height } = page.getSize()
+          const fontSize = Math.min(width, height) * 0.08
+          const textWidth = helveticaFont.widthOfTextAtSize(watermark.text, fontSize)
+          const x = Math.max(15, (width - textWidth) / 2)
+          const y = watermark.position === "header"
+            ? height - fontSize - 20
+            : watermark.position === "footer"
+              ? 20
+              : height / 2
+          page.drawText(watermark.text, {
+            x,
+            y,
+            size: fontSize,
+            font: helveticaFont,
+            color: rgb(0.55, 0.55, 0.55),
+            opacity: watermark.opacity,
+            rotate: watermark.position === "diagonal" ? degrees(-35) : degrees(0),
+          })
+        }
+        pdfDoc.setTitle(pdf.title)
+        pdfDoc.setCreator(`${watermark.siteName} PDF Library`)
+        pdfDoc.setProducer(watermark.siteName)
+        responseBytes = await pdfDoc.save()
+      } catch (watermarkError) {
+        console.warn("[pdf/download-watermarked] Watermark failed; serving verified original:", watermarkError)
       }
-      pdfDoc.setTitle(pdf.title)
-      pdfDoc.setCreator(`${watermark.siteName} PDF Library`)
-      pdfDoc.setProducer(watermark.siteName)
-      responseBytes = await pdfDoc.save()
     }
 
     const { error: countError } = await supabase.rpc("increment_download_count", {
@@ -103,19 +109,19 @@ export async function GET(request: Request, { params }: RouteProps) {
     })
     if (countError) {
       console.error("[pdf/download-watermarked] Atomic counter failed:", countError)
-      return NextResponse.json({ error: "Failed to track download" }, { status: 500 })
     }
 
     // Create filename
-    const safeFilename = pdf.title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_")
+    const safeFilename = pdf.title.replace(/[^a-zA-Z0-9\s]/g, "").trim().replace(/\s+/g, "_") || "TechVyro_PDF"
     const safeSiteName = watermark.siteName.replace(/[^a-zA-Z0-9]/g, "") || "PDF"
     const filename = `${safeFilename}_${safeSiteName}.pdf`
+    const utf8Filename = encodeURIComponent(`${pdf.title}_${safeSiteName}.pdf`)
 
     // Return the watermarked PDF
     return new NextResponse(Buffer.from(responseBytes), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${utf8Filename}`,
         "Content-Length": responseBytes.byteLength.toString(),
       },
     })
