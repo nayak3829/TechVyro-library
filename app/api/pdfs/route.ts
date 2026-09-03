@@ -78,11 +78,10 @@ export async function GET(request: NextRequest) {
     // Prevent caching to ensure fresh data after uploads
     const rows = (data || []) as unknown as Record<string, unknown>[]
     const pdfs = rows.map((pdf) => {
-      const thumbnailPath = typeof pdf.thumbnail_path === "string" ? pdf.thumbnail_path : null
-      const thumbnailUrl = thumbnailPath ? `/api/pdfs/${pdf.id}/thumbnail` : null
-      if (isAdmin) return thumbnailUrl ? { ...pdf, thumbnail_url: thumbnailUrl } : pdf
+      const thumbnailUrl = `/api/pdfs/${pdf.id}/thumbnail`
+      if (isAdmin) return { ...pdf, thumbnail_url: thumbnailUrl }
       const { thumbnail_path: _privateThumbnailPath, ...publicPdf } = pdf
-      return thumbnailUrl ? { ...publicPdf, thumbnail_url: thumbnailUrl } : publicPdf
+      return { ...publicPdf, thumbnail_url: thumbnailUrl }
     })
     const response = NextResponse.json({ pdfs })
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate")

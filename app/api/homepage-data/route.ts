@@ -58,10 +58,10 @@ export async function GET() {
       ...(topRatedResult.data || []),
     ]
     const withThumbnailUrl = (pdf: any) => {
-      const { thumbnail_path: thumbnailPath, ...safePdf } = pdf
+      const { thumbnail_path: _thumbnailPath, ...safePdf } = pdf
       return {
         ...safePdf,
-        ...(thumbnailPath ? { thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail` } : {}),
+        thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
       }
     }
     const pdfs = Array.from(new Map(cardRows.map((pdf) => [pdf.id, withThumbnailUrl(pdf)])).values())

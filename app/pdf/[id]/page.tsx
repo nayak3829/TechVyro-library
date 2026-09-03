@@ -38,7 +38,7 @@ async function getPDF(id: string): Promise<PDF | null> {
 
   return {
     ...data,
-    thumbnail_url: data.thumbnail_path ? `/api/pdfs/${data.id}/thumbnail` : null,
+    thumbnail_url: `/api/pdfs/${data.id}/thumbnail`,
     thumbnail_path: undefined,
   } as unknown as PDF
 }
@@ -60,7 +60,7 @@ async function getRelatedPDFs(categoryId: string | null, currentId: string): Pro
     .limit(6)
   return (data || []).map((pdf: { id: string; thumbnail_path?: string | null } & Record<string, unknown>) => ({
     ...pdf,
-    thumbnail_url: pdf.thumbnail_path ? `/api/pdfs/${pdf.id}/thumbnail` : null,
+    thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
     thumbnail_path: undefined,
   })) as unknown as PDF[]
 }

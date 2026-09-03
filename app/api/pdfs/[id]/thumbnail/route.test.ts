@@ -19,6 +19,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         eq: () => query,
         single: async () => ({
           data: {
+            title: "Fallback PDF",
             thumbnail_path: state.thumbnailPath,
             visibility: "public",
             scheduled_at: null,
@@ -58,12 +59,14 @@ describe("PDF thumbnail route", () => {
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([0xff, 0xd8, 0xff]))
   })
 
-  it("returns 404 when no thumbnail exists", async () => {
+  it("returns a generated cover when no stored thumbnail exists", async () => {
     state.thumbnailPath = null
     const response = await GET(new Request("https://example.test/api/pdfs/pdf-1/thumbnail"), {
       params: Promise.resolve({ id: "pdf-1" }),
     })
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-type")).toContain("image/svg+xml")
+    expect(await response.text()).toContain("Fallback PDF")
   })
 })
