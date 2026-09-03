@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendTelegramMessage } from "@/lib/telegram"
 import { escapeTelegramHtml } from "@/lib/admin-chat-validation"
+import { analyzePdfOnServer } from "@/lib/pdf-server-analysis"
 
 const LEASE_MS = 60_000
 const MAX_BATCH = 10
@@ -72,17 +73,58 @@ async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: st
   }
   if (!job.pdf_id) throw new Error("PDF job is missing pdf_id")
   const { data: pdf, error } = await db.from("pdfs")
-    .select("id,title,publish_status,notification_preference,notification_state,processing_status,scheduled_at,content_hash,page_count,review_warnings,malware_status")
+    .select("id,title,description,tags,slug,file_path,thumbnail_path,category_id,structure_location,publish_status,notification_preference,notification_state,processing_status,scheduled_at,content_hash,page_count,review_warnings,malware_status")
     .eq("id", job.pdf_id).maybeSingle()
   if (error || !pdf) throw new Error("PDF not found")
   if (job.job_type === "process") {
     // The save endpoint computes this SHA-256 from bytes downloaded directly
     // from storage. Browser analysis is advisory and may be unavailable.
     if (!hasServerVerifiedPdfHash(pdf.content_hash)) throw new Error("Server PDF verification is absent")
+    const { data: source, error: downloadError } = await db.storage.from("pdfs").download(pdf.file_path)
+    if (downloadError || !source) throw new Error("Stored PDF could not be read")
+    const foldersResult = await db.from("site_settings").select("value").eq("key", "folders").maybeSingle()
+    const folders = Array.isArray(foldersResult.data?.value) ? foldersResult.data.value : []
+    const location = pdf.structure_location as { categoryId?: string } | null
+    const structureCategory = folders.flatMap((folder: any) => Array.isArray(folder.categories) ? folder.categories : [])
+      .find((category: any) => category.id === location?.categoryId)
+    const categoryName = typeof structureCategory?.name === "string" ? structureCategory.name : null
+    let categoryId = pdf.category_id
+    if (!categoryId && categoryName) {
+      const existing = await db.from("categories").select("id").ilike("name", categoryName).maybeSingle()
+      if (existing.data?.id) categoryId = existing.data.id
+      else {
+        const created = await db.from("categories").insert({
+          name: categoryName,
+          slug: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `category-${Date.now()}`,
+        }).select("id").single()
+        if (!created.error) categoryId = created.data?.id
+      }
+    }
+    const bytes = new Uint8Array(await source.arrayBuffer())
+    const analysis = await analyzePdfOnServer(bytes, pdf.title, pdf.content_hash, categoryName)
+    let thumbnailPath = pdf.thumbnail_path
+    if (!thumbnailPath) {
+      thumbnailPath = `thumbnails/${Date.now()}-${pdf.id}.jpg`
+      const uploaded = await db.storage.from("pdfs").upload(thumbnailPath, analysis.thumbnail, {
+        contentType: "image/jpeg", cacheControl: "3600", upsert: false,
+      })
+      if (uploaded.error) thumbnailPath = null
+    }
+    const previousWarnings = Array.isArray(pdf.review_warnings) ? pdf.review_warnings.filter((warning: unknown) =>
+      typeof warning === "string" && !warning.includes("Browser PDF analysis was unavailable")
+    ) : []
     const processing = pdf.processing_status === "queued" || pdf.processing_status === "processing"
     const result = await db.from("pdfs").update({
       processing_status: processing ? "completed" : pdf.processing_status,
       processing_completed_at: processing ? new Date().toISOString() : undefined,
+      page_count: analysis.pageCount,
+      malware_status: analysis.malwareStatus,
+      review_warnings: [...previousWarnings, ...analysis.warnings],
+      thumbnail_path: thumbnailPath,
+      category_id: categoryId,
+      description: pdf.description || analysis.description,
+      tags: Array.isArray(pdf.tags) && pdf.tags.length ? pdf.tags : analysis.tags,
+      slug: pdf.slug || analysis.slug,
       processing_error: null, updated_at: new Date().toISOString(),
     }).eq("id", job.pdf_id).eq("processing_status", pdf.processing_status)
     if (result.error) throw new Error("Processing update failed")
