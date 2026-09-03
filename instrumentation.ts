@@ -1,10 +1,5 @@
-let started = false
-
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs" || started) return
-  started = true
-  const { maybeRunPdfMaintenance } = await import("./lib/pdf-job-runner")
-  void maybeRunPdfMaintenance()
-  const timer = setInterval(() => { void maybeRunPdfMaintenance() }, 30_000)
-  timer.unref()
+  // PDF work is triggered after successful uploads and opportunistically by
+  // the homepage API. Keep instrumentation dependency-free so native server
+  // packages are never bundled into the instrumentation runtime.
 }
