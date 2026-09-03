@@ -14,6 +14,10 @@ export function isSafePdfJobObjectPath(bucket: unknown, path: unknown): path is 
   return bucket === "pdfs" && typeof path === "string" && (SAFE_PDF_PATH.test(path) || SAFE_THUMBNAIL_PATH.test(path))
 }
 
+export function hasServerVerifiedPdfHash(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value)
+}
+
 /** The next 09:00 wall-clock time in Asia/Kolkata (IST has no DST). */
 export function nextDailyDigestAt(now = new Date()): Date {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -72,11 +76,9 @@ async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: st
     .eq("id", job.pdf_id).maybeSingle()
   if (error || !pdf) throw new Error("PDF not found")
   if (job.job_type === "process") {
-    const completeAnalysis = typeof pdf.content_hash === "string" && /^[a-f0-9]{32,128}$/i.test(pdf.content_hash) &&
-      Number.isSafeInteger(pdf.page_count) && pdf.page_count > 0 &&
-      Array.isArray(pdf.review_warnings) &&
-      ["pending", "clean", "suspicious", "blocked", "unknown"].includes(String(pdf.malware_status))
-    if (!completeAnalysis) throw new Error("Required PDF analysis is absent")
+    // The save endpoint computes this SHA-256 from bytes downloaded directly
+    // from storage. Browser analysis is advisory and may be unavailable.
+    if (!hasServerVerifiedPdfHash(pdf.content_hash)) throw new Error("Server PDF verification is absent")
     const processing = pdf.processing_status === "queued" || pdf.processing_status === "processing"
     const result = await db.from("pdfs").update({
       processing_status: processing ? "completed" : pdf.processing_status,

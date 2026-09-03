@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isSafePdfJobObjectPath, nextDailyDigestAt } from "./pdf-job-runner"
+import { hasServerVerifiedPdfHash, isSafePdfJobObjectPath, nextDailyDigestAt } from "./pdf-job-runner"
 
 describe("PDF job object safety", () => {
   it("accepts only generated PDF and thumbnail paths in the pdfs bucket", () => {
@@ -14,5 +14,11 @@ describe("PDF job object safety", () => {
     expect(before.toISOString()).toBe("2025-01-15T03:30:00.000Z")
     const after = nextDailyDigestAt(new Date("2025-01-15T04:00:00.000Z"))
     expect(after.toISOString()).toBe("2025-01-16T03:30:00.000Z")
+  })
+
+  it("processes server-verified PDFs even when advisory browser analysis is absent", () => {
+    expect(hasServerVerifiedPdfHash("a".repeat(64))).toBe(true)
+    expect(hasServerVerifiedPdfHash("a".repeat(32))).toBe(false)
+    expect(hasServerVerifiedPdfHash(null)).toBe(false)
   })
 })
