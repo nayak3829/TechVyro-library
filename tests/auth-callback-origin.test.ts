@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { NextRequest } from "next/server"
 
-import { getPublicOrigin } from "@/app/auth/callback/route"
-import { CANONICAL_SITE_ORIGIN } from "@/lib/public-site"
+import { CANONICAL_SITE_ORIGIN, getPublicOrigin } from "@/lib/public-site"
 
 const originalSiteUrl = process.env.NEXT_PUBLIC_SITE_URL
 
