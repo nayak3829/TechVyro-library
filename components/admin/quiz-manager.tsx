@@ -200,15 +200,24 @@ export function QuizManager() {
     visibility: "public" as VisibilityType, tags: [] as string[],
     structureLocation: { folderId: "", categoryId: "", sectionId: "" }
   })
+  const [globalTouched, setGlobalTouched] = useState({
+    category: false, section: false, visibility: false, tags: false, structureLocation: false,
+  })
   const [contentFolders, setContentFolders] = useState<unknown[]>([])
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
   const [globalTagInput, setGlobalTagInput] = useState("")
   function addGlobalTag(raw: string) {
     const tag = raw.trim().replace(/^#/, "").toLowerCase()
-    if (tag && !globalSettings.tags.includes(tag)) setGlobalSettings(p => ({ ...p, tags: [...p.tags, tag] }))
+    if (tag && !globalSettings.tags.includes(tag)) {
+      setGlobalSettings(p => ({ ...p, tags: [...p.tags, tag] }))
+      setGlobalTouched(p => ({ ...p, tags: true }))
+    }
     setGlobalTagInput("")
   }
-  function removeGlobalTag(tag: string) { setGlobalSettings(p => ({ ...p, tags: p.tags.filter(t => t !== tag) })) }
+  function removeGlobalTag(tag: string) {
+    setGlobalSettings(p => ({ ...p, tags: p.tags.filter(t => t !== tag) }))
+    setGlobalTouched(p => ({ ...p, tags: true }))
+  }
   const [showBulkTitleEditor, setShowBulkTitleEditor] = useState(false)
   const [bulkPrefix, setBulkPrefix] = useState("")
   const [bulkSuffix, setBulkSuffix] = useState("")
@@ -275,6 +284,9 @@ export function QuizManager() {
   const [showPasteJson, setShowPasteJson] = useState(false)
   const [showJsonGlobalSettings, setShowJsonGlobalSettings] = useState(false)
   const [jsonGs, setJsonGs] = useState({ category: "Mathematics", section: "General", difficulty: "auto" as QuizDifficultyOverride, visibility: "public" as VisibilityType })
+  const [jsonGlobalTouched, setJsonGlobalTouched] = useState({
+    category: false, section: false, visibility: false,
+  })
 
   // Bulk selection
   const [selectedQuizzes, setSelectedQuizzes] = useState<Set<string>>(new Set())
@@ -399,6 +411,7 @@ export function QuizManager() {
       category,
       ...(match ? { structureLocation: match } : {}),
     }))
+    setGlobalTouched(previous => ({ ...previous, category: true }))
   }
 
   const handleGenerateAiQuiz = async () => {
@@ -759,22 +772,27 @@ export function QuizManager() {
   const applyJsonGlobalSettings = (
     settings: Omit<JsonFileEntry["settings"], "difficulty"> & { difficulty: QuizDifficultyOverride },
   ) => {
+    const applyCategory = jsonGlobalTouched.category && Boolean(settings.category.trim())
+    const applySection = jsonGlobalTouched.section && Boolean(settings.section.trim())
+    if (applyCategory) void ensureCategoryExists(settings.category.trim())
     const structureLocation = findStructureLocationByCategoryName(contentFolders, settings.category) ?? undefined
     setJsonEntries(prev => prev.map(e => ({
       ...e,
       settings: {
-        ...settings,
+        ...e.settings,
+        ...(applyCategory ? { category: settings.category.trim() } : {}),
+        ...(applySection ? { section: settings.section.trim() } : {}),
+        ...(jsonGlobalTouched.visibility ? { visibility: settings.visibility } : {}),
         difficulty: resolveQuizDifficulty(e.settings.difficulty, settings.difficulty),
       },
       quizzes: e.quizzes.map(item => ({
         ...item,
         quiz: {
           ...item.quiz,
-          category: settings.category,
-          section: settings.section,
+          ...(applyCategory ? { category: settings.category.trim(), structureLocation } : {}),
+          ...(applySection ? { section: settings.section.trim() } : {}),
           difficulty: resolveQuizDifficulty(item.quiz.difficulty || "medium", settings.difficulty),
-          visibility: settings.visibility,
-          structureLocation,
+          ...(jsonGlobalTouched.visibility ? { visibility: settings.visibility } : {}),
         }
       }))
     })))
@@ -1012,8 +1030,12 @@ export function QuizManager() {
     expanded: false, editingTitle: false,
     difficultyOverride: globalSettings.difficulty,
     settings: {
-      ...globalSettings,
+      category: "Mathematics",
+      section: "General",
       difficulty: resolveQuizDifficulty("medium", globalSettings.difficulty),
+      visibility: "public" as VisibilityType,
+      tags: [],
+      structureLocation: { folderId: "", categoryId: "", sectionId: "" },
     },
   })
 
@@ -1158,21 +1180,29 @@ export function QuizManager() {
     }))
   }
   const applyGlobalSettings = () => {
+    const applyCategory = globalTouched.category && Boolean(globalSettings.category.trim())
+    const applySection = globalTouched.section && Boolean(globalSettings.section.trim())
+    if (applyCategory) void ensureCategoryExists(globalSettings.category.trim())
     setUploadEntries(prev => prev.map(e => ({
       ...e,
       difficultyOverride: globalSettings.difficulty,
       settings: {
-        ...globalSettings,
+        ...e.settings,
+        ...(applyCategory ? { category: globalSettings.category.trim() } : {}),
+        ...(applySection ? { section: globalSettings.section.trim() } : {}),
+        ...(globalTouched.visibility ? { visibility: globalSettings.visibility } : {}),
+        ...(globalTouched.tags ? { tags: globalSettings.tags } : {}),
+        ...(globalTouched.structureLocation ? { structureLocation: globalSettings.structureLocation } : {}),
         difficulty: resolveQuizDifficulty(e.settings.difficulty, globalSettings.difficulty),
       },
       quiz: e.quiz ? {
         ...e.quiz,
-        category: globalSettings.category,
-        section: globalSettings.section,
+        ...(applyCategory ? { category: globalSettings.category.trim() } : {}),
+        ...(applySection ? { section: globalSettings.section.trim() } : {}),
         difficulty: resolveQuizDifficulty(e.quiz.difficulty || "medium", globalSettings.difficulty),
-        visibility: globalSettings.visibility,
-        tags: globalSettings.tags,
-        structureLocation: globalSettings.structureLocation,
+        ...(globalTouched.visibility ? { visibility: globalSettings.visibility } : {}),
+        ...(globalTouched.tags ? { tags: globalSettings.tags } : {}),
+        ...(globalTouched.structureLocation ? { structureLocation: globalSettings.structureLocation } : {}),
       } : null
     })))
     toast.success("Global settings applied to all files")
@@ -1223,6 +1253,8 @@ export function QuizManager() {
       structureLocation: { folderId: "", categoryId: "", sectionId: "" },
     }))
     setJsonGs(p => ({ ...p, difficulty: "auto" }))
+    setGlobalTouched({ category: false, section: false, visibility: false, tags: false, structureLocation: false })
+    setJsonGlobalTouched({ category: false, section: false, visibility: false })
     setShowGlobalSettings(false)
     setShowBulkTitleEditor(false); setBulkPrefix(""); setBulkSuffix(""); setBulkFind(""); setBulkReplace("")
     setJsonEntries([]); setPasteJsonText(""); setShowPasteJson(false); setShowJsonGlobalSettings(false)
@@ -1896,12 +1928,21 @@ export function QuizManager() {
                                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                                 <SelectContent>{allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                               </Select>
+                              <Input
+                                value={globalTouched.category ? globalSettings.category : ""}
+                                onChange={e => updateGlobalQuizCategory(e.target.value)}
+                                placeholder="Or type a new category name"
+                                className="h-9"
+                              />
                             </div>
                             <div className="space-y-2">
                               <Label className="text-sm font-medium flex items-center gap-2">
                                 <Eye className="h-4 w-4 text-muted-foreground" /> Visibility
                               </Label>
-                              <Select value={globalSettings.visibility} onValueChange={v => setGlobalSettings(p => ({ ...p, visibility: v as any }))}>
+                              <Select value={globalSettings.visibility} onValueChange={v => {
+                                setGlobalSettings(p => ({ ...p, visibility: v as any }))
+                                setGlobalTouched(p => ({ ...p, visibility: true }))
+                              }}>
                                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="public"><span className="flex items-center gap-2"><Globe className="h-3.5 w-3.5" /> Public</span></SelectItem>
@@ -1927,17 +1968,32 @@ export function QuizManager() {
                               <Label className="text-sm font-medium flex items-center gap-2">
                                 <FolderOpen className="h-4 w-4 text-muted-foreground" /> Section
                               </Label>
-                              <Select value={globalSettings.section} onValueChange={v => setGlobalSettings(p => ({ ...p, section: v }))}>
+                              <Select value={globalSettings.section} onValueChange={v => {
+                                setGlobalSettings(p => ({ ...p, section: v }))
+                                setGlobalTouched(p => ({ ...p, section: true }))
+                              }}>
                                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                                 <SelectContent>{SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                               </Select>
+                              <Input
+                                value={globalTouched.section ? globalSettings.section : ""}
+                                onChange={e => {
+                                  setGlobalSettings(p => ({ ...p, section: e.target.value }))
+                                  setGlobalTouched(p => ({ ...p, section: true }))
+                                }}
+                                placeholder="Or type a new section name"
+                                className="h-9"
+                              />
                             </div>
                           </div>
                           <div className="space-y-2">
                             <Label className="text-sm font-medium flex items-center gap-2">
                               <FolderPlus className="h-4 w-4 text-muted-foreground" /> Content Location
                             </Label>
-                            <StructureSelector value={globalSettings.structureLocation} onChange={loc => setGlobalSettings(p => ({ ...p, structureLocation: loc }))} placeholder="Select folder/category/section" className="w-full" />
+                            <StructureSelector value={globalSettings.structureLocation} onChange={loc => {
+                              setGlobalSettings(p => ({ ...p, structureLocation: loc }))
+                              setGlobalTouched(p => ({ ...p, structureLocation: true }))
+                            }} placeholder="Select folder/category/section" className="w-full" />
                             <p className="text-xs text-muted-foreground">All imported quizzes will be placed at this location</p>
                           </div>
                           <div className="space-y-2">
@@ -2313,10 +2369,22 @@ export function QuizManager() {
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <Label className="text-xs">Category</Label>
-                              <Select value={jsonGs.category} onValueChange={v => setJsonGs(p => ({ ...p, category: v }))}>
+                              <Select value={jsonGs.category} onValueChange={v => {
+                                setJsonGs(p => ({ ...p, category: v }))
+                                setJsonGlobalTouched(p => ({ ...p, category: true }))
+                              }}>
                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>{allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                               </Select>
+                              <Input
+                                value={jsonGlobalTouched.category ? jsonGs.category : ""}
+                                onChange={e => {
+                                  setJsonGs(p => ({ ...p, category: e.target.value }))
+                                  setJsonGlobalTouched(p => ({ ...p, category: true }))
+                                }}
+                                placeholder="New category name"
+                                className="h-8 text-xs mt-1"
+                              />
                             </div>
                             <div>
                               <Label className="text-xs">Difficulty</Label>
@@ -2330,14 +2398,29 @@ export function QuizManager() {
                             </div>
                             <div>
                               <Label className="text-xs">Section</Label>
-                              <Select value={jsonGs.section} onValueChange={v => setJsonGs(p => ({ ...p, section: v }))}>
+                              <Select value={jsonGs.section} onValueChange={v => {
+                                setJsonGs(p => ({ ...p, section: v }))
+                                setJsonGlobalTouched(p => ({ ...p, section: true }))
+                              }}>
                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>{SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                               </Select>
+                              <Input
+                                value={jsonGlobalTouched.section ? jsonGs.section : ""}
+                                onChange={e => {
+                                  setJsonGs(p => ({ ...p, section: e.target.value }))
+                                  setJsonGlobalTouched(p => ({ ...p, section: true }))
+                                }}
+                                placeholder="New section name"
+                                className="h-8 text-xs mt-1"
+                              />
                             </div>
                             <div>
                               <Label className="text-xs">Visibility</Label>
-                              <Select value={jsonGs.visibility} onValueChange={v => setJsonGs(p => ({ ...p, visibility: v as any }))}>
+                              <Select value={jsonGs.visibility} onValueChange={v => {
+                                setJsonGs(p => ({ ...p, visibility: v as any }))
+                                setJsonGlobalTouched(p => ({ ...p, visibility: true }))
+                              }}>
                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="public">Public</SelectItem>
