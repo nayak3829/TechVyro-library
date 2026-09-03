@@ -1,0 +1,75 @@
+-- 001: Create tables
+CREATE TABLE IF NOT EXISTS categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  color TEXT DEFAULT '#8B5CF6',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS pdfs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  file_path TEXT NOT NULL,
+  file_size BIGINT,
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  download_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pdfs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access on categories" ON categories FOR SELECT USING (true);
+CREATE POLICY "Allow public read access on pdfs" ON pdfs FOR SELECT USING (true);
+
+INSERT INTO categories (name, slug, color) VALUES
+  ('Technology', 'technology', '#3B82F6'),
+  ('Business', 'business', '#10B981'),
+  ('Education', 'education', '#8B5CF6'),
+  ('Health', 'health', '#EC4899'),
+  ('Science', 'science', '#F59E0B')
+ON CONFLICT (slug) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_pdfs_category_id ON pdfs(category_id);
+CREATE INDEX IF NOT EXISTS idx_pdfs_created_at ON pdfs(created_at DESC);
+
+-- 002: Add view count
+ALTER TABLE pdfs ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_pdfs_view_count ON pdfs(view_count DESC);
+
+-- 003: Add reviews
+CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pdf_id UUID NOT NULL REFERENCES pdfs(id) ON DELETE CASCADE,
+  user_name VARCHAR(100) NOT NULL,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE pdfs 
+ADD COLUMN IF NOT EXISTS average_rating DECIMAL(2,1) DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS review_count INTEGER DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_reviews_pdf_id ON reviews(pdf_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
+
+CREATE OR REPLACE FUNCTION update_pdf_review_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE pdfs 
+  SET 
+    average_rating = (SELECT AVG(rating)::DECIMAL(2,1) FROM reviews WHERE pdf_id = COALESCE(NEW.pdf_id, OLD.pdf_id)),
+    review_count = (SELECT COUNT(*) FROM reviews WHERE pdf_id = COALESCE(NEW.pdf_id, OLD.pdf_id))
+  WHERE id = COALESCE(NEW.pdf_id, OLD.pdf_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_pdf_review_stats ON reviews;
+CREATE TRIGGER trigger_update_pdf_review_stats
+AFTER INSERT OR UPDATE OR DELETE ON reviews
+FOR EACH ROW EXECUTE FUNCTION update_pdf_review_stats();

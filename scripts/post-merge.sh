@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pnpm install --frozen-lockfile --prefer-offline
+pnpm exec tsc --noEmit

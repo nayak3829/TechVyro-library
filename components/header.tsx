@@ -1,0 +1,683 @@
+"use client"
+
+import { useState, useEffect, useRef, useCallback } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import {
+  FileText, Settings, Home, Search, X, Sparkles, Clock, TrendingUp,
+  ChevronDown, Flame, Download, BookOpen, FolderOpen, User, LogOut,
+  Info, Trophy, Zap, GraduationCap, Layers, ArrowRight,
+  LayoutGrid
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { useAuth } from "@/hooks/use-auth"
+import { useAdmin } from "@/hooks/use-admin"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
+
+const RECENT_SEARCHES_KEY = "techvyro_recent_searches"
+const MAX_RECENT_SEARCHES = 5
+
+const FALLBACK_SUGGESTIONS = [
+  "NDA Notes", "Mathematics", "Physics", "Chemistry", "English",
+  "Computer Science", "Biology", "History", "Geography", "Economics",
+  "Previous Year Papers", "CBSE Notes", "JEE", "NEET"
+]
+
+const DEFAULT_WHATSAPP = "https://whatsapp.com/channel/0029Vadk2XHLSmbX3oEVmX37"
+
+interface LiveResult {
+  id: string
+  title: string
+  download_count: number
+  view_count: number
+}
+
+interface HeaderAuthControlProps {
+  user: import("@supabase/supabase-js").User | null
+  loading: boolean
+  onSignOut: () => void | Promise<void>
+}
+
+export function HeaderAuthControl({ user, loading, onSignOut }: HeaderAuthControlProps) {
+  if (loading) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        asChild
+        className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-primary/30 text-foreground/80"
+      >
+        <Link href="/login" aria-label="Login while account status is being checked">
+          <User className="h-4 w-4" />
+          <span className="hidden sm:inline">Login</span>
+          <span className="sr-only">Checking account status</span>
+        </Link>
+      </Button>
+    )
+  }
+
+  if (user) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="px-2.5 sm:px-3 gap-1.5 border-primary/30 hover:bg-primary/5 hover:border-primary/50 transition-all">
+            <div className="h-5 w-5 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <span className="text-[9px] font-bold text-white">
+                {(user.user_metadata?.full_name || user.email || "U")[0].toUpperCase()}
+              </span>
+            </div>
+            <span className="hidden sm:inline text-xs max-w-[80px] truncate">
+              {user.user_metadata?.full_name?.split(" ")[0] || user.email?.split("@")[0]}
+            </span>
+            <ChevronDown className="h-3 w-3 hidden sm:block text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <div className="px-3 py-2.5 border-b border-border/50">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
+                <span className="text-sm font-bold text-white">
+                  {(user.user_metadata?.full_name || user.email || "U")[0].toUpperCase()}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">{user.user_metadata?.full_name || "Student"}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-1">
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="gap-2 cursor-pointer rounded-lg">
+                <User className="h-4 w-4 text-primary" />My Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/quiz" className="gap-2 cursor-pointer rounded-lg">
+                <Trophy className="h-4 w-4 text-amber-500" />Quiz Portal
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/" className="gap-2 cursor-pointer rounded-lg">
+                <Home className="h-4 w-4 text-muted-foreground" />Home
+              </Link>
+            </DropdownMenuItem>
+          </div>
+          <div className="p-1 border-t border-border/50">
+            <DropdownMenuItem onClick={onSignOut} className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer rounded-lg">
+              <LogOut className="h-4 w-4" />Sign Out
+            </DropdownMenuItem>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  return (
+    <Button
+      variant="default"
+      size="sm"
+      asChild
+      className="px-3 sm:px-4 gap-1.5 sm:gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white border-0 shadow-md shadow-primary/20 transition-all duration-300"
+    >
+      <Link href="/login" aria-label="Login">
+        <User className="h-4 w-4" />
+        <span className="hidden sm:inline">Login</span>
+      </Link>
+    </Button>
+  )
+}
+
+export function Header() {
+  const router = useRouter()
+  const { user, loading: authLoading, signOut } = useAuth()
+  const { isAdmin, isLoading: adminLoading } = useAdmin()
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [liveResults, setLiveResults] = useState<LiveResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [whatsappUrl, setWhatsappUrl] = useState(DEFAULT_WHATSAPP)
+  const [browseOpen, setBrowseOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
+  const browseRef = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(RECENT_SEARCHES_KEY)
+      if (stored) setRecentSearches(JSON.parse(stored))
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then(r => r.json())
+      .then(data => {
+        const cats: { name: string }[] = data.categories || []
+        setCategories(cats.map(c => c.name))
+      })
+      .catch(() => {})
+
+    fetch("/api/site-settings?key=general_settings")
+      .then(r => r.json())
+      .then(data => {
+        if (data.value?.whatsappChannelUrl) setWhatsappUrl(data.value.whatsappChannelUrl)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 10)
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  useEffect(() => {
+    if (searchOpen && searchInputRef.current) searchInputRef.current.focus()
+  }, [searchOpen])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setSearchOpen(true)
+        setShowSuggestions(true)
+      }
+      if (e.key === "Escape") {
+        setSearchOpen(false)
+        setSearchQuery("")
+        setShowSuggestions(false)
+        setBrowseOpen(false)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+      if (browseRef.current && !browseRef.current.contains(e.target as Node)) {
+        setBrowseOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!searchQuery.trim()) {
+      setLiveResults([])
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/pdfs/search?q=${encodeURIComponent(searchQuery.trim())}&limit=5`)
+        const data = await res.json()
+        setLiveResults(data.pdfs || [])
+      } catch {
+        setLiveResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 300)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [searchQuery])
+
+  const saveRecentSearch = useCallback((query: string) => {
+    if (!query.trim()) return
+    const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, MAX_RECENT_SEARCHES)
+    setRecentSearches(updated)
+    try { sessionStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated)) } catch {}
+  }, [recentSearches])
+
+  const clearRecentSearches = () => {
+    setRecentSearches([])
+    try { sessionStorage.removeItem(RECENT_SEARCHES_KEY) } catch {}
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim()
+      saveRecentSearch(query)
+      setSearchOpen(false)
+      setShowSuggestions(false)
+      window.location.assign(`/?q=${encodeURIComponent(query)}#content`)
+    }
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setSearchQuery(suggestion)
+    saveRecentSearch(suggestion)
+    setShowSuggestions(false)
+    window.location.assign(`/?q=${encodeURIComponent(suggestion)}#content`)
+  }
+
+  const handleResultClick = (pdf: LiveResult) => {
+    saveRecentSearch(pdf.title)
+    setSearchOpen(false)
+    setShowSuggestions(false)
+    setSearchQuery("")
+    router.push(`/pdf/${pdf.id}`)
+  }
+
+  const suggestions = categories.length > 0 ? categories : FALLBACK_SUGGESTIONS
+  const filteredSuggestions = searchQuery
+    ? suggestions.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
+    : suggestions.slice(0, 6)
+
+  const SuggestionsPanel = () => (
+    <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border/50 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+      {recentSearches.length > 0 && !searchQuery && (
+        <div className="p-3 border-b border-border/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground">Recent Searches</span>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive" onClick={clearRecentSearches}>
+              Clear
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {recentSearches.map((search, idx) => (
+              <button key={idx} onClick={() => handleSuggestionClick(search)} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-xs hover:bg-muted transition-colors">
+                <Clock className="h-3 w-3 text-muted-foreground" />
+                {search}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {searchQuery && liveResults.length > 0 && (
+        <div className="p-3 border-b border-border/50">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <FileText className="h-3 w-3" /> Live Results
+            </span>
+            {searching && <span className="inline-block h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+          </div>
+          <div className="space-y-1">
+            {liveResults.map((pdf) => (
+              <button key={pdf.id} onClick={() => handleResultClick(pdf)} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left hover:bg-primary/8 transition-colors group">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate text-foreground group-hover:text-primary transition-colors">{pdf.title}</p>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-0.5"><Download className="h-2.5 w-2.5" />{pdf.download_count}</span>
+                    <span className="flex items-center gap-0.5"><TrendingUp className="h-2.5 w-2.5" />{pdf.view_count}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">Open</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {searching && liveResults.length === 0 && searchQuery && (
+        <div className="p-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          Searching...
+        </div>
+      )}
+
+      {filteredSuggestions.length > 0 && (
+        <div className="p-3">
+          <span className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+            {searchQuery ? (
+              <><Search className="h-3 w-3" /> Suggestions</>
+            ) : (
+              <><FolderOpen className="h-3 w-3" /> Browse by Subject</>
+            )}
+          </span>
+          <div className="space-y-1">
+            {filteredSuggestions.map((suggestion, idx) => (
+              <button key={idx} onClick={() => handleSuggestionClick(suggestion)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-muted/50 transition-colors">
+                <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span>{suggestion}</span>
+                {!searchQuery && idx < 3 && (
+                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Trending</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+
+  return (
+    <header className={`sticky top-0 z-50 w-full border-b transition-all duration-300 ${
+      isScrolled
+        ? "border-border/60 bg-background/98 backdrop-blur-xl shadow-sm"
+        : "border-border/40 bg-background/95 backdrop-blur-xl"
+    } supports-[backdrop-filter]:bg-background/80`}>
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
+      <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between gap-4 px-4">
+
+        {/* Logo */}
+        <a href="/" className="flex items-center gap-2.5 group shrink-0">
+          <div className="relative">
+            <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <img
+              src="/techvyro-logo.jpg"
+              alt="TechVyro"
+              width={40}
+              height={40}
+              className="relative h-9 w-9 rounded-xl object-contain shadow-md transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg sm:h-10 sm:w-10"
+            />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-lg sm:text-xl font-bold leading-tight tracking-tight">
+              <span className="text-[#ef4444]">Tech</span>
+              <span className="text-foreground">Vyro</span>
+            </span>
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground -mt-0.5 hidden sm:block font-medium">Study Platform</span>
+          </div>
+        </a>
+
+        {/* Desktop Search */}
+        <div className="hidden md:flex flex-1 max-w-xl mx-4" ref={suggestionsRef}>
+          <div className="relative w-full">
+            <form onSubmit={handleSearch} className="relative w-full group">
+              <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-primary/20 to-accent/20 opacity-0 group-focus-within:opacity-100 blur-sm transition-opacity duration-300" />
+              <div className="relative flex items-center">
+                <Search className="absolute left-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input
+                  ref={searchInputRef}
+                  type="search"
+                  aria-label="Search PDFs, notes, and subjects"
+                  placeholder="Search PDFs, notes, subjects... (Ctrl+K)"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true) }}
+                  onFocus={() => setShowSuggestions(true)}
+                  className="pl-10 pr-24 h-10 bg-muted/50 border-border/50 focus-visible:ring-primary focus-visible:ring-1 focus-visible:border-primary/50 text-sm rounded-xl transition-all duration-300"
+                  autoComplete="off"
+                  suppressHydrationWarning
+                />
+                <div className="absolute right-2 flex items-center gap-1">
+                  {searching && <span className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+                  {searchQuery && !searching && (
+                    <Button type="button" variant="ghost" size="sm" aria-label="Clear search" className="h-7 w-7 p-0 rounded-lg hover:bg-destructive/10 hover:text-destructive" onClick={() => { setSearchQuery(""); setLiveResults([]) }}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </form>
+            {showSuggestions && <SuggestionsPanel />}
+          </div>
+        </div>
+
+        {/* Desktop Nav */}
+        <nav className="flex items-center gap-1 sm:gap-1.5">
+
+          {/* Mobile search icon */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary"
+            onClick={() => { setSearchOpen(!searchOpen); setShowSuggestions(true) }}
+            aria-label={searchOpen ? "Close search" : "Open search"}
+            aria-expanded={searchOpen}
+            aria-controls="mobile-header-search"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+
+          {/* Home */}
+          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
+            <a href="/"><Home className="h-4 w-4" />Home</a>
+          </Button>
+
+          {/* Browse Dropdown */}
+          <div className="relative hidden lg:block" ref={browseRef}>
+            <button
+              onClick={() => setBrowseOpen(!browseOpen)}
+              aria-expanded={browseOpen}
+              aria-haspopup="menu"
+              className={`flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${browseOpen ? "bg-primary/10 text-primary" : "text-foreground/80"}`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Browse
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${browseOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {browseOpen && (
+              <div className="absolute top-full left-0 mt-2 w-[480px] bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                <div className="p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Access</p>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {[
+                      { href: "/#content", icon: BookOpen, label: "All PDFs", desc: "Browse full library", color: "text-primary", bg: "bg-primary/10" },
+                      { href: "/?q=popular#content", icon: Flame, label: "Popular", desc: "Most downloaded", color: "text-rose-500", bg: "bg-rose-500/10" },
+                      { href: "/?q=latest#content", icon: Sparkles, label: "Latest", desc: "Recently added", color: "text-amber-500", bg: "bg-amber-500/10" },
+                      { href: "/?q=notes#content", icon: FileText, label: "Study Notes", desc: "Exam-ready notes", color: "text-blue-500", bg: "bg-blue-500/10" },
+                    ].map(item => (
+                      <a
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setBrowseOpen(false)}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-all duration-150 group border border-transparent hover:border-border/50"
+                      >
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.bg}`}>
+                          <item.icon className={`h-4.5 w-4.5 ${item.color}`} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                          <p className="text-[11px] text-muted-foreground">{item.desc}</p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+
+                  {categories.length > 0 && (
+                    <>
+                      <div className="h-px bg-border/50 mb-3" />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Browse by Category</p>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {categories.slice(0, 10).map(cat => (
+                          <a
+                            key={cat}
+                            href={`/?q=${encodeURIComponent(cat)}#content`}
+                            onClick={() => setBrowseOpen(false)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/60 hover:bg-primary/10 hover:text-primary border border-border/40 hover:border-primary/30 text-xs font-medium transition-all duration-150"
+                          >
+                            <Layers className="h-3 w-3 shrink-0" />
+                            {cat}
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="h-px bg-border/50 mb-3" />
+                  <a
+                    href="/browse"
+                    onClick={() => setBrowseOpen(false)}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 hover:border-primary/40 transition-all group mb-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <LayoutGrid className="h-4 w-4 text-primary" />
+                      <div>
+                        <span className="text-sm font-semibold text-primary block">Browse by Subject</span>
+                        <span className="text-[11px] text-muted-foreground">Content structure navigation</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+                  </a>
+                  <a
+                    href="/#content"
+                    onClick={() => setBrowseOpen(false)}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-muted/40 border border-border/40 hover:border-border/60 transition-all group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">View Full Library</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quiz Portal - direct link */}
+          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-amber-500/10 hover:text-amber-600 text-sm font-medium">
+            <a href="/quiz"><Trophy className="h-4 w-4" />Quiz Portal</a>
+          </Button>
+
+          {/* Mock Tests - direct link */}
+          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-violet-500/10 hover:text-violet-600 text-sm font-medium">
+            <a href="/test-series"><Zap className="h-4 w-4" />Mock Tests</a>
+          </Button>
+
+          {/* About - compact */}
+          <Button variant="ghost" size="sm" asChild className="hidden xl:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
+            <a href="/about"><Info className="h-4 w-4" />About</a>
+          </Button>
+
+          <ThemeToggle />
+
+          {/* Auth button */}
+          <HeaderAuthControl user={user} loading={authLoading} onSignOut={signOut} />
+
+          {!adminLoading && isAdmin && (
+            <Button variant="outline" size="sm" asChild className="px-2.5 sm:px-3.5 gap-1.5 sm:gap-2 border-primary/30 hover:border-destructive/50 hover:bg-destructive/5 transition-all duration-300">
+              <Link href="/admin">
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            </Button>
+          )}
+        </nav>
+      </div>
+
+      {/* Mobile Search Overlay */}
+      {searchOpen && (
+        <div id="mobile-header-search" className="md:hidden absolute top-full left-0 right-0 bg-background/98 backdrop-blur-xl border-b border-border/40 p-4 animate-in slide-in-from-top-2 duration-200 z-50">
+          <form onSubmit={handleSearch} className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              aria-label="Search PDFs, notes, and subjects"
+              placeholder="Search PDFs, notes, subjects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10 h-12 bg-muted/50 border-border/50 focus-visible:ring-primary text-base rounded-xl"
+              autoFocus
+              autoComplete="off"
+              suppressHydrationWarning
+            />
+            {searchQuery && (
+              <Button type="button" variant="ghost" size="sm" aria-label="Clear search" className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 p-0 rounded-lg" onClick={() => { setSearchQuery(""); setLiveResults([]) }}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </form>
+
+          {searching && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              Searching...
+            </div>
+          )}
+
+          {liveResults.length > 0 && searchQuery && (
+            <div className="mt-3 space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Results</span>
+              {liveResults.map(pdf => (
+                <button key={pdf.id} onClick={() => { handleResultClick(pdf); setSearchOpen(false) }} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left bg-muted/40 hover:bg-muted transition-colors">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <span className="flex-1 truncate font-medium">{pdf.title}</span>
+                  <Download className="h-3 w-3 text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">{pdf.download_count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {recentSearches.length > 0 && !searchQuery && (
+            <div className="mt-3 pb-3 border-b border-border/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">Recent</span>
+                <button onClick={clearRecentSearches} className="text-xs text-muted-foreground hover:text-destructive transition-colors">Clear</button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentSearches.map((s, i) => (
+                  <button key={i} onClick={() => { handleSuggestionClick(s); setSearchOpen(false) }} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-xs hover:bg-muted transition-colors">
+                    <Clock className="h-3 w-3 text-muted-foreground" />{s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mobile nav links */}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {[
+              { href: "/", icon: Home, label: "Home", color: "text-primary" },
+              { href: "/#content", icon: BookOpen, label: "All PDFs", color: "text-blue-500" },
+              { href: "/quiz", icon: Trophy, label: "Quiz Portal", color: "text-amber-500" },
+              { href: "/test-series", icon: Zap, label: "Mock Test", color: "text-violet-500" },
+              { href: "/about", icon: Info, label: "About Us", color: "text-emerald-500" },
+            ].map(item => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setSearchOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/40 hover:bg-muted text-sm font-medium transition-colors"
+              >
+                <item.icon className={`h-4 w-4 ${item.color} shrink-0`} />
+                {item.label}
+              </a>
+            ))}
+          </div>
+
+          {categories.length > 0 && (
+            <div className="mt-3">
+              <span className="text-xs font-medium text-muted-foreground mb-2 block">Categories</span>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.slice(0, 8).map(cat => (
+                  <a
+                    key={cat}
+                    href={`/?q=${encodeURIComponent(cat)}#content`}
+                    onClick={() => setSearchOpen(false)}
+                    className="px-2.5 py-1 rounded-full bg-muted/60 hover:bg-primary/10 hover:text-primary border border-border/40 text-xs font-medium transition-colors"
+                  >
+                    {cat}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </header>
+  )
+}

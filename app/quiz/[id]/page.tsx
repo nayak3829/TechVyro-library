@@ -1,0 +1,148 @@
+"use client"
+
+import { useParams, useRouter } from "next/navigation"
+import { QuizPlayer } from "@/components/quiz/quiz-player"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { ArrowLeft, FileText, Lock } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { saveRecentlyViewed } from "@/components/home/recently-viewed-section"
+import { loginHref } from "@/lib/auth-redirect"
+
+interface Question {
+  id: string
+  question: string
+  options: string[]
+  correct: number
+  marks: number
+  explanation: string
+}
+
+interface Quiz {
+  id: string
+  title: string
+  description: string
+  category: string
+  time_limit: number
+  questions: Question[]
+  enabled: boolean
+  created_at: string
+}
+
+export default function QuizPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+  const id = params.id as string
+  const [quiz, setQuiz] = useState<Quiz | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace(loginHref(`/quiz/${encodeURIComponent(id)}`))
+      return
+    }
+    if (!authLoading && user) {
+      fetch(`/api/quizzes/${id}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.error || !data.quiz) {
+            setError("Quiz not found")
+            return
+          }
+          const q: Quiz = data.quiz
+          if (!q.enabled) {
+            setError("This quiz is currently disabled")
+          } else if (!q.questions || q.questions.length === 0) {
+            setError("This quiz has no questions yet")
+          } else {
+            const hasContent = q.questions.some(
+              (qs) => qs.question && qs.question.trim() !== ""
+            )
+            if (!hasContent) {
+              setError("Questions are being prepared. Please check back soon!")
+            } else {
+              setQuiz(q)
+              saveRecentlyViewed({ id: q.id, title: q.title, type: "quiz" })
+            }
+          }
+        })
+        .catch(() => setError("Failed to load quiz"))
+        .finally(() => setLoading(false))
+    }
+  }, [id, user, authLoading, router])
+
+  if (authLoading || (!user && !error)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (error || !quiz) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/10 to-accent/10">
+        <Card className="max-w-md w-full p-8 text-center">
+          <div className="mb-6">
+            <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold">
+              <span className="text-red-500">Tech</span>
+              <span>Vyro</span>
+            </Link>
+          </div>
+          
+          <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h1 className="text-xl font-bold mb-2">{error || "Quiz Not Found"}</h1>
+          <p className="text-muted-foreground mb-6">
+            The quiz you're looking for doesn't exist or is not available.
+          </p>
+          
+          <Button asChild>
+            <Link href="/">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Link>
+          </Button>
+        </Card>
+      </div>
+    )
+  }
+
+  const transformedQuestions = quiz.questions.map(q => ({
+    qid: q.id,
+    question: q.question,
+    options: q.options,
+    correct: q.correct,
+    marks: q.marks,
+    explanation: q.explanation
+  }))
+
+  // Extract user's display name: full_name → name → email prefix
+  const userName = user
+    ? (user.user_metadata?.full_name as string | undefined)
+      || (user.user_metadata?.name as string | undefined)
+      || user.email?.split("@")[0]
+      || ""
+    : ""
+
+  return (
+    <QuizPlayer
+      title={quiz.title}
+      quizId={quiz.id}
+      questions={transformedQuestions}
+      timeLimit={quiz.time_limit}
+      userName={userName}
+    />
+  )
+}

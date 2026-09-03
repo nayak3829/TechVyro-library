@@ -1,0 +1,313 @@
+import { NextResponse } from "next/server"
+import type { SampleQuestion, SampleSeries } from "@/lib/sample-tests"
+import { createClient } from "@/lib/supabase/server"
+import {
+  fetchWithTimeout as fetchTrustedQuizApi,
+  validatePublicHttpsUrl,
+} from "@/lib/quiz-remote-fetch"
+
+// Lazy load sample test helpers only when needed (saves ~215KB from initial bundle)
+async function loadSampleHelpers() {
+  const module = await import("@/lib/sample-tests")
+  return {
+    getSampleQuestions: module.getSampleQuestions,
+    getAllSampleSeries: module.getAllSampleSeries,
+    getSampleSeriesForCategory: module.getSampleSeriesForCategory,
+    mapUrlToCategory: module.mapUrlToCategory,
+  }
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .trim()
+}
+
+interface AppXQuestion {
+  id?: string | number
+  question?: string
+  title?: string
+  question_title?: string
+  options?: Array<{ option?: string; text?: string; optionKey?: string; id?: number; value?: string }>
+  answer?: string | number
+  correct_option?: string | number
+  correct?: string | number
+  correct_answer?: string | number
+  solution?: string
+  explanation?: string
+  marks?: number
+  negative_marks?: number
+}
+
+interface NormalizedQuestion {
+  qid: string
+  question: string
+  options: string[]
+  correct: number
+  marks: number
+  explanation: string
+}
+
+function normalizeQuestion(q: AppXQuestion, idx: number): NormalizedQuestion | null {
+  try {
+    const questionText = stripHtml(String(q.question || q.title || q.question_title || ""))
+    if (!questionText || questionText.length < 2) return null
+
+    const rawOptions = q.options || []
+    const options = rawOptions.map((o) =>
+      stripHtml(String(o.option || o.text || o.value || ""))
+    ).filter(o => o.length > 0)
+
+    if (options.length < 2) return null
+
+    let correctIdx = 0
+    const rawAnswer = q.answer ?? q.correct_answer ?? q.correct_option ?? q.correct
+
+    if (typeof rawAnswer === "number") {
+      correctIdx = rawAnswer > options.length ? rawAnswer - 1 : rawAnswer
+    } else if (typeof rawAnswer === "string") {
+      const letter = rawAnswer.toLowerCase().trim()
+      if (["a", "b", "c", "d", "e"].includes(letter)) {
+        correctIdx = letter.charCodeAt(0) - "a".charCodeAt(0)
+      } else {
+        const num = parseInt(letter)
+        if (!isNaN(num)) correctIdx = num > options.length ? num - 1 : num
+      }
+    }
+
+    if (rawOptions.length > 0 && typeof rawAnswer === "string") {
+      const matchIdx = rawOptions.findIndex(
+        (o) => o.optionKey === rawAnswer || String(o.id) === String(rawAnswer)
+      )
+      if (matchIdx >= 0) correctIdx = matchIdx
+    }
+
+    correctIdx = Math.max(0, Math.min(correctIdx, options.length - 1))
+
+    return {
+      qid: String(q.id || idx + 1),
+      question: questionText,
+      options,
+      correct: correctIdx,
+      marks: q.marks ?? 1,
+      explanation: stripHtml(String(q.solution || q.explanation || "")),
+    }
+  } catch {
+    return null
+  }
+}
+
+function findQuestions(data: unknown, depth = 0): unknown[] {
+  if (depth > 6 || !data) return []
+
+  if (Array.isArray(data) && data.length > 0) {
+    const first = data[0] as Record<string, unknown>
+    if (typeof first === "object" && first !== null) {
+      if ("question" in first || "options" in first || "question_title" in first) return data
+    }
+    for (const item of data) {
+      const found = findQuestions(item, depth + 1)
+      if (found.length > 0) return found
+    }
+  }
+
+  if (typeof data === "object" && data !== null) {
+    for (const key of ["questions", "data", "results", "items", "content", "tests"]) {
+      const val = (data as Record<string, unknown>)[key]
+      if (Array.isArray(val) && val.length > 0) {
+        const found = findQuestions(val, depth + 1)
+        if (found.length > 0) return found
+      }
+    }
+    for (const val of Object.values(data as object)) {
+      if (typeof val === "object" && val !== null) {
+        const found = findQuestions(val, depth + 1)
+        if (found.length > 0) return found
+      }
+    }
+  }
+  return []
+}
+
+export async function GET(request: Request) {
+  // This route returns answer keys and explanations, including for sample
+  // series. A request parameter is not proof of identity.
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase?.auth.getUser() ?? { data: { user: null }, error: null }
+    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const testId = searchParams.get("testId")
+  const apiBase = searchParams.get("apiBase")
+
+  if (!testId || !apiBase) {
+    return NextResponse.json({ error: "testId and apiBase required" }, { status: 400 })
+  }
+
+  // Short-circuit: sample tests — skip all live API calls (lazy loaded)
+  if (apiBase.startsWith("sample:")) {
+    const { getSampleQuestions, getAllSampleSeries, getSampleSeriesForCategory } = await loadSampleHelpers()
+    
+    // First try direct test ID match
+    const sampleQ = getSampleQuestions(testId)
+    if (sampleQ && sampleQ.length > 0) {
+      return NextResponse.json({ success: true, questions: sampleQ, total: sampleQ.length }, { headers: { "Cache-Control": "no-store" } })
+    }
+    
+    // Find the test or series to get its category for fallback
+    let testCategory = "ssc-banking"
+    let foundQuestions: SampleQuestion[] | null = null
+    
+    for (const series of getAllSampleSeries()) {
+      // Check if testId matches a test ID
+      const matchedTest = series.tests.find(t => t.id === testId)
+      if (matchedTest) {
+        testCategory = series.category
+        if (matchedTest.questions && matchedTest.questions.length > 0) {
+          foundQuestions = matchedTest.questions
+        }
+        break
+      }
+      
+      // Check if testId matches series slug or series ID (clicking on series card)
+      if (series.slug === testId || series.id === testId) {
+        testCategory = series.category
+        // Find first test in this series with questions
+        const testWithQuestions = series.tests.find(t => t.questions && t.questions.length > 0)
+        if (testWithQuestions) {
+          foundQuestions = testWithQuestions.questions
+        }
+        break
+      }
+    }
+    
+    if (foundQuestions && foundQuestions.length > 0) {
+      return NextResponse.json({ success: true, questions: foundQuestions, total: foundQuestions.length }, { headers: { "Cache-Control": "no-store" } })
+    }
+    
+    // Fallback: get sample questions from same category
+    const categorySeries = getSampleSeriesForCategory(testCategory)
+    for (const series of categorySeries) {
+      for (const test of series.tests) {
+        if (test.questions && test.questions.length > 0) {
+          return NextResponse.json({ 
+            success: true, 
+            questions: test.questions, 
+            total: test.questions.length,
+            notice: "Showing practice questions from this category."
+          }, { headers: { "Cache-Control": "no-store" } })
+        }
+      }
+    }
+    
+    // Ultimate fallback: get any available sample questions
+    for (const series of getAllSampleSeries()) {
+      for (const test of series.tests) {
+        if (test.questions && test.questions.length > 0) {
+          return NextResponse.json({ 
+            success: true, 
+            questions: test.questions, 
+            total: test.questions.length,
+            notice: "Showing sample practice questions."
+          }, { headers: { "Cache-Control": "no-store" } })
+        }
+      }
+    }
+    
+    return NextResponse.json({ error: "No sample questions available", testId }, { status: 404 })
+  }
+
+  let safeApiBase: string
+  try {
+    safeApiBase = (await validatePublicHttpsUrl(apiBase)).toString().replace(/\/$/, "")
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid API URL" },
+      { status: 400 },
+    )
+  }
+
+  const safeTestId = encodeURIComponent(testId)
+  const errors: string[] = []
+
+  const endpoints = [
+    `${safeApiBase}/api/v1/test/${safeTestId}/questions/?format=json`,
+    `${safeApiBase}/api/v1/test/${safeTestId}/questions/`,
+    `${safeApiBase}/api/v1/tests/${safeTestId}/questions/?format=json`,
+    `${safeApiBase}/api/v1/tests/${safeTestId}/questions/`,
+    `${safeApiBase}/api/v1/test-series/test/${safeTestId}/questions/?format=json`,
+    `${safeApiBase}/api/v2/test/${safeTestId}/questions/?format=json`,
+    `${safeApiBase}/api/v1/quiz/${safeTestId}/questions/?format=json`,
+  ]
+
+  const tryQuestionEndpoint = async (endpoint: string): Promise<NormalizedQuestion[] | null> => {
+    try {
+      const res = await fetchTrustedQuizApi(endpoint, 3000)
+      if (!res.ok) { errors.push(`${endpoint}: HTTP ${res.status}`); return null }
+      const text = await res.text()
+      let json: unknown
+      try { json = JSON.parse(text) } catch { return null }
+      const rawQuestions = findQuestions(json)
+      if (rawQuestions.length > 0) {
+        const questions = rawQuestions.map((q, i) => normalizeQuestion(q as AppXQuestion, i)).filter(Boolean) as NormalizedQuestion[]
+        return questions.length > 0 ? questions : null
+      }
+      return null
+    } catch (e) {
+      errors.push(`${endpoint}: ${e instanceof Error ? e.message : "timeout"}`)
+      return null
+    }
+  }
+
+  const questionResults = await Promise.allSettled(endpoints.map(tryQuestionEndpoint))
+  for (const result of questionResults) {
+    if (result.status === "fulfilled" && result.value) {
+        return NextResponse.json({ success: true, questions: result.value, total: result.value.length }, { headers: { "Cache-Control": "no-store" } })
+    }
+  }
+
+  // Check if this is a sample test ID (lazy load helpers)
+  const { getSampleQuestions, getAllSampleSeries, getSampleSeriesForCategory, mapUrlToCategory } = await loadSampleHelpers()
+  
+  const sampleQuestions = getSampleQuestions(testId)
+  if (sampleQuestions && sampleQuestions.length > 0) {
+    return NextResponse.json({ success: true, questions: sampleQuestions, total: sampleQuestions.length }, { headers: { "Cache-Control": "no-store" } })
+  }
+
+  // Also try matching by slug — find a test in sample series
+  for (const series of getAllSampleSeries()) {
+    const matchedTest = series.tests.find(t => t.id === testId || t.id.includes(testId) || testId.includes(t.id))
+    if (matchedTest) {
+      return NextResponse.json({ success: true, questions: matchedTest.questions, total: matchedTest.questions.length }, { headers: { "Cache-Control": "no-store" } })
+    }
+  }
+
+  // Last resort: category-based sample fallback (live test that requires auth)
+  const category = mapUrlToCategory(apiBase)
+  const categorySeries = getSampleSeriesForCategory(category)
+  const fallbackSeries = categorySeries.length > 0 ? categorySeries[0] : getAllSampleSeries()[0]
+  if (fallbackSeries && fallbackSeries.tests.length > 0) {
+    const fallbackTest = fallbackSeries.tests[0]
+    return NextResponse.json({
+      success: true,
+      questions: fallbackTest.questions,
+      total: fallbackTest.questions.length,
+      notice: "Showing sample practice questions.",
+    }, { headers: { "Cache-Control": "no-store" } })
+  }
+
+  return NextResponse.json({
+    error: "Could not load questions for this test.",
+    debug: errors.slice(0, 4),
+  }, { status: 404 })
+}
