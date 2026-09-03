@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { hasServerVerifiedPdfHash, isSafePdfJobObjectPath, nextDailyDigestAt } from "./pdf-job-runner"
+import { hasServerVerifiedPdfHash, isLegacyServerThumbnail, isSafePdfJobObjectPath, nextDailyDigestAt } from "./pdf-job-runner"
 
 describe("PDF job object safety", () => {
   it("accepts only generated PDF and thumbnail paths in the pdfs bucket", () => {
@@ -21,5 +21,11 @@ describe("PDF job object safety", () => {
     expect(hasServerVerifiedPdfHash("a".repeat(64))).toBe(true)
     expect(hasServerVerifiedPdfHash("a".repeat(32))).toBe(false)
     expect(hasServerVerifiedPdfHash(null)).toBe(false)
+  })
+
+  it("recognizes only the legacy generated JPEG for a PDF", () => {
+    expect(isLegacyServerThumbnail("thumbnails/1712345678901-pdf-1.jpg", "pdf-1")).toBe(true)
+    expect(isLegacyServerThumbnail("thumbnails/1712345678901-preview.jpg", "pdf-1")).toBe(false)
+    expect(isLegacyServerThumbnail("thumbnails/1712345678901-pdf-1.svg", "pdf-1")).toBe(false)
   })
 })

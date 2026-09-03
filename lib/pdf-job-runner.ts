@@ -19,6 +19,10 @@ export function hasServerVerifiedPdfHash(value: unknown): value is string {
   return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value)
 }
 
+export function isLegacyServerThumbnail(path: unknown, pdfId: string) {
+  return typeof path === "string" && path.endsWith(`-${pdfId}.jpg`)
+}
+
 /** The next 09:00 wall-clock time in Asia/Kolkata (IST has no DST). */
 export function nextDailyDigestAt(now = new Date()): Date {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -102,13 +106,15 @@ async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: st
     }
     const bytes = new Uint8Array(await source.arrayBuffer())
     const analysis = await analyzePdfOnServer(bytes, pdf.title, pdf.content_hash, categoryName)
-    let thumbnailPath = pdf.thumbnail_path
-    if (!thumbnailPath) {
+    const oldThumbnailPath = pdf.thumbnail_path
+    let thumbnailPath = oldThumbnailPath
+    if (!thumbnailPath || isLegacyServerThumbnail(thumbnailPath, pdf.id)) {
       thumbnailPath = `thumbnails/${Date.now()}-${pdf.id}.svg`
       const uploaded = await db.storage.from("pdfs").upload(thumbnailPath, analysis.thumbnail, {
         contentType: "image/svg+xml", cacheControl: "3600", upsert: false,
       })
       if (uploaded.error) thumbnailPath = null
+      else if (oldThumbnailPath) await db.storage.from("pdfs").remove([oldThumbnailPath])
     }
     const previousWarnings = Array.isArray(pdf.review_warnings) ? pdf.review_warnings.filter((warning: unknown) =>
       typeof warning === "string" && !warning.includes("Browser PDF analysis was unavailable")
