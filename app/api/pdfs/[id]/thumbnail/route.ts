@@ -63,9 +63,11 @@ export async function GET(request: Request, { params }: RouteProps) {
       return coverResponse(pdf.title, pdf.visibility)
     }
 
-    const contentType = thumbnail.type === "image/webp" || pdf.thumbnail_path.toLowerCase().endsWith(".webp")
-      ? "image/webp"
-      : "image/jpeg"
+    const contentType = pdf.thumbnail_path.toLowerCase().endsWith(".svg")
+      ? "image/svg+xml; charset=utf-8"
+      : thumbnail.type === "image/webp" || pdf.thumbnail_path.toLowerCase().endsWith(".webp")
+        ? "image/webp"
+        : "image/jpeg"
     return new NextResponse(await thumbnail.arrayBuffer(), {
       headers: {
         "Content-Type": contentType,

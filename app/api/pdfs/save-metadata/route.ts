@@ -1,15 +1,25 @@
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 import { isValidStructureLocation } from "@/lib/content-structure-validation"
 import { enqueuePdfJob } from "@/lib/pdf-jobs"
 import { createHash } from "node:crypto"
 import { simhashSimilarity } from "@/lib/pdf-similarity"
+import { runDuePdfJobs } from "@/lib/pdf-job-runner"
 
 const STORAGE_PATH = /^[0-9]{10,20}-[^/\\]+\.pdf$/i
 const THUMBNAIL_PATH = /^thumbnails\/[0-9]{10,20}-[^/\\]+\.(?:jpg|jpeg|webp)$/i
 const MAX_PDF_BYTES = 100 * 1024 * 1024
 const PDF_SIGNATURE_BYTES = 5
+
+function processQueuedPdfAfterResponse() {
+  try {
+    after(() => runDuePdfJobs(2))
+  } catch (error) {
+    // Direct unit-test route invocation has no Next request scope.
+    if (process.env.NODE_ENV !== "test") throw error
+  }
+}
 
 function boundedAnalysis(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {
@@ -270,6 +280,7 @@ export async function POST(request: Request) {
 
       await clearCleanupReservation(supabase, filePath)
       await enqueuePdfJob(existingPdf.id, "process").catch(() => {})
+      processQueuedPdfAfterResponse()
       if (cleanupFailures.length) {
         return NextResponse.json({
           pdf: updatedPdf, replaced: true,
@@ -324,6 +335,7 @@ export async function POST(request: Request) {
     if (pdf) {
       await clearCleanupReservation(supabase, filePath)
       await enqueuePdfJob(pdf.id, "process").catch(() => {})
+      processQueuedPdfAfterResponse()
     }
 
     return NextResponse.json({ pdf })

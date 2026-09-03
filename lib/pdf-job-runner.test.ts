@@ -5,6 +5,7 @@ describe("PDF job object safety", () => {
   it("accepts only generated PDF and thumbnail paths in the pdfs bucket", () => {
     expect(isSafePdfJobObjectPath("pdfs", "1712345678901-handout.pdf")).toBe(true)
     expect(isSafePdfJobObjectPath("pdfs", "thumbnails/1712345678901-cover.webp")).toBe(true)
+    expect(isSafePdfJobObjectPath("pdfs", "thumbnails/1712345678901-cover.svg")).toBe(true)
     expect(isSafePdfJobObjectPath("pdfs", "../private.pdf")).toBe(false)
     expect(isSafePdfJobObjectPath("other", "1712345678901-handout.pdf")).toBe(false)
   })
