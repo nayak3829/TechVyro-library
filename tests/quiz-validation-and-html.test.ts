@@ -104,7 +104,7 @@ describe("quiz payload validation", () => {
     expect(result).toEqual({ ok: false, error: "Choose a complete folder, category, and section" })
   })
 
-  it("rejects empty quizzes, duplicate question IDs, and duplicate options", () => {
+  it("rejects empty quizzes and duplicate question IDs while safely collapsing duplicate options", () => {
     expect(validateQuizPayload({ id: "quiz-1", title: "Quiz", questions: [] }))
       .toEqual({ ok: false, error: expect.stringContaining("between 1 and 500") })
 
@@ -114,11 +114,30 @@ describe("quiz payload validation", () => {
       questions: [validQuestion, { ...validQuestion }],
     })).toEqual({ ok: false, error: expect.stringContaining("duplicate ID") })
 
+    const duplicateOptions = validateQuizPayload({
+      id: "quiz-1",
+      title: "Quiz",
+      questions: [{
+        ...validQuestion,
+        options: ["First", " Second ", " second ", "Third"],
+        correct: 3,
+      }],
+    })
+    expect(duplicateOptions).toMatchObject({
+      ok: true,
+      data: {
+        questions: [{
+          options: ["First", "Second", "Third"],
+          correct: 2,
+        }],
+      },
+    })
+
     expect(validateQuizPayload({
       id: "quiz-1",
       title: "Quiz",
       questions: [{ ...validQuestion, options: ["Same", " same "] }],
-    })).toEqual({ ok: false, error: expect.stringContaining("duplicate options") })
+    })).toEqual({ ok: false, error: expect.stringContaining("at least 2 distinct options") })
   })
 
   it.each([

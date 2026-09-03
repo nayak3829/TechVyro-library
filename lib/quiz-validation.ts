@@ -33,14 +33,30 @@ function normalizeQuestions(value: unknown) {
     if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 8) {
       throw new Error(`Question ${index + 1} must have 2 to 8 options`)
     }
-    const options = q.options.map((option, optionIndex) =>
+    const parsedOptions = q.options.map((option, optionIndex) =>
       boundedText(option, `Question ${index + 1} option ${optionIndex + 1}`, 1000, true)
     )
-    if (new Set(options.map((option) => option.toLocaleLowerCase())).size !== options.length) {
-      throw new Error(`Question ${index + 1} has duplicate options`)
+    const options: string[] = []
+    const optionIndexMap = new Map<number, number>()
+    const uniqueOptionIndexes = new Map<string, number>()
+    parsedOptions.forEach((option, optionIndex) => {
+      const key = option.toLocaleLowerCase()
+      let normalizedIndex = uniqueOptionIndexes.get(key)
+      if (normalizedIndex === undefined) {
+        options.push(option)
+        normalizedIndex = options.length
+        uniqueOptionIndexes.set(key, normalizedIndex)
+      }
+      optionIndexMap.set(optionIndex + 1, normalizedIndex)
+    })
+    if (options.length < 2) {
+      throw new Error(`Question ${index + 1} must have at least 2 distinct options`)
     }
-    const correct = Number(q.correct ?? 1)
-    const correctOptions = Array.isArray(q.correctOptions) ? q.correctOptions.map(Number) : []
+    const originalCorrect = Number(q.correct ?? 1)
+    const correct = optionIndexMap.get(originalCorrect) ?? originalCorrect
+    const correctOptions = Array.isArray(q.correctOptions)
+      ? [...new Set(q.correctOptions.map(Number).map((item) => optionIndexMap.get(item) ?? item))]
+      : []
     if (type === "multiselect") {
       if (!correctOptions.length || correctOptions.some((item) => !Number.isInteger(item) || item < 1 || item > options.length)) {
         throw new Error(`Question ${index + 1} has invalid correct options`)
