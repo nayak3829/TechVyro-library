@@ -37,7 +37,7 @@ vi.mock("@/lib/supabase/admin", () => ({
             : [{ name: "1712345678901-not-a-pdf.pdf", metadata: { size: 10 } }],
           error: null,
         }),
-        download: async () => ({ data: new Blob([state.replacement ? "%PDF-valid" : "not a pdf"]), error: null }),
+        download: async () => ({ data: new Blob([state.replacement ? "%PDF-valid" : "not a pdf!"]), error: null }),
         remove: async (paths: string[]) => {
           state.removed.push(...paths)
           return { error: state.replacement && paths.includes("old-file.pdf") ? { message: "storage outage" } : null }
@@ -91,15 +91,15 @@ describe("signed PDF metadata save", () => {
     expect(state.removed).toContain("old-file.pdf")
   })
 
-  it("rejects incomplete analysis before creating an unanalyzed record", async () => {
+  it("allows admin review when browser analysis is unavailable", async () => {
     state.replacement = true // mock a valid PDF payload; contract validation follows signature validation.
     const response = await POST(new Request("https://example.test/api/pdfs/save-metadata", {
       method: "POST",
       body: JSON.stringify({
-        title: "Missing analysis", filePath: "1712345678901-not-a-pdf.pdf", fileSize: 10,
+        title: "Missing analysis", filePath: "1712345678901-not-a-pdf.pdf", fileSize: 10, replace: true,
       }),
     }))
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({ error: expect.stringMatching(/Complete PDF analysis/) })
+    expect(response.status).toBe(207)
+    await expect(response.json()).resolves.toMatchObject({ replaced: true })
   })
 })

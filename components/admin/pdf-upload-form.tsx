@@ -981,13 +981,22 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
     const title = entry.title.trim() || titleFromFilename(entry.file.name)
 
     try {
-      // Step 0: Pre-check for duplicate title (unless replace is already set)
-      if (!entry.replaceExisting) {
-        updateEntry(entry.id, { status: "checking", progress: 5, isDuplicate: false })
+      // Start independent preflight requests together to remove one network
+      // round trip from every upload.
+      updateEntry(entry.id, { status: "checking", progress: 5, isDuplicate: false })
+      const titleCheckPromise = entry.replaceExisting
+        ? Promise.resolve<Response | null>(null)
+        : fetch(`/api/pdfs/check-title?title=${encodeURIComponent(title)}`, { signal: controller.signal })
+      const uploadUrlPromise = fetch("/api/pdfs/get-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ filename: entry.file.name, contentType: getFileContentType(entry.file) }),
+      })
+      const [checkRes, urlRes] = await Promise.all([titleCheckPromise, uploadUrlPromise])
+
+      if (checkRes) {
         try {
-          const checkRes = await fetch(`/api/pdfs/check-title?title=${encodeURIComponent(title)}`, {
-            signal: controller.signal,
-          })
           const checkData = await checkRes.json().catch(() => null)
           if (!checkRes.ok) {
             throw new Error(
@@ -1017,13 +1026,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
 
       updateEntry(entry.id, { status: "uploading", progress: 10, isDuplicate: false })
 
-      // Step 1: Get signed upload URL
-      const urlRes = await fetch("/api/pdfs/get-upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({ filename: entry.file.name, contentType: getFileContentType(entry.file) }),
-      })
+      // Step 1: Validate the signed upload URL prepared during preflight.
       if (!urlRes.ok) {
         const d = await urlRes.json().catch(() => ({}))
         throw new Error(d.error || "Failed to get upload URL")

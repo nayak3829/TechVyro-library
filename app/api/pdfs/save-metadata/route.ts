@@ -73,29 +73,22 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminClient()
-    const { data: storageObjects, error: storageLookupError } = await supabase.storage
-      .from("pdfs")
-      .list("", { limit: 1, search: filePath })
-    const uploadedObject = storageObjects?.find((object) => object.name === filePath)
-    const storedSize = uploadedObject?.metadata?.size
-    if (storageLookupError || !uploadedObject || !Number.isSafeInteger(storedSize) || storedSize !== fileSize) {
-      if (!storageLookupError && uploadedObject && storedSize !== fileSize) {
-        await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
-        uploadedFilePath = null
-      }
-      return NextResponse.json(
-        { error: storageLookupError || !uploadedObject ? "Uploaded PDF was not found in storage" : "Uploaded PDF size does not match metadata" },
-        { status: 400 },
-      )
-    }
-    // A signed upload only proves the object was placed in the bucket. Verify
-    // its bytes before making the object authoritative in the database.
+    // Download once and use the same bytes for size, signature, and SHA-256
+    // verification instead of making a separate storage-list request first.
     const { data: uploadedBlob, error: downloadError } = await supabase.storage.from("pdfs").download(filePath)
+    if (downloadError || !uploadedBlob) {
+      return NextResponse.json({ error: "Uploaded PDF was not found in storage" }, { status: 400 })
+    }
+    if (uploadedBlob.size !== fileSize) {
+      await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
+      uploadedFilePath = null
+      return NextResponse.json({ error: "Uploaded PDF size does not match metadata" }, { status: 400 })
+    }
     const uploadedBytes = uploadedBlob ? new Uint8Array(await uploadedBlob.arrayBuffer()) : null
     const signature = uploadedBytes
       ? new TextDecoder().decode(uploadedBytes.slice(0, PDF_SIGNATURE_BYTES))
       : ""
-    if (downloadError || !uploadedBytes || signature !== "%PDF-") {
+    if (!uploadedBytes || signature !== "%PDF-") {
       await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
       uploadedFilePath = null
       return NextResponse.json({ error: "Uploaded file is not a valid PDF" }, { status: 400 })
