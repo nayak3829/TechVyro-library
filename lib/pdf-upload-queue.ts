@@ -41,7 +41,7 @@ export function thumbnailBlobKey(entryId: string): string {
 }
 
 export function isUploadReady(entry: Pick<QueueMetadata, "status" | "analysisStatus"> & { analysis?: { valid?: boolean } }): boolean {
-  return entry.status === "pending" && entry.analysisStatus === "complete" && entry.analysis?.valid === true
+  return entry.status === "pending" && entry.analysisStatus !== "analyzing"
 }
 
 export interface CategoryMatchCandidate {

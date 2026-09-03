@@ -16,10 +16,12 @@ describe("pdf upload queue helpers", () => {
     expect(normalizeRestoredQueueState({ status: "error", progress: 20, analysisStatus: "error" }))
       .toMatchObject({ status: "error", progress: 0, analysisStatus: "error" })
   })
-  it("requires a completed, valid analysis before upload", () => {
+  it("lets the admin approve an upload when analysis is incomplete or unavailable", () => {
     expect(isUploadReady({ status: "pending", analysisStatus: "complete", analysis: { valid: true } })).toBe(true)
-    expect(isUploadReady({ status: "pending", analysisStatus: "queued", analysis: { valid: true } })).toBe(false)
-    expect(isUploadReady({ status: "pending", analysisStatus: "complete", analysis: { valid: false } })).toBe(false)
+    expect(isUploadReady({ status: "pending", analysisStatus: "queued", analysis: { valid: true } })).toBe(true)
+    expect(isUploadReady({ status: "pending", analysisStatus: "complete", analysis: { valid: false } })).toBe(true)
+    expect(isUploadReady({ status: "pending", analysisStatus: "error" })).toBe(true)
+    expect(isUploadReady({ status: "pending", analysisStatus: "analyzing" })).toBe(false)
   })
   it("selects only meaningful category matches", () => {
     const categories = [{ id: "math", name: "Mathematics", slug: "mathematics" }, { id: "cs", name: "Computer Science", slug: "computer-science" }]

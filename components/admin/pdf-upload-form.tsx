@@ -503,8 +503,6 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
       updateEntry(entry.id, { analysisStatus: "complete", analysisMessage: "HTML document · ready for metadata review", progress: 20 })
       return
     }
-    let lastError: unknown
-    for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         updateEntry(entry.id, { analysisStatus: "analyzing", analysisMessage: "Inspecting document…" })
         const result = await analyzePdfFile(entry.file, {
@@ -514,12 +512,12 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
         })
         if (!result.valid) {
           updateEntry(entry.id, {
-            status: "error",
+            status: "pending",
             progress: 0,
             analysis: result,
-            analysisStatus: "error",
-            analysisMessage: "PDF analysis found an invalid document — analyze again after replacing it.",
-            error: result.errors[0] || "The PDF is not valid for upload.",
+            analysisStatus: "complete",
+            analysisMessage: "Analysis warning — review the findings before approving upload.",
+            error: undefined,
           })
           return
         }
@@ -559,11 +557,13 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
           })
           return
         }
-        lastError = error
-        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt))
+        updateEntry(entry.id, {
+          status: "pending",
+          analysisStatus: "error",
+          analysisMessage: "Analysis unavailable — review the warning and upload if you approve.",
+          error: error instanceof Error ? error.message : "Analysis unavailable",
+        })
       }
-    }
-    updateEntry(entry.id, { analysisStatus: "error", analysisMessage: "Analysis failed — analyze again before uploading", error: lastError instanceof Error ? lastError.message : "Analysis failed" })
     } finally {
       analyzingIdsRef.current.delete(entry.id)
       if (analysisControllersRef.current.get(entry.id) === controller) {
@@ -965,7 +965,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
   // ── Upload Logic ────────────────────────────────────────────────
   const uploadEntry = useCallback(async (entry: FileEntry): Promise<boolean> => {
     if (!isUploadReady(entry) || uploadingIdsRef.current.has(entry.id) || analyzingIdsRef.current.has(entry.id)) {
-      toast.error(entry.analysisStatus === "error" ? "Analysis failed. Analyze again before uploading." : "Wait for a valid PDF analysis before uploading.")
+      toast.error("This file is currently being analyzed or uploaded.")
       return false
     }
     if (activeUploadCountRef.current >= MAX_PARALLEL_UPLOADS) {
@@ -1768,9 +1768,9 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
                   {/* Generic error (non-duplicate) with Retry button */}
                   {entry.analysisStatus === "error" && (
                     <div className="mt-1 flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-destructive">{entry.analysisMessage || "Analysis failed."}</span>
+                      <span className="text-xs text-amber-600">{entry.analysisMessage || "Analysis unavailable — admin review required."}</span>
                       <Button size="sm" variant="outline" className="h-6 text-[11px] px-2 gap-1" onClick={() => analyzeAgain(entry.id)}>
-                        <RefreshCw className="h-3 w-3" /> Analyze Again
+                        <RefreshCw className="h-3 w-3" /> Analyze manually
                       </Button>
                     </div>
                   )}

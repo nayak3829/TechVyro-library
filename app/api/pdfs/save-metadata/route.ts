@@ -40,17 +40,6 @@ function boundedAnalysis(value: unknown) {
   }
 }
 
-function hasCompleteAnalysis(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false
-  const analysis = value as Record<string, unknown>
-  return analysis.valid === true &&
-    Number.isSafeInteger(analysis.pageCount) && Number(analysis.pageCount) > 0 && Number(analysis.pageCount) <= 10000 &&
-    typeof analysis.contentHash === "string" && /^[a-f0-9]{32,128}$/i.test(analysis.contentHash) &&
-    typeof analysis.thumbnailPath === "string" && THUMBNAIL_PATH.test(analysis.thumbnailPath) &&
-    Array.isArray(analysis.warnings) &&
-    ["pending", "clean", "suspicious", "blocked", "unknown"].includes(String(analysis.malwareStatus))
-}
-
 async function clearCleanupReservation(db: ReturnType<typeof createAdminClient>, path: string) {
   try {
     await db.from("pdf_jobs").delete().eq("job_type", "cleanup").is("pdf_id", null)
@@ -142,24 +131,26 @@ export async function POST(request: Request) {
     }
 
     const normalizedVisibility = ["public", "unlisted", "private"].includes(visibility) ? visibility : "public"
-    if (!hasCompleteAnalysis(analysis)) {
-      await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
-      uploadedFilePath = null
-      return NextResponse.json({ error: "Complete PDF analysis is required (valid, page count, hash, scan status, and warnings)" }, { status: 400 })
-    }
     const analyzed = boundedAnalysis(analysis)
+    if (!analysis || typeof analysis !== "object") {
+      analyzed.warnings.push("Browser PDF analysis was unavailable; admin review is required")
+    } else if (!analyzed.pageCount || analyzed.malwareStatus === "pending" || analyzed.malwareStatus === "unknown") {
+      analyzed.warnings.push("PDF analysis was incomplete; admin review is required")
+    }
     if (analyzed.thumbnailPath && !THUMBNAIL_PATH.test(analyzed.thumbnailPath)) {
       await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
       return NextResponse.json({ error: "A valid thumbnail path is required" }, { status: 400 })
     }
-    const thumbnailName = analyzed.thumbnailPath?.slice("thumbnails/".length)
-    const { data: thumbnailObjects, error: thumbnailLookupError } = await supabase.storage
-      .from("pdfs")
-      .list("thumbnails", { limit: 1, search: thumbnailName })
-    if (thumbnailLookupError || !thumbnailObjects?.some((object) => object.name === thumbnailName)) {
-      await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
-      uploadedFilePath = null
-      return NextResponse.json({ error: "Generated thumbnail was not found in storage" }, { status: 400 })
+    if (analyzed.thumbnailPath) {
+      const thumbnailName = analyzed.thumbnailPath.slice("thumbnails/".length)
+      const { data: thumbnailObjects, error: thumbnailLookupError } = await supabase.storage
+        .from("pdfs")
+        .list("thumbnails", { limit: 1, search: thumbnailName })
+      if (thumbnailLookupError || !thumbnailObjects?.some((object) => object.name === thumbnailName)) {
+        await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
+        uploadedFilePath = null
+        return NextResponse.json({ error: "Generated thumbnail was not found in storage" }, { status: 400 })
+      }
     }
     if (analyzed.textFingerprint) {
       const { data: fingerprintCandidates, error: fingerprintError } = await supabase.from("pdfs")
