@@ -39,7 +39,12 @@ import { InlineStructureEditor } from "./inline-structure-editor"
 import { StructureSelector } from "./structure-selector"
 import { findStructureLocationByCategoryName } from "@/lib/structure-matching"
 import { validateQuizPayload } from "@/lib/quiz-validation"
-import { analyzeQuizDifficulty, isQuizDifficulty } from "@/lib/quiz-difficulty"
+import {
+  analyzeQuizDifficulty,
+  isQuizDifficulty,
+  resolveQuizDifficulty,
+  type QuizDifficultyOverride,
+} from "@/lib/quiz-difficulty"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -186,11 +191,12 @@ export function QuizManager() {
     conflictAction: "skip" | "replace" | "copy"
     expanded: boolean
     editingTitle: boolean
+    difficultyOverride: QuizDifficultyOverride
     settings: { category: string; section: string; difficulty: "easy"|"medium"|"hard"; visibility: VisibilityType; tags: string[]; structureLocation: { folderId:string;categoryId:string;sectionId:string } }
   }[]>([])
   const [dragActive, setDragActive] = useState(false)
   const [globalSettings, setGlobalSettings] = useState({
-    category: "Mathematics", section: "General", difficulty: "medium" as "easy"|"medium"|"hard",
+    category: "Mathematics", section: "General", difficulty: "auto" as QuizDifficultyOverride,
     visibility: "public" as VisibilityType, tags: [] as string[],
     structureLocation: { folderId: "", categoryId: "", sectionId: "" }
   })
@@ -268,7 +274,7 @@ export function QuizManager() {
   const [pasteJsonText, setPasteJsonText] = useState("")
   const [showPasteJson, setShowPasteJson] = useState(false)
   const [showJsonGlobalSettings, setShowJsonGlobalSettings] = useState(false)
-  const [jsonGs, setJsonGs] = useState({ category: "Mathematics", section: "General", difficulty: "medium" as "easy"|"medium"|"hard", visibility: "public" as VisibilityType })
+  const [jsonGs, setJsonGs] = useState({ category: "Mathematics", section: "General", difficulty: "auto" as QuizDifficultyOverride, visibility: "public" as VisibilityType })
 
   // Bulk selection
   const [selectedQuizzes, setSelectedQuizzes] = useState<Set<string>>(new Set())
@@ -750,17 +756,23 @@ export function QuizManager() {
     }))
   }
 
-  const applyJsonGlobalSettings = (settings: JsonFileEntry["settings"]) => {
+  const applyJsonGlobalSettings = (
+    settings: Omit<JsonFileEntry["settings"], "difficulty"> & { difficulty: QuizDifficultyOverride },
+  ) => {
     const structureLocation = findStructureLocationByCategoryName(contentFolders, settings.category) ?? undefined
     setJsonEntries(prev => prev.map(e => ({
-      ...e, settings,
+      ...e,
+      settings: {
+        ...settings,
+        difficulty: resolveQuizDifficulty(e.settings.difficulty, settings.difficulty),
+      },
       quizzes: e.quizzes.map(item => ({
         ...item,
         quiz: {
           ...item.quiz,
           category: settings.category,
           section: settings.section,
-          difficulty: settings.difficulty,
+          difficulty: resolveQuizDifficulty(item.quiz.difficulty || "medium", settings.difficulty),
           visibility: settings.visibility,
           structureLocation,
         }
@@ -998,7 +1010,11 @@ export function QuizManager() {
     status: "pending" as const, quiz: null as Quiz | null,
     included: true, conflictId: null as string | null, conflictAction: "copy" as const,
     expanded: false, editingTitle: false,
-    settings: { ...globalSettings },
+    difficultyOverride: globalSettings.difficulty,
+    settings: {
+      ...globalSettings,
+      difficulty: resolveQuizDifficulty("medium", globalSettings.difficulty),
+    },
   })
 
   const processMultipleFiles = async (files: File[]) => {
@@ -1026,6 +1042,7 @@ export function QuizManager() {
           const htmlSection = detectSection(text)
           const finalQuiz = {
             ...quiz,
+            difficulty: resolveQuizDifficulty(quiz.difficulty || "medium", entry.difficultyOverride),
             section: quiz.section !== "General" ? quiz.section : htmlSection,
             visibility: entry.settings.visibility,
             tags: entry.settings.tags,
@@ -1068,6 +1085,7 @@ export function QuizManager() {
         const htmlSection = detectSection(text)
         const finalQuiz = {
           ...quiz,
+          difficulty: resolveQuizDifficulty(quiz.difficulty || "medium", entry.difficultyOverride),
           section: quiz.section !== "General" ? quiz.section : htmlSection,
           visibility: entry.settings.visibility,
           tags: entry.settings.tags,
@@ -1099,7 +1117,10 @@ export function QuizManager() {
       conflictId,
       included: !duplicateInBatch,
       warning: duplicateInBatch ? "Duplicate title in this import batch — excluded automatically" : undefined,
-      quiz,
+      quiz: {
+        ...quiz,
+        difficulty: resolveQuizDifficulty(quiz.difficulty || "medium", base.difficultyOverride),
+      },
       settings: { ...base.settings, category: quiz.category, difficulty: (quiz.difficulty || "medium") as "easy"|"medium"|"hard", section: quiz.section || "General" },
     }
     setUploadEntries(prev => [...prev, entry])
@@ -1138,12 +1159,17 @@ export function QuizManager() {
   }
   const applyGlobalSettings = () => {
     setUploadEntries(prev => prev.map(e => ({
-      ...e, settings: { ...globalSettings },
+      ...e,
+      difficultyOverride: globalSettings.difficulty,
+      settings: {
+        ...globalSettings,
+        difficulty: resolveQuizDifficulty(e.settings.difficulty, globalSettings.difficulty),
+      },
       quiz: e.quiz ? {
         ...e.quiz,
         category: globalSettings.category,
         section: globalSettings.section,
-        difficulty: globalSettings.difficulty,
+        difficulty: resolveQuizDifficulty(e.quiz.difficulty || "medium", globalSettings.difficulty),
         visibility: globalSettings.visibility,
         tags: globalSettings.tags,
         structureLocation: globalSettings.structureLocation,
@@ -1190,7 +1216,13 @@ export function QuizManager() {
     setImportHtml(""); setParsedPreview(null); setShowPasteHtml(false)
     setUploadEntries([])
     setGlobalTagInput("")
-    setGlobalSettings(p => ({ ...p, tags: [], structureLocation: { folderId: "", categoryId: "", sectionId: "" } }))
+    setGlobalSettings(p => ({
+      ...p,
+      difficulty: "auto",
+      tags: [],
+      structureLocation: { folderId: "", categoryId: "", sectionId: "" },
+    }))
+    setJsonGs(p => ({ ...p, difficulty: "auto" }))
     setShowGlobalSettings(false)
     setShowBulkTitleEditor(false); setBulkPrefix(""); setBulkSuffix(""); setBulkFind(""); setBulkReplace("")
     setJsonEntries([]); setPasteJsonText(""); setShowPasteJson(false); setShowJsonGlobalSettings(false)
@@ -1884,8 +1916,12 @@ export function QuizManager() {
                               </Label>
                               <Select value={globalSettings.difficulty} onValueChange={v => setGlobalSettings(p => ({ ...p, difficulty: v as any }))}>
                                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                                <SelectContent>{DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                                <SelectContent>
+                                  <SelectItem value="auto">Auto — keep each analyzed level</SelectItem>
+                                  {DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                                </SelectContent>
                               </Select>
+                              <p className="text-xs text-muted-foreground">Auto preserves a different analyzed level for every quiz.</p>
                             </div>
                             <div className="space-y-2">
                               <Label className="text-sm font-medium flex items-center gap-2">
@@ -2286,7 +2322,10 @@ export function QuizManager() {
                               <Label className="text-xs">Difficulty</Label>
                               <Select value={jsonGs.difficulty} onValueChange={v => setJsonGs(p => ({ ...p, difficulty: v as any }))}>
                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>{DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                                <SelectContent>
+                                  <SelectItem value="auto">Auto — keep analyzed</SelectItem>
+                                  {DIFFICULTIES.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                                </SelectContent>
                               </Select>
                             </div>
                             <div>

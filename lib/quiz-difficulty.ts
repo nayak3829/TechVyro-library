@@ -1,4 +1,5 @@
 export type QuizDifficulty = "easy" | "medium" | "hard"
+export type QuizDifficultyOverride = QuizDifficulty | "auto"
 
 type DifficultyQuestion = {
   question?: unknown
@@ -58,4 +59,11 @@ export function analyzeQuizDifficulty(input: DifficultyInput): QuizDifficulty {
 
 export function isQuizDifficulty(value: unknown): value is QuizDifficulty {
   return value === "easy" || value === "medium" || value === "hard"
+}
+
+export function resolveQuizDifficulty(
+  analyzed: QuizDifficulty,
+  override: QuizDifficultyOverride,
+): QuizDifficulty {
+  return override === "auto" ? analyzed : override
 }

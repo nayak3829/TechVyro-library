@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { analyzeQuizDifficulty } from "@/lib/quiz-difficulty"
+import { analyzeQuizDifficulty, resolveQuizDifficulty } from "@/lib/quiz-difficulty"
 
 describe("quiz difficulty analysis", () => {
   it("classifies short recall questions as easy", () => {
@@ -45,5 +45,11 @@ describe("quiz difficulty analysis", () => {
         options: ["Statement one", "Statement two", "Statement three"],
       }],
     })).toBe("medium")
+  })
+
+  it("preserves analyzed levels for bulk Auto and applies explicit overrides", () => {
+    expect(resolveQuizDifficulty("easy", "auto")).toBe("easy")
+    expect(resolveQuizDifficulty("hard", "auto")).toBe("hard")
+    expect(resolveQuizDifficulty("easy", "hard")).toBe("hard")
   })
 })
