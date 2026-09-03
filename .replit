@@ -41,10 +41,11 @@ outputType = "webview"
 localPort = 5000
 externalPort = 80
 
+
 [deployment]
-deploymentTarget = "vm"
-run = ["pnpm", "run", "start"]
-build = ["pnpm", "run", "build"]
+deploymentTarget = "autoscale"
+run = ["sh", "-c", "HOSTNAME=0.0.0.0 PORT=5000 node .next/standalone/server.js"]
+build = ["sh", "-c", "pnpm run build && mkdir -p .next/standalone/.next && rm -rf .next/standalone/.next/static .next/standalone/public && cp -R .next/static .next/standalone/.next/static && cp -R public .next/standalone/public && rm -rf node_modules .next/cache"]
 
 [postMerge]
 path = "scripts/post-merge.sh"

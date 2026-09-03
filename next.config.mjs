@@ -2,6 +2,9 @@
 const isDevelopment = process.env.NODE_ENV !== "production"
 
 const nextConfig = {
+  // Package only the files required by the production server. Replit's
+  // Autoscale image should not need the full build-time dependency tree.
+  output: "standalone",
   // One-time URL version for development chunks that were previously served
   // with an immutable one-year cache. Production assets keep Next's defaults.
   deploymentId: isDevelopment ? "replit-dev-cache-reset-20260902" : undefined,

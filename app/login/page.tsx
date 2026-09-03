@@ -6,6 +6,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { retryAuthNetworkRequest } from "@/lib/auth-network"
 import { safeInternalPath } from "@/lib/auth-redirect"
+import { CANONICAL_SITE_ORIGIN } from "@/lib/public-site"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   Mail, Lock, User, Eye, EyeOff,
@@ -64,7 +65,9 @@ function LoginPageContent() {
     if (typeof window === "undefined") return ""
     const origin = window.location.origin
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-    const base = (origin.includes("localhost") && siteUrl) ? siteUrl : origin
+    const base = process.env.NODE_ENV === "production"
+      ? CANONICAL_SITE_ORIGIN
+      : ((origin.includes("localhost") && siteUrl) ? siteUrl : origin)
     const next = destination !== "/" ? `?next=${encodeURIComponent(destination)}` : ""
     return `${base}/auth/callback${next}`
   }
@@ -73,7 +76,9 @@ function LoginPageContent() {
     if (typeof window === "undefined") return ""
     const origin = window.location.origin
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-    const base = (origin.includes("localhost") && siteUrl) ? siteUrl : origin
+    const base = process.env.NODE_ENV === "production"
+      ? CANONICAL_SITE_ORIGIN
+      : ((origin.includes("localhost") && siteUrl) ? siteUrl : origin)
     return `${base}/reset-password`
   }
 

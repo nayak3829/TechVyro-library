@@ -3,13 +3,12 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { safeInternalPath } from "@/lib/auth-redirect"
+import { CANONICAL_SITE_ORIGIN } from "@/lib/public-site"
 
-const CANONICAL_SITE_URL = "https://techvyro-library.replit.app"
-
-function getPublicOrigin(request: NextRequest): string {
+export function getPublicOrigin(request: NextRequest): string {
   const candidates = [
     process.env.NEXT_PUBLIC_SITE_URL,
-    CANONICAL_SITE_URL,
+    CANONICAL_SITE_ORIGIN,
     process.env.REPLIT_DEV_DOMAIN
       ? `https://${process.env.REPLIT_DEV_DOMAIN}`
       : undefined,
@@ -39,7 +38,7 @@ function getPublicOrigin(request: NextRequest): string {
     if (allowed.has(forwardedOrigin)) return forwardedOrigin
   }
 
-  const configuredSite = process.env.NEXT_PUBLIC_SITE_URL || CANONICAL_SITE_URL
+  const configuredSite = CANONICAL_SITE_ORIGIN
   if (configuredSite) {
     try {
       return new URL(configuredSite).origin

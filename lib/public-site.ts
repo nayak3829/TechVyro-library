@@ -1,0 +1,1 @@
+export const CANONICAL_SITE_ORIGIN = "https://techvyro-library.vercel.app"
