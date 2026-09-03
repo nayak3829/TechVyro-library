@@ -1,0 +1,14 @@
+- [Next dev asset caching](next-dev-asset-caching.md) — never serve Next development chunks as immutable; stale JS can mix with fresh HTML and cause hydration crashes.
+- [Supabase auth session architecture](supabase-auth-sessions.md) — browser and server auth must share SSR cookies; Next 15 route guards require the middleware convention.
+- [Vitest JSX transforms](vitest-jsx-transforms.md) — with JSX preserved for Next, configure Vitest 4’s OXC transform rather than its ignored esbuild option.
+- [Browser test concurrency](browser-test-concurrency.md) — run navigation-heavy Playwright suites with one worker; parallel cold Next dev compiles cause false timeouts.
+- [Admin auth migrations](admin-auth-migrations.md) — inventory every privileged route and integration hook when changing admin session transport; partial migrations silently break CRUD.
+- [Analytics event history](analytics-event-history.md) — daily trends use append-only real events from enablement onward; never fabricate historical buckets from lifetime counters.
+- [Supabase clock-skew retries](supabase-clock-skew.md) — retry once only for transient “JWT issued at future” failures during Replit cold starts.
+- [Mixed CRUD save safety](mixed-crud-save-safety.md) — never claim client rollback undoes parallel server writes; phase deletes last and reload server truth after failure.
+- [Canonical pnpm lock handling](canonical-pnpm-lock.md) — mixed npm/pnpm locks can select the wrong installer and corrupt a running Next process’s dependency links.
+- [Smart upload concurrency](smart-upload-concurrency.md) — keep browser PDF analysis/uploads continuously pooled but bounded; unbounded OCR workers can freeze the admin tab.
+- [Private PDF thumbnails](private-pdf-thumbnails.md) — expose private-bucket previews only through policy-aware app routes; never serialize storage paths publicly.
+- [Homepage aggregate stats](homepage-aggregate-stats.md) — compute public catalogue totals in a SQL RPC; never infer them from bounded homepage card rows.
+- [Quiz import precedence](quiz-import-precedence.md) — preserve embedded quiz metadata unless an admin explicitly applies an override; preflight every item before writes.
+- [Publish image size](publish-image-size.md) — exclude generated workspace state from publish sources; gitignore alone does not prevent oversized Replit image layers.
