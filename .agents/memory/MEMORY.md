@@ -12,3 +12,4 @@
 - [Homepage aggregate stats](homepage-aggregate-stats.md) — compute public catalogue totals in a SQL RPC; never infer them from bounded homepage card rows.
 - [Quiz import precedence](quiz-import-precedence.md) — preserve embedded quiz metadata unless an admin explicitly applies an override; preflight every item before writes.
 - [Publish image size](publish-image-size.md) — exclude generated workspace state from publish sources; gitignore alone does not prevent oversized Replit image layers.
+- [Native packages in instrumentation](native-packages-in-instrumentation.md) — never transitively import native Node packages from Next instrumentation; trigger that work from Node request paths.
