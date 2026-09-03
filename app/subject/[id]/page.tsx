@@ -14,7 +14,7 @@ import {
   Play, Clock, Layers, LayoutGrid, Lock, Sparkles, X,
   Brain, GraduationCap, Flame, Star, ArrowRight,
   AlignLeft, ListChecks, ChevronDown, ChevronUp,
-  Home
+  Home, Folder as FolderIcon
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -50,6 +50,15 @@ type Tab = "all" | "pdfs" | "quizzes"
 
 const DIFF_COLORS: Record<string, string> = {
   easy: "#22c55e", medium: "#f59e0b", hard: "#ef4444",
+}
+
+function StructureIcon({ name, className = "h-6 w-6" }: { name?: string; className?: string }) {
+  const Icon = name === "Folder" ? FolderIcon
+    : name === "GraduationCap" ? GraduationCap
+      : name === "FileText" ? FileText
+        : name === "Layers" ? Layers
+          : BookOpen
+  return <Icon className={className} aria-hidden="true" />
 }
 
 function fmtSize(bytes: number | null) {
@@ -227,7 +236,7 @@ export default function SubjectPage() {
               className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl shadow-lg shrink-0"
               style={{ background: `linear-gradient(135deg, ${folderColor}30, ${folderColor}15)`, border: `1.5px solid ${folderColor}40` }}
             >
-              {folder.icon || "📚"}
+              <StructureIcon name={folder.icon} className="h-8 w-8 sm:h-10 sm:w-10" />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -327,7 +336,7 @@ export default function SubjectPage() {
                           : {}}
                         onClick={() => { selectCategory(cat.id); if (!isExpanded) toggleCat(cat.id) }}
                       >
-                        <span className="text-base shrink-0">{cat.icon || "📂"}</span>
+                        <StructureIcon name={cat.icon} className="h-4 w-4 shrink-0" />
                         <span className="flex-1 truncate font-medium">{cat.name}</span>
                         <span className="text-[10px] opacity-60">{total || ""}</span>
                         {cat.sections.length > 0 && (
@@ -475,7 +484,7 @@ export default function SubjectPage() {
                             className="h-10 w-10 rounded-xl flex items-center justify-center text-lg shrink-0"
                             style={{ backgroundColor: `${catColor}18` }}
                           >
-                            {cat.icon || "📖"}
+                            <StructureIcon name={cat.icon} className="h-5 w-5" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate">{cat.name}</p>
