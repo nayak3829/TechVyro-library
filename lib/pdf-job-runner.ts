@@ -109,11 +109,11 @@ async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: st
     const oldThumbnailPath = pdf.thumbnail_path
     let thumbnailPath = oldThumbnailPath
     if (!thumbnailPath || isLegacyServerThumbnail(thumbnailPath, pdf.id)) {
-      thumbnailPath = `thumbnails/${Date.now()}-${pdf.id}.svg`
+      thumbnailPath = `thumbnails/${Date.now()}-auto-${pdf.id}.webp`
       const uploaded = await db.storage.from("pdfs").upload(thumbnailPath, analysis.thumbnail, {
-        contentType: "image/svg+xml", cacheControl: "3600", upsert: false,
+        contentType: "image/webp", cacheControl: "3600", upsert: false,
       })
-      if (uploaded.error) thumbnailPath = null
+      if (uploaded.error) thumbnailPath = oldThumbnailPath
       else if (oldThumbnailPath) await db.storage.from("pdfs").remove([oldThumbnailPath])
     }
     const previousWarnings = Array.isArray(pdf.review_warnings) ? pdf.review_warnings.filter((warning: unknown) =>
@@ -125,7 +125,7 @@ async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: st
       processing_completed_at: processing ? new Date().toISOString() : undefined,
       page_count: analysis.pageCount,
       malware_status: analysis.malwareStatus,
-      review_warnings: [...previousWarnings, ...analysis.warnings],
+      review_warnings: [...new Set([...previousWarnings, ...analysis.warnings])],
       thumbnail_path: thumbnailPath,
       category_id: categoryId,
       description: pdf.description || analysis.description,

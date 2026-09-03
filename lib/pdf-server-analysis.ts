@@ -1,4 +1,5 @@
 import { PDFDocument } from "pdf-lib"
+import sharp from "sharp"
 
 const SUSPICIOUS_MARKERS = ["/JavaScript", "/JS", "/Launch", "/OpenAction", "/EmbeddedFile", "/RichMedia"]
 
@@ -26,16 +27,15 @@ export async function analyzePdfOnServer(bytes: Uint8Array, title: string, hash:
   const suspiciousMarkers = SUSPICIOUS_MARKERS.filter((marker) => buffer.includes(Buffer.from(marker)))
   const tags = serverPdfTags(title, category)
   const description = `${title} — ${pageCount} page PDF study material available on TechVyro.`
-  const lines = title.match(/.{1,22}(?:\s|$)|.{1,22}/gu)?.slice(0, 5) || [title]
-  const titleSvg = lines.map((line, index) =>
-    `<text x="360" y="${400 + index * 70}" text-anchor="middle" fill="white" font-size="48" font-weight="700">${escapeXml(line.trim())}</text>`
-  ).join("")
+  const safeCategory = escapeXml((category || "STUDY MATERIAL").replace(/[^\x20-\x7E]/g, "").slice(0, 30))
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="960">
     <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#172554"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
     <rect width="720" height="960" fill="url(#g)"/><text x="360" y="170" text-anchor="middle" fill="#bfdbfe" font-size="40" font-weight="700">TECHVYRO</text>
-    ${titleSvg}<text x="360" y="850" text-anchor="middle" fill="#dbeafe" font-size="30">PDF · ${pageCount} pages</text>
+    <text x="360" y="430" text-anchor="middle" fill="white" font-size="92" font-weight="700">PDF</text>
+    <text x="360" y="535" text-anchor="middle" fill="#bfdbfe" font-size="42" font-weight="700">${safeCategory}</text>
+    <text x="360" y="850" text-anchor="middle" fill="#dbeafe" font-size="30">${pageCount} pages</text>
   </svg>`
-  const thumbnail = Buffer.from(svg)
+  const thumbnail = await sharp(Buffer.from(svg)).webp({ quality: 84 }).toBuffer()
   return {
     pageCount,
     malwareStatus: suspiciousMarkers.length ? "suspicious" : "clean",

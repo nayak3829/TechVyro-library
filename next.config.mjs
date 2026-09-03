@@ -41,7 +41,7 @@ const nextConfig = {
       },
     ],
   },
-  serverExternalPackages: [],
+  serverExternalPackages: ["sharp"],
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",
