@@ -104,6 +104,29 @@ describe("quiz payload validation", () => {
     expect(result).toEqual({ ok: false, error: "Choose a complete folder, category, and section" })
   })
 
+  it("accepts long question, option, and explanation text", () => {
+    const result = validateQuizPayload({
+      id: "long-question-quiz",
+      title: "Long Question Quiz",
+      questions: [{
+        ...validQuestion,
+        question: "Q".repeat(12_000),
+        options: [`A${"x".repeat(3_000)}`, `B${"y".repeat(3_000)}`],
+        explanation: "E".repeat(20_000),
+      }],
+    })
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        questions: [{
+          question: "Q".repeat(12_000),
+          explanation: "E".repeat(20_000),
+        }],
+      },
+    })
+  })
+
   it("rejects empty quizzes and duplicate question IDs while safely collapsing duplicate options", () => {
     expect(validateQuizPayload({ id: "quiz-1", title: "Quiz", questions: [] }))
       .toEqual({ ok: false, error: expect.stringContaining("between 1 and 500") })

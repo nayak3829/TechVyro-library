@@ -8,7 +8,7 @@ type ValidationResult =
   | { ok: true; data: Record<string, unknown> }
   | { ok: false; error: string }
 
-function boundedText(value: unknown, field: string, max: number, required = false): string {
+function boundedText(value: unknown, field: string, max: number | undefined, required = false): string {
   if (value === undefined || value === null) {
     if (required) throw new Error(`${field} is required`)
     return ""
@@ -16,7 +16,7 @@ function boundedText(value: unknown, field: string, max: number, required = fals
   if (typeof value !== "string") throw new Error(`${field} must be text`)
   const normalized = value.trim()
   if (required && !normalized) throw new Error(`${field} is required`)
-  if (normalized.length > max) throw new Error(`${field} is too long`)
+  if (max !== undefined && normalized.length > max) throw new Error(`${field} is too long`)
   return normalized
 }
 
@@ -29,12 +29,12 @@ function normalizeQuestions(value: unknown) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`Question ${index + 1} is invalid`)
     const q = raw as Record<string, unknown>
     const type = typeof q.type === "string" && QUESTION_TYPES.has(q.type) ? q.type : "mcq"
-    const question = boundedText(q.question, `Question ${index + 1}`, 5000, true)
+    const question = boundedText(q.question, `Question ${index + 1}`, undefined, true)
     if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 8) {
       throw new Error(`Question ${index + 1} must have 2 to 8 options`)
     }
     const parsedOptions = q.options.map((option, optionIndex) =>
-      boundedText(option, `Question ${index + 1} option ${optionIndex + 1}`, 1000, true)
+      boundedText(option, `Question ${index + 1} option ${optionIndex + 1}`, undefined, true)
     )
     const options: string[] = []
     const optionIndexMap = new Map<number, number>()
@@ -82,7 +82,7 @@ function normalizeQuestions(value: unknown) {
       correctOptions,
       marks,
       negativeMarks,
-      explanation: boundedText(q.explanation, `Question ${index + 1} explanation`, 10000),
+      explanation: boundedText(q.explanation, `Question ${index + 1} explanation`, undefined),
       timeLimit,
     }
   })
