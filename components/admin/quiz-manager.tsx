@@ -39,6 +39,7 @@ import { InlineStructureEditor } from "./inline-structure-editor"
 import { StructureSelector } from "./structure-selector"
 import { findStructureLocationByCategoryName } from "@/lib/structure-matching"
 import { validateQuizPayload } from "@/lib/quiz-validation"
+import { analyzeQuizDifficulty, isQuizDifficulty } from "@/lib/quiz-difficulty"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -578,7 +579,9 @@ export function QuizManager() {
     description: q.description || "",
     category: settings?.category || q.category || "General",
     section: settings?.section || q.section || "General",
-    difficulty: settings?.difficulty || q.difficulty || "medium",
+    difficulty: settings?.difficulty || (isQuizDifficulty(q.difficulty)
+      ? q.difficulty
+      : analyzeQuizDifficulty(q)),
     visibility: settings?.visibility || q.visibility || "public",
     timeLimit: q.timeLimit || q.time_limit || 1200,
     tags: q.tags || [],
@@ -829,14 +832,6 @@ export function QuizManager() {
     return null
   }
 
-  /** Detect difficulty level from text */
-  const detectDifficulty = (text: string): "easy" | "medium" | "hard" => {
-    const t = text.toLowerCase()
-    if (t.match(/\beasy\b|\bbasic\b|\bbeginner\b|\bsimple\b|\bclass [1-8]\b/)) return "easy"
-    if (t.match(/\bhard\b|\badvanced\b|\bdifficult\b|\btough\b|\bexpert\b|\bhigh level\b/)) return "hard"
-    return "medium"
-  }
-
   /** Detect section from text */
   const detectSection = (text: string): string => {
     const t = text.toLowerCase()
@@ -942,8 +937,12 @@ export function QuizManager() {
 
       const category = detectedCategory || "General"
 
-      // Detect difficulty and section from title
-      const difficulty = detectDifficulty(title)
+      // Analyze the complete quiz rather than relying only on its title.
+      const difficulty = analyzeQuizDifficulty({
+        title,
+        context: html.slice(0, 20_000),
+        questions,
+      })
       const section = detectSection(title)
 
       return {
@@ -1024,11 +1023,9 @@ export function QuizManager() {
           // Auto-create category if new
           await ensureCategoryExists(quiz.category)
           // Detect difficulty, section from full HTML too (improve accuracy)
-          const htmlDifficulty = detectDifficulty(text)
           const htmlSection = detectSection(text)
           const finalQuiz = {
             ...quiz,
-            difficulty: quiz.difficulty !== "medium" ? quiz.difficulty : htmlDifficulty,
             section: quiz.section !== "General" ? quiz.section : htmlSection,
             visibility: entry.settings.visibility,
             tags: entry.settings.tags,
@@ -1068,11 +1065,9 @@ export function QuizManager() {
       if (quiz) {
         const conflictId = quizzes.find(q => q.title.toLowerCase().trim() === quiz.title.toLowerCase().trim())?.id || null
         await ensureCategoryExists(quiz.category)
-        const htmlDifficulty = detectDifficulty(text)
         const htmlSection = detectSection(text)
         const finalQuiz = {
           ...quiz,
-          difficulty: quiz.difficulty !== "medium" ? quiz.difficulty : htmlDifficulty,
           section: quiz.section !== "General" ? quiz.section : htmlSection,
           visibility: entry.settings.visibility,
           tags: entry.settings.tags,
