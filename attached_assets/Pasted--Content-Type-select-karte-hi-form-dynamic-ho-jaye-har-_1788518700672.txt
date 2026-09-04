@@ -1,0 +1,48 @@
+"Content Type" select karte hi form dynamic ho jaye — har type ke andar ye fields aayenge:
+
+Exams → Exam group (SSC/Defense/Banking/Railways/UPSC/Teaching) → specific exam (CGL/CHSL/NDA/CDS...)
+School → Class (1–12) → Board (CBSE/ICSE/State) → Subject
+College → Course (B.Tech/B.Sc/B.Com/BA) → Branch/Stream → Semester → Subject
+Diploma → Branch (Mechanical/Civil/CS etc.) → Semester → Subject
+
+Database side — ek hi generic structure kaafi hai, alag-alag table banane ki zarurat nahi:
+
+content_type   → "exam" | "school" | "college" | "diploma"
+category       → e.g. "SSC", "Class 10", "B.Tech", "Polytechnic - Mechanical"
+subcategory    → e.g. "CGL", "CBSE", "3rd Semester", "4th Semester"
+subject/tags   → optional, free text ya multi-select
+
+Ye flexible hai — kal agar koi 5th type add karna ho (jaise "Entrance Exams" for JEE/NEET separately), bina schema todhe ho jayega.
+
+Replit AI ko dena hai to ye prompt copy kar lo:
+
+I need to add a category system to my PDF upload flow.
+
+Add a "Content Type" dropdown as the first field in my upload form 
+(admin panel), with options: Exams, School, College, Diploma.
+
+Based on the selected Content Type, show these additional fields (cascading, 
+each dependent on the previous):
+
+- Exams: Exam Group (SSC, Banking, Defence, Railways, UPSC/PCS, Teaching, 
+  JEE/NEET, Agriculture) → Specific Exam (free text, e.g. "SSC CGL")
+- School: Class (1–12) → Board (CBSE, ICSE, State Board) → Subject
+- College: Course (B.Tech, B.Sc, B.Com, BA, etc.) → Branch/Stream → 
+  Semester → Subject
+- Diploma: Branch (Mechanical, Civil, Computer Science, etc.) → Semester → 
+  Subject
+
+Store this as generic fields on the content record so I don't need a 
+separate table per type:
+  content_type (string)
+  category (string)
+  subcategory (string)  
+  subject (string, optional)
+
+Update the PDF listing/filter pages to filter by content_type first, 
+then category, matching this same hierarchy. Keep my existing "SSC" PDFs 
+working — map them to content_type: "exams", category: "SSC".
+
+Match my existing dark theme styling for any new form fields or filters.
+
+Isse admin panel mein upload karte waqt category select karna easy ho jayega, aur student side pe bhi filter usi hierarchy se kaam karega.

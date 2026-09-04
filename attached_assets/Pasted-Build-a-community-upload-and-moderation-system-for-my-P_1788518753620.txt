@@ -1,0 +1,109 @@
+Build a community upload and moderation system for my PDF library platform.
+
+GOAL: Let students/teachers submit PDFs through a public form. Nothing goes 
+live until an admin reviews and approves it. This adds to my existing 
+content library alongside admin-uploaded PDFs.
+
+--- 1. DATABASE ---
+
+Create a new table/collection "submissions" with these fields:
+  id                  (auto)
+  title               (string, required)
+  file_url            (string, required — uploaded file location)
+  file_size           (number, in MB)
+  page_count          (number, optional — auto-detect if possible)
+  content_type        (enum: "exams" | "school" | "college" | "diploma")
+  category            (string, e.g. "SSC", "Class 10", "B.Tech")
+  subcategory         (string, e.g. "CGL", "CBSE", "3rd Semester")
+  subject             (string, optional)
+  description          (text, optional, max 300 chars)
+  submitter_name       (string, required)
+  submitter_email      (string, required)
+  submitter_note       (text, optional — e.g. "source: my own class notes")
+  copyright_confirmed  (boolean, required — must be true to submit)
+  status               (enum: "pending" | "approved" | "rejected", default "pending")
+  rejection_reason     (text, optional, filled by admin if rejected)
+  submitted_at          (timestamp, auto)
+  reviewed_at            (timestamp, optional)
+  reviewed_by            (string, optional — admin username)
+
+--- 2. PUBLIC SUBMISSION FORM ---
+
+Create a page at /submit (or /contribute) with:
+  - File upload (PDF only, max 50MB, validate mime type server-side not 
+    just extension)
+  - Title (required)
+  - Content Type dropdown (Exams / School / College / Diploma) — reuse 
+    the same cascading Category → Subcategory fields from my existing 
+    upload flow (Exams: exam group → specific exam. School: class → 
+    board. College: course → branch → semester. Diploma: branch → 
+    semester)
+  - Subject (optional text field)
+  - Short description (optional, 300 char limit with live counter)
+  - Submitter name + email (required, no login needed — but if I already 
+    have user accounts, prefill from logged-in user)
+  - Checkbox: "I own the rights to this document or have permission to 
+    share it" — required, form won't submit unless checked
+  - Submit button — on success show: "Thanks! Your submission is under 
+    review. We'll notify you once it's approved."
+
+Rate-limit submissions: max 5 per email/IP per day, to prevent spam.
+
+--- 3. ADMIN MODERATION DASHBOARD ---
+
+Create an admin-only page at /admin/submissions with:
+  - Tabs or filter: Pending / Approved / Rejected
+  - Pending tab is default view, sorted oldest-first
+  - Each row shows: title, content type/category, submitter name, file 
+    size, page count, submitted date
+  - Click a row to open a detail view with:
+      - Embedded PDF preview (or a "view file" link if embedding isn't 
+        feasible)
+      - All submitted metadata
+      - Two buttons: "Approve" and "Reject"
+      - If Reject is clicked, show a text field for rejection reason 
+        before confirming (required, so submitter knows why)
+  - Bulk actions: checkbox to select multiple pending submissions and 
+    approve/reject in one action
+
+--- 4. APPROVAL FLOW ---
+
+When admin clicks Approve:
+  - Copy the submission's data into my main content/PDFs table (same 
+    schema as my existing PDFs: content_type, category, subcategory, 
+    subject, title, file_url, page_count, file_size)
+  - Set status = "approved", reviewed_at = now, reviewed_by = admin 
+    username
+  - The PDF should now appear in the normal public library/browse pages 
+    exactly like admin-uploaded content — no separate "community" 
+    badge unless I ask for one
+  - Attribute it quietly if needed: store submitter_name on the content 
+    record as "contributed_by" (optional, don't display prominently 
+    unless I want a "Contributed by" credit line on the PDF page)
+
+When admin clicks Reject:
+  - Set status = "rejected", store rejection_reason, reviewed_at, 
+    reviewed_by
+  - Do NOT add it to the main content table
+  - If the submitter has an account, show the rejection reason in their 
+    dashboard; otherwise just store it (email notification is optional, 
+    skip if I don't have email sending set up yet)
+
+--- 5. VALIDATION & SAFETY ---
+
+  - Reject non-PDF files at upload (check actual file content type, not 
+    just filename extension)
+  - Scan for duplicate titles against existing approved content and 
+    warn admin ("Similar title already exists: [link]") rather than 
+    blocking
+  - Never auto-publish — status must always start as "pending"
+
+--- 6. STYLING ---
+
+Match my existing dark theme (#0a0a0a background, existing button and 
+card styles). The submission form should feel like a natural part of the 
+site, not a bolted-on page. Add a "Contribute" or "Upload your notes" 
+link in the main navigation pointing to /submit.
+
+Build this as a complete, working feature — form, database, admin 
+dashboard, and approval logic all connected.
