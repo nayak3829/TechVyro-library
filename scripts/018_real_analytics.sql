@@ -26,8 +26,8 @@ DECLARE
   new_count INTEGER;
 BEGIN
   INSERT INTO analytics_events(pdf_id, event_type, event_key)
-  VALUES (pdf_id, 'view', NULLIF(event_key, ''))
-  ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING
+  VALUES (increment_view_count.pdf_id, 'view', NULLIF(increment_view_count.event_key, ''))
+  ON CONFLICT DO NOTHING
   RETURNING id INTO inserted_id;
 
   IF inserted_id IS NULL THEN
@@ -56,8 +56,8 @@ DECLARE
   new_count INTEGER;
 BEGIN
   INSERT INTO analytics_events(pdf_id, event_type, event_key)
-  VALUES (pdf_id, 'download', NULLIF(event_key, ''))
-  ON CONFLICT (event_key) WHERE event_key IS NOT NULL DO NOTHING
+  VALUES (increment_download_count.pdf_id, 'download', NULLIF(increment_download_count.event_key, ''))
+  ON CONFLICT DO NOTHING
   RETURNING id INTO inserted_id;
 
   IF inserted_id IS NULL THEN

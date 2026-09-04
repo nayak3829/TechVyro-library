@@ -4,12 +4,16 @@ import { isValidAnalyticsEventKey } from "@/lib/analytics-events"
 
 describe("real analytics migration", () => {
   const sql = readFileSync("scripts/018_real_analytics.sql", "utf8")
+  const ambiguityFix = readFileSync("scripts/037_fix_analytics_event_key_ambiguity.sql", "utf8")
 
   it("uses append-only events and atomic counter updates", () => {
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS analytics_events")
     expect(sql).toContain("view_count = COALESCE(view_count, 0) + 1")
     expect(sql).toContain("download_count = COALESCE(download_count, 0) + 1")
-    expect(sql).toContain("ON CONFLICT (event_key)")
+    expect(sql).toContain("ON CONFLICT DO NOTHING")
+    expect(sql).toContain("increment_view_count.event_key")
+    expect(ambiguityFix).toContain("increment_download_count.event_key")
+    expect(ambiguityFix).not.toContain("ON CONFLICT (event_key)")
   })
 
   it("keeps analytics data private and service-role functions constrained", () => {

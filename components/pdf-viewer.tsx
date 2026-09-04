@@ -460,7 +460,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
               <div>
                 <h2 className="text-base font-bold text-foreground">Related PDFs</h2>
                 <p className="text-[10px] text-muted-foreground">
-                  {pdf.category?.name} ke aur documents
+                  More documents from {pdf.category?.name}
                 </p>
               </div>
             </div>
@@ -469,7 +469,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
                 href={`/category/${pdf.category.slug || pdf.category_id}`}
                 className="flex items-center gap-1 text-xs text-primary hover:underline"
               >
-                Sab dekhो <ChevronRight className="h-3.5 w-3.5" />
+                View all <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             )}
           </div>
