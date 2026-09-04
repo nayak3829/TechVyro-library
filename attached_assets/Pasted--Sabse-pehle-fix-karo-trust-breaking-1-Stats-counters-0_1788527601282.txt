@@ -1,0 +1,29 @@
+🔴 Sabse pehle fix karo (trust-breaking)
+
+1. Stats counters "0" dikha rahe hain jabki data real hai
+"Trusted by Students" section mein:
+
+"Total PDFs: 0" — lekin subtitle khud kehta hai "+4 added this week"
+"Categories: 0" — lekin subtitle "1 subject covered" bolta hai
+"Downloads: 0", "Total Views: 0"
+
+Ye seedha contradiction hai — agar 4 PDFs hain to counter 0 kyun dikhaye? Ye do wajah se ho sakta hai: (a) real bug hai jahan stats API sahi count nahi la raha, ya (b) mera fetch tool page ko JS-hydration se pehle capture kar raha hai (jaisa "Loading TechVyro..." aur login button pe "Checking account status" text bhi dikha, jo typically loading state hote hain). Aap khud live browser mein incognito/refresh karke check kar lo — agar real visitors ko bhi 0 dikh raha hai, ye sabse critical fix hai kyunki ye exact wahi section hai jo trust build karne ke liye bana hai.
+
+2. Testimonials jo content promise karte hain wo library mein hai hi nahi
+Reviews mein likha hai: "Biology and Chemistry notes", "NCERT solutions", "engineering subjects", "Current affairs and static GK" — lekin abhi library mein sirf SSC category hai, 4 PDFs. Naya visitor review padhega, us content ko dhundhega, nahi milega, aur bounce karega — jo sabse pehle trust todhta hai jab wo doosri baar wapas nahi aata. Do options:
+
+Jab tak actual multi-category content na aaye, testimonials ko sirf jo content abhi live hai (SSC) usi tak limit karo
+Ya jaldi se School/College/Diploma PDFs bhi add karo taaki testimonials sach ho jayein
+🟡 Engagement gaps
+
+3. Leaderboard "No scores yet" — pehle bhi flag kiya tha, quiz-attempt tracking wire-up karna hoga taaki real scores show hon.
+
+4. Har PDF/quiz card pe view/download count "0" hai — agar genuinely abhi kam traffic hai to theek hai (organic hai), lekin agar tracking hi nahi lagi hai to ye ek missed opportunity hai — "50+ downloads" jaisa badge trust badhata hai, "0" ulta effect karta hai.
+
+🟢 Content-inventory mismatch
+
+5. Mock Tests section mein 8 categories hain (SSC, Banking, Defence, Railways, UPSC/PCS, JEE/NEET, CTET/TET, Agriculture) lekin PDF library sirf SSC mein hai. Student "Banking" pe click karega mock test ke liye, phir PDF dhundhega, nahi milega. Jab tak content nahi hai un categories mein, unhe thoda "Coming soon" tag de do taaki dead-end na lage.
+
+🔵 Technical/performance
+
+6. Testimonials section mein wahi 6 reviews 8+ baar repeat ho rahe hain page ke HTML mein. Ye agar infinite auto-scroll marquee effect ke liye hai to normal technique hai, lekin usually seamless loop ke liye sirf 2x duplicate karna kaafi hota hai — 8x se zyada page weight badhta hai aur Google crawler ko near-duplicate content dikh sakta hai jo SEO ke liye halka negative signal hai.
