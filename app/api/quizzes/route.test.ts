@@ -66,7 +66,7 @@ describe("quiz list visibility", () => {
     const response = await GET(new Request("https://example.test/api/quizzes"))
     const body = await response.json()
 
-    expect(response.headers.get("Cache-Control")).toContain("public")
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store")
     expect(body.quizzes[0].questions).toEqual([{ id: "question-1" }])
   })
 })

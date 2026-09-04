@@ -35,12 +35,14 @@ interface FolderNode {
 interface PDF {
   id: string; title: string; description: string | null
   file_size: number | null; view_count: number; allow_download: boolean
+  page_count?: number | null; tags?: string[] | null; thumbnail_url?: string
   created_at: string
   structure_location: { folderId: string; categoryId: string; sectionId: string } | null
   category: { id: string; name: string; color?: string } | null
 }
 interface Quiz {
   id: string; title: string; description: string; category: string
+  section?: string; tags?: string[]
   difficulty: string; time_limit: number; questions: { id: string }[]
   enabled: boolean; created_at: string; url_slug?: string
   structure_location: { folderId: string; categoryId: string; sectionId: string } | null
@@ -556,6 +558,7 @@ export default function SubjectPage() {
                                     </span>
                                   )}
                                   {pdf.file_size && <span>{fmtSize(pdf.file_size)}</span>}
+                                   {pdf.page_count && <span>{pdf.page_count} pages</span>}
                                   <span>{timeAgo(pdf.created_at)}</span>
                                   {!pdf.allow_download && (
                                     <span className="flex items-center gap-0.5 text-amber-500">
@@ -608,6 +611,9 @@ export default function SubjectPage() {
                                   >
                                     {quiz.difficulty}
                                   </span>
+                                   {quiz.section && quiz.section !== "General" && (
+                                     <span className="text-[11px] text-muted-foreground">{quiz.section}</span>
+                                   )}
                                   <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
                                     <ListChecks className="h-3 w-3" />{quiz.questions.length} Qs
                                   </span>

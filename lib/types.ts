@@ -44,6 +44,7 @@ export interface PDF {
   } | null
   thumbnail_path?: string | null
   thumbnail_url?: string | null
+  page_count?: number | null
   category?: Category | null
   reviews?: Review[]
 }

@@ -38,13 +38,19 @@ async function getCategoryPDFs(categoryId: string): Promise<PDF[]> {
     .select(`
       id, title, description, file_size, category_id, download_count,
       view_count, average_rating, review_count, created_at, updated_at,
-      visibility, allow_download, tags, category:categories(*)
+      visibility, allow_download, tags, page_count, thumbnail_path,
+      category:categories(*)
     `)
     .eq("category_id", categoryId)
     )
     .order("created_at", { ascending: false })
   if (error) return []
-  return (data || []) as unknown as PDF[]
+  const pdfRows = (data || []) as unknown as PDF[]
+  return pdfRows.map((pdf) => ({
+    ...pdf,
+    thumbnail_path: undefined,
+    thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
+  }))
 }
 
 async function getAllCategories(): Promise<Category[]> {

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   try {
     const isAdmin = verifyAdminToken(extractToken(request))
     // Admin reads must observe changes made by another process immediately.
-    const list = await getQuizList({ bypassCache: isAdmin })
+    const list = await getQuizList({ bypassCache: true })
     const quizzes = isAdmin
       ? list
       : list
@@ -29,10 +29,7 @@ export async function GET(request: Request) {
           questions: quiz.questions.map(question => ({ id: typeof question.id === "string" ? question.id : "" })),
         }))
     const response = NextResponse.json({ quizzes })
-    response.headers.set(
-      "Cache-Control",
-      isAdmin ? "private, no-store" : "public, s-maxage=60, stale-while-revalidate=120"
-    )
+    response.headers.set("Cache-Control", "private, no-store")
     return response
   } catch (err) {
     console.error("[quiz-api] GET quizzes exception:", err)

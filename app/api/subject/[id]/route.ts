@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
+import { getQuizList } from "@/lib/quiz-cache"
 
 export const revalidate = 0
 export const dynamic = "force-dynamic"
@@ -35,7 +36,7 @@ export async function GET(
     // 2. Fetch PDFs
     const { data: allPdfs } = await supabase
       .from("pdfs")
-      .select("id, title, description, file_size, view_count, allow_download, created_at, scheduled_at, structure_location, category:categories(id,name,color)")
+      .select("id, title, description, file_size, page_count, view_count, allow_download, tags, created_at, scheduled_at, structure_location, category:categories(id,name,color)")
       .eq("visibility", "public")
       .eq("publish_status", "published")
       .or(`scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()}`)
@@ -46,20 +47,46 @@ export async function GET(
       if (loc?.folderId === folderId) return true
       const catName = (p.category as any)?.name?.toLowerCase()
       return catName && catNameToId[catName]
-    })
+    }).map((pdf) => ({
+      ...pdf,
+      thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
+    }))
 
     // 3. Fetch Quizzes
-    const { data: allQuizzes } = await supabase
-      .from("quizzes")
-      .select("id, title, description, category, difficulty, time_limit, questions, enabled, created_at, structure_location, url_slug")
-      .eq("enabled", true)
-      .eq("visibility", "public")
-      .order("created_at", { ascending: false })
-
-    const quizzes = (allQuizzes || []).filter((q: any) => {
-      const loc = q.structure_location as StructureLoc | null
-      return loc?.folderId === folderId
-    }).filter((q: any) => Array.isArray(q.questions) && q.questions.length > 0)
+    const allQuizzes = await getQuizList({ bypassCache: true })
+    const quizzes = allQuizzes
+      .filter((quiz) => quiz.enabled && quiz.visibility === "public" && quiz.hasContent)
+      .map((quiz) => {
+        let structureLocation = quiz.structure_location
+        if (!structureLocation) {
+          const category = (folder.categories ?? []).find(
+            (candidate) => candidate.enabled !== false && candidate.name.toLowerCase() === quiz.category.toLowerCase()
+          )
+          if (category) {
+            const normalizedSection = quiz.section.toLowerCase()
+            const normalizedTitle = quiz.title.toLowerCase()
+            const section = (category.sections ?? []).find(
+              (candidate) =>
+                candidate.enabled !== false &&
+                (candidate.name.toLowerCase() === normalizedSection ||
+                  normalizedTitle.includes(candidate.name.toLowerCase()))
+            )
+            structureLocation = {
+              folderId,
+              categoryId: category.id,
+              sectionId: section?.id || "",
+            }
+          }
+        }
+        return {
+          ...quiz,
+          structure_location: structureLocation,
+          questions: quiz.questions.map((question) => ({
+            id: typeof question.id === "string" ? question.id : "",
+          })),
+        }
+      })
+      .filter((quiz) => quiz.structure_location?.folderId === folderId)
 
     // 4. Enrich categories with counts
     const pByCategory: Record<string, number> = {}
@@ -100,7 +127,10 @@ export async function GET(
         })),
     }
 
-    return NextResponse.json({ folder: enrichedFolder, pdfs, quizzes })
+    return NextResponse.json(
+      { folder: enrichedFolder, pdfs, quizzes },
+      { headers: { "Cache-Control": "private, no-store" } },
+    )
   } catch (err) {
     console.error("[subject]", err)
     return NextResponse.json({ error: "Server error" }, { status: 500 })

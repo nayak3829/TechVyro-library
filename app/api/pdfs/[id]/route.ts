@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
+import { enqueuePdfJob } from "@/lib/pdf-jobs"
+import { runDuePdfJobs } from "@/lib/pdf-job-runner"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -8,6 +10,14 @@ interface RouteProps {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const VISIBILITIES = new Set(["public", "unlisted", "private"])
+
+function processQueuedPdfAfterResponse() {
+  try {
+    after(() => runDuePdfJobs(1))
+  } catch (error) {
+    if (process.env.NODE_ENV !== "test") throw error
+  }
+}
 
 function validStoragePath(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0 || value.length > 1024 || value !== value.trim()) return false
@@ -131,6 +141,10 @@ export async function PATCH(request: Request, { params }: RouteProps) {
         file_path,
         file_size: file_size ?? null,
         thumbnail_path: null,
+        page_count: null,
+        malware_status: "pending",
+        ocr_status: "pending",
+        processing_status: "pending",
         updated_at: new Date().toISOString(),
       }
       if (typeof title === "string" && title.trim()) updatePayload.title = title.trim()
@@ -169,6 +183,21 @@ export async function PATCH(request: Request, { params }: RouteProps) {
         if (!removed) warning = warning
           ? `${warning}; the old thumbnail could not be removed`
           : "PDF was updated, but the old thumbnail could not be removed"
+      }
+      try {
+        const { error: enqueueError } = await enqueuePdfJob(id, "process", { replacement: true })
+        if (enqueueError) {
+          warning = warning
+            ? `${warning}; automatic metadata refresh could not be queued`
+            : "PDF was updated, but automatic metadata refresh could not be queued"
+        } else {
+          processQueuedPdfAfterResponse()
+        }
+      } catch (enqueueError) {
+        console.error("[pdfs/id] replacement metadata refresh enqueue failed:", enqueueError)
+        warning = warning
+          ? `${warning}; automatic metadata refresh could not be queued`
+          : "PDF was updated, but automatic metadata refresh could not be queued"
       }
       return NextResponse.json(warning ? { ...data, warning } : data)
     }

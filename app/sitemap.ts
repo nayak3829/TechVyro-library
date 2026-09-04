@@ -1,6 +1,8 @@
 import { MetadataRoute } from 'next'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 
+export const revalidate = 300
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://www.techvyro.in'
   
@@ -95,6 +97,34 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           priority: 0.6,
         }))
         staticPages.push(...pdfPages)
+      }
+
+      // Fetch public quizzes with usable question content
+      const { data: quizzes } = await supabase
+        .from('quizzes')
+        .select('id, created_at, questions')
+        .eq('enabled', true)
+        .eq('visibility', 'public')
+        .order('created_at', { ascending: false })
+        .limit(500)
+
+      if (quizzes) {
+        const quizPages: MetadataRoute.Sitemap = quizzes
+          .filter((quiz) => Array.isArray(quiz.questions) && quiz.questions.some(
+            (question: unknown) =>
+              !!question &&
+              typeof question === 'object' &&
+              !Array.isArray(question) &&
+              typeof (question as { question?: unknown }).question === 'string' &&
+              (question as { question: string }).question.trim().length > 0
+          ))
+          .map((quiz) => ({
+            url: `${baseUrl}/quiz/${quiz.id}`,
+            lastModified: new Date(quiz.created_at),
+            changeFrequency: 'monthly' as const,
+            priority: 0.6,
+          }))
+        staticPages.push(...quizPages)
       }
     }
   }
