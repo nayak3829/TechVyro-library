@@ -21,7 +21,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         return {
           eq() {
             return {
-               single: async () => ({ data: { file_path: state.currentPath, thumbnail_path: state.currentThumbnail }, error: null }),
+               single: async () => ({ data: { file_path: state.currentPath, storage_bucket: "pdfs", thumbnail_path: state.currentThumbnail }, error: null }),
             }
           },
         }
@@ -135,7 +135,7 @@ describe("PDF replacement ordering", () => {
       params: Promise.resolve({ id: "pdf-1" }),
     })
     expect(response.status).toBe(200)
-    expect(state.events).toEqual(["db-delete", "remove:old.pdf,thumbnails/1700000000000-old.jpg"])
+    expect(state.events).toEqual(["db-delete", "remove:old.pdf", "remove:thumbnails/1700000000000-old.jpg"])
   })
 
   it("returns a successful partial result when storage cleanup fails", async () => {

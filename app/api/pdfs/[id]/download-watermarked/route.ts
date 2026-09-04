@@ -4,6 +4,7 @@ import { PDFDocument, degrees, rgb, StandardFonts } from "pdf-lib"
 import { applyPublicPdfVisibility, canDownloadPDF, canViewPDF, getPDFRequestIdentity } from "@/lib/pdf-access"
 import { isValidAnalyticsEventKey } from "@/lib/analytics-events"
 import { getWatermarkSettings } from "@/lib/watermark-settings"
+import { validPdfStorageLocation } from "@/lib/pdf-storage"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -38,6 +39,9 @@ export async function GET(request: Request, { params }: RouteProps) {
     if (!canDownloadPDF(pdf)) {
       return NextResponse.json({ error: "Downloads are disabled for this PDF" }, { status: 403 })
     }
+    if (pdf.storage_bucket === "community-pdfs" && pdf.malware_status !== "clean") {
+      return NextResponse.json({ error: "PDF not found" }, { status: 404 })
+    }
     const eventKey = request.headers.get("Idempotency-Key")
     if (!isValidAnalyticsEventKey(eventKey, "download", id)) {
       return NextResponse.json({ error: "Invalid idempotency key" }, { status: 400 })
@@ -53,9 +57,12 @@ export async function GET(request: Request, { params }: RouteProps) {
     }
     const watermark = getWatermarkSettings(storedSettings?.value)
 
-    // Download the original PDF from Supabase Storage
+    // Download only from the explicit, validated persisted source bucket.
+    if (!validPdfStorageLocation(pdf.storage_bucket, pdf.file_path)) {
+      return NextResponse.json({ error: "PDF not found" }, { status: 404 })
+    }
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from("pdfs")
+      .from(pdf.storage_bucket)
       .download(pdf.file_path)
 
     if (downloadError || !fileData) {

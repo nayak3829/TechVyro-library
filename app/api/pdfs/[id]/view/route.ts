@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { applyPublicPdfVisibility, canViewPDF, getPDFRequestIdentity } from "@/lib/pdf-access"
 import { isValidAnalyticsEventKey } from "@/lib/analytics-events"
+import { validPdfStorageLocation } from "@/lib/pdf-storage"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -14,7 +15,7 @@ export async function GET(request: Request, { params }: RouteProps) {
     const identity = await getPDFRequestIdentity(request)
     let pdfQuery = supabase
       .from("pdfs")
-      .select("file_path, visibility, scheduled_at, publish_status")
+      .select("file_path, storage_bucket, malware_status, visibility, scheduled_at, publish_status")
       .eq("id", id)
     if (!identity.isAdmin) pdfQuery = applyPublicPdfVisibility(pdfQuery)
     const { data: pdf, error } = await pdfQuery.single()
@@ -26,8 +27,12 @@ export async function GET(request: Request, { params }: RouteProps) {
     if (!canViewPDF(pdf, identity.isAdmin)) {
       return NextResponse.json({ error: "PDF not found" }, { status: 404 })
     }
+    if (pdf.storage_bucket === "community-pdfs" && pdf.malware_status !== "clean") {
+      return NextResponse.json({ error: "PDF not found" }, { status: 404 })
+    }
 
-    const { data: file, error: downloadError } = await supabase.storage.from("pdfs").download(pdf.file_path)
+    if (!validPdfStorageLocation(pdf.storage_bucket, pdf.file_path)) return NextResponse.json({ error: "PDF not found" }, { status: 404 })
+    const { data: file, error: downloadError } = await supabase.storage.from(pdf.storage_bucket).download(pdf.file_path)
     if (downloadError || !file) {
       console.error("[pdf/view] Storage download error:", downloadError)
       return NextResponse.json({ error: "Failed to load PDF" }, { status: 500 })

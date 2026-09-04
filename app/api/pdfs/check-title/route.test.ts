@@ -8,7 +8,7 @@ vi.mock("@/lib/admin-auth", () => ({
 }))
 vi.mock("@/lib/supabase/admin", () => ({
   isAdminConfigured: () => true,
-  createAdminClient: () => ({ from: () => ({ select: () => ({ ilike: () => ({ single: async () => ({ data: { id: "1", title: "Private title" } }) }) }) }) }),
+  createAdminClient: () => ({ rpc: async () => ({ data: [{ id: "1", title: "Private title" }] }) }),
 }))
 
 import { GET } from "./route"
@@ -23,6 +23,6 @@ describe("check-title access control", () => {
   it("allows the admin upload flow to check a title", async () => {
     auth.allowed = true
     const response = await GET(new Request("https://example.test/api/pdfs/check-title?title=Private+title"))
-    await expect(response.json()).resolves.toEqual({ exists: true, existingTitle: "Private title" })
+    await expect(response.json()).resolves.toEqual({ exists: true, existingTitle: "Private title", matches: [{ id: "1", title: "Private title" }] })
   })
 })

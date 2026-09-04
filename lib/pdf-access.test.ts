@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { applyPublicPdfVisibility, canViewPDF } from "./pdf-access"
+import { applyPublicPdfVisibility, canViewPDF, communityPdfPassesSafety } from "./pdf-access"
 
 describe("public PDF visibility policy", () => {
   it("adds every public catalogue predicate at the query boundary", () => {
@@ -20,6 +20,7 @@ describe("public PDF visibility policy", () => {
     expect(calls).toEqual([
       ["visibility", "public"],
       ["publish_status", "published"],
+      ["or", "storage_bucket.neq.community-pdfs,malware_status.eq.clean"],
       ["or", "scheduled_at.is.null,scheduled_at.lte.2026-01-02T03:04:05.000Z"],
     ])
   })
@@ -30,5 +31,19 @@ describe("public PDF visibility policy", () => {
     expect(canViewPDF({ visibility: "public", publish_status: "rejected" }, false)).toBe(false)
     expect(canViewPDF({ visibility: "public", publish_status: "published", scheduled_at: "2999-01-01T00:00:00Z" }, false)).toBe(false)
     expect(canViewPDF({ visibility: "public", publish_status: "published", scheduled_at: "2020-01-01T00:00:00Z" }, false)).toBe(true)
+  })
+
+  it("requires clean community sources without changing normal or admin access", () => {
+    const base = { visibility: "public" as const, publish_status: "published" as const }
+    expect(canViewPDF({ ...base, storage_bucket: "community-pdfs", malware_status: "suspicious" }, false)).toBe(false)
+    expect(canViewPDF({ ...base, storage_bucket: "community-pdfs", malware_status: "clean" }, false)).toBe(true)
+    expect(canViewPDF({ ...base, storage_bucket: "pdfs", malware_status: "suspicious" }, false)).toBe(true)
+    expect(canViewPDF({ ...base, storage_bucket: "community-pdfs", malware_status: "suspicious" }, true)).toBe(true)
+  })
+
+  it("permits publication only for clean community or normal PDFs", () => {
+    expect(communityPdfPassesSafety({ storage_bucket: "community-pdfs", malware_status: "suspicious" })).toBe(false)
+    expect(communityPdfPassesSafety({ storage_bucket: "community-pdfs", malware_status: "clean" })).toBe(true)
+    expect(communityPdfPassesSafety({ storage_bucket: "pdfs", malware_status: "suspicious" })).toBe(true)
   })
 })

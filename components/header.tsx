@@ -7,7 +7,7 @@ import {
   FileText, Settings, Home, Search, X, Sparkles, Clock, TrendingUp,
   ChevronDown, Flame, Download, BookOpen, FolderOpen, User, LogOut,
   Info, Trophy, Zap, GraduationCap, Layers, ArrowRight,
-  LayoutGrid
+  LayoutGrid, Upload
 } from "lucide-react"
 import { NotificationBell } from "@/components/notification-bell"
 import { Button } from "@/components/ui/button"
@@ -544,6 +544,11 @@ export function Header() {
               </div>
             )}
           </div>
+
+          {/* Contribute - direct link */}
+          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
+            <Link href="/submit"><Upload className="h-4 w-4" />Contribute</Link>
+          </Button>
 
           {/* Quiz Portal - direct link */}
           <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-amber-500/10 hover:text-amber-600 text-sm font-medium">

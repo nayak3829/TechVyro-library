@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { applyPublicPdfVisibility } from '@/lib/pdf-access'
 
 export const revalidate = 300
 
@@ -80,17 +81,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
 
       // Fetch PDFs
-      const { data: pdfs } = await supabase
+      const { data: pdfs } = await applyPublicPdfVisibility(supabase
         .from('pdfs')
         .select('id, updated_at')
-        .eq('visibility', 'public')
-        .eq('publish_status', 'published')
-        .or(`scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()}`)
+        )
         .order('created_at', { ascending: false })
         .limit(500)
 
       if (pdfs) {
-        const pdfPages: MetadataRoute.Sitemap = pdfs.map((pdf) => ({
+        const pdfPages: MetadataRoute.Sitemap = pdfs.map((pdf: { id: string; updated_at: string }) => ({
           url: `${baseUrl}/pdf/${pdf.id}`,
           lastModified: new Date(pdf.updated_at),
           changeFrequency: 'monthly' as const,

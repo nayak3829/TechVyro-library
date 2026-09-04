@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import { validPdfStorageLocation } from "@/lib/pdf-storage"
 import { sendTelegramMessage } from "@/lib/telegram"
 import { escapeTelegramHtml } from "@/lib/admin-chat-validation"
 import { analyzePdfOnServer } from "@/lib/pdf-server-analysis"
@@ -77,14 +78,15 @@ async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: st
   }
   if (!job.pdf_id) throw new Error("PDF job is missing pdf_id")
   const { data: pdf, error } = await db.from("pdfs")
-    .select("id,title,description,tags,slug,file_path,thumbnail_path,category_id,structure_location,publish_status,notification_preference,notification_state,processing_status,scheduled_at,content_hash,page_count,review_warnings,malware_status")
+    .select("id,title,description,tags,slug,file_path,storage_bucket,thumbnail_path,category_id,structure_location,visibility,publish_status,notification_preference,notification_state,processing_status,scheduled_at,content_hash,page_count,review_warnings,malware_status")
     .eq("id", job.pdf_id).maybeSingle()
   if (error || !pdf) throw new Error("PDF not found")
   if (job.job_type === "process") {
     // The save endpoint computes this SHA-256 from bytes downloaded directly
     // from storage. Browser analysis is advisory and may be unavailable.
     if (!hasServerVerifiedPdfHash(pdf.content_hash)) throw new Error("Server PDF verification is absent")
-    const { data: source, error: downloadError } = await db.storage.from("pdfs").download(pdf.file_path)
+    if (!validPdfStorageLocation(pdf.storage_bucket, pdf.file_path)) throw new Error("Invalid PDF storage location")
+    const { data: source, error: downloadError } = await db.storage.from(pdf.storage_bucket).download(pdf.file_path)
     if (downloadError || !source) throw new Error("Stored PDF could not be read")
     const foldersResult = await db.from("site_settings").select("value").eq("key", "folders").maybeSingle()
     const folders = Array.isArray(foldersResult.data?.value) ? foldersResult.data.value : []
@@ -126,6 +128,9 @@ async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: st
       page_count: analysis.pageCount,
       malware_status: analysis.malwareStatus,
       review_warnings: [...new Set([...previousWarnings, ...analysis.warnings])],
+      ...(pdf.storage_bucket === "community-pdfs" && analysis.malwareStatus === "suspicious"
+        ? { visibility: "private", publish_status: "needs_review" }
+        : {}),
       thumbnail_path: thumbnailPath,
       category_id: categoryId,
       description: pdf.description || analysis.description,

@@ -57,7 +57,17 @@ interface ProfileData {
   favoritePdfs: FavoritePdf[]
 }
 
-type Tab = "history" | "saved" | "recent" | "settings"
+type Tab = "history" | "saved" | "recent" | "submissions" | "settings"
+
+interface CommunitySubmission {
+  id: string
+  title: string
+  status: "pending" | "approved" | "rejected"
+  rejection_reason: string | null
+  approved_pdf_id: string | null
+  submitted_at: string
+  reviewed_at: string | null
+}
 
 function formatTime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
@@ -93,6 +103,8 @@ export default function ProfilePage() {
   const [savingName, setSavingName] = useState(false)
   const [nameMsg, setNameMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [recentItems, setRecentItems] = useState<RecentlyViewedItem[]>([])
+  const [submissions, setSubmissions] = useState<CommunitySubmission[] | null>(null)
+  const [submissionsError, setSubmissionsError] = useState("")
 
   // Credits state
   const [credits, setCredits] = useState<{ credits: number; is_premium: boolean; referral_code: string; referred_by?: string } | null>(null)
@@ -132,6 +144,22 @@ export default function ProfilePage() {
       setApplyingReferral(false)
     }
   }
+
+  const fetchSubmissions = useCallback(async () => {
+    setSubmissionsError("")
+    try {
+      const response = await fetch("/api/submissions/mine")
+      if (!response.ok) throw new Error("Could not load your submissions.")
+      const json = await response.json()
+      setSubmissions(json.submissions || [])
+    } catch (caught) {
+      setSubmissionsError(caught instanceof Error ? caught.message : "Could not load your submissions.")
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === "submissions" && submissions === null) fetchSubmissions()
+  }, [tab, submissions, fetchSubmissions])
 
   const fetchProfile = useCallback(async () => {
     setLoading(true)
@@ -263,6 +291,7 @@ export default function ProfilePage() {
     { id: "history", label: "Quiz History", icon: <Trophy className="h-4 w-4" />, count: stats.totalQuizzes },
     { id: "saved", label: "Saved PDFs", icon: <Star className="h-4 w-4" />, count: stats.totalFavorites },
     { id: "recent", label: "Recently Viewed", icon: <Clock className="h-4 w-4" />, count: recentItems.length || undefined },
+    { id: "submissions", label: "My Submissions", icon: <FileText className="h-4 w-4" /> },
     { id: "settings", label: "Settings", icon: <Edit2 className="h-4 w-4" /> },
   ]
 
@@ -581,6 +610,26 @@ export default function ProfilePage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* MY SUBMISSIONS */}
+            {tab === "submissions" && (
+              <div>
+                {submissions === null && !submissionsError ? (
+                  <div className="flex items-center justify-center py-12 gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Loading submissions…</div>
+                ) : submissionsError ? (
+                  <div className="py-10 text-center"><p className="text-sm text-destructive">{submissionsError}</p><Button variant="outline" size="sm" className="mt-3" onClick={fetchSubmissions}>Try Again</Button></div>
+                ) : submissions?.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-14 gap-3 text-center"><FileText className="h-8 w-8 text-primary" /><p className="font-semibold">No submissions yet</p><p className="text-sm text-muted-foreground">PDFs you share for review will appear here.</p><Button asChild size="sm"><Link href="/submit">Contribute a PDF</Link></Button></div>
+                ) : <div className="space-y-2">{submissions?.map(submission => (
+                  <div key={submission.id} className="rounded-xl border border-border/50 p-3.5">
+                    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-sm truncate">{submission.title}</p><p className="mt-1 text-xs text-muted-foreground">Submitted {formatDate(submission.submitted_at)}{submission.reviewed_at ? ` · Reviewed ${formatDate(submission.reviewed_at)}` : ""}</p></div>
+                      <Badge variant="outline" className={submission.status === "approved" ? "border-emerald-500/40 text-emerald-600" : submission.status === "rejected" ? "border-destructive/40 text-destructive" : "border-amber-500/40 text-amber-600"}>{submission.status}</Badge></div>
+                    {submission.status === "rejected" && submission.rejection_reason && <p className="mt-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">Reason: {submission.rejection_reason}</p>}
+                    {submission.status === "approved" && submission.approved_pdf_id && <Link className="mt-2 inline-flex text-xs font-semibold text-primary hover:underline" href={`/pdf/${submission.approved_pdf_id}`}>View approved PDF</Link>}
+                  </div>
+                ))}</div>}
               </div>
             )}
 

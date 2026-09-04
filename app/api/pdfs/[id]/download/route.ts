@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: RouteProps) {
 
     let pdfQuery = supabase
       .from("pdfs")
-      .select("visibility, allow_download, scheduled_at, publish_status")
+      .select("storage_bucket, malware_status, visibility, allow_download, scheduled_at, publish_status")
       .eq("id", id)
     if (!identity.isAdmin) pdfQuery = applyPublicPdfVisibility(pdfQuery)
     const { data: pdf, error: pdfError } = await pdfQuery.single()

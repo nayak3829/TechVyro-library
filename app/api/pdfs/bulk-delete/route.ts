@@ -1,6 +1,7 @@
 import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
+import { validPdfStorageLocation } from "@/lib/pdf-storage"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     // Get all PDFs to find their file paths
     const { data: pdfs, error: fetchError } = await supabase
       .from("pdfs")
-      .select("id, file_path, thumbnail_path")
+      .select("id, file_path, storage_bucket, thumbnail_path")
       .in("id", ids)
 
     if (fetchError) {
@@ -49,14 +50,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to delete PDFs" }, { status: 500 })
     }
 
-    const filePaths = pdfs.flatMap((pdf) => [pdf.file_path, pdf.thumbnail_path])
-      .filter((path): path is string => typeof path === "string" && path.length > 0)
-    if (filePaths.length === 0) {
-      return NextResponse.json({ success: true, deleted: pdfs.length })
+    const sources = new Map<"pdfs" | "community-pdfs", string[]>()
+    const thumbnails: string[] = []
+    for (const pdf of pdfs) {
+      if (validPdfStorageLocation(pdf.storage_bucket, pdf.file_path)) {
+        sources.set(pdf.storage_bucket, [...(sources.get(pdf.storage_bucket) || []), pdf.file_path])
+      }
+      if (typeof pdf.thumbnail_path === "string" && pdf.thumbnail_path.length > 0) thumbnails.push(pdf.thumbnail_path)
     }
-    const { error: storageError } = await supabase.storage
-      .from("pdfs")
-      .remove(filePaths)
+    let storageError = null as unknown
+    for (const [bucket, paths] of sources) {
+      const result = await supabase.storage.from(bucket).remove(paths)
+      storageError ||= result.error
+    }
+    if (thumbnails.length) storageError ||= (await supabase.storage.from("pdfs").remove(thumbnails)).error
 
     if (storageError) {
       console.error("[v0] Storage bulk delete error:", storageError)

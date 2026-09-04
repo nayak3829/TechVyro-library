@@ -7,7 +7,7 @@ vi.mock("@/lib/admin-auth", () => ({ extractToken: () => "valid", verifyAdminTok
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: () => ({
-      select: () => ({ in: async () => ({ data: [{ id, file_path: "1700000000000-a.pdf", thumbnail_path: "thumbnails/1700000000000-a.jpg" }], error: null }) }),
+      select: () => ({ in: async () => ({ data: [{ id, file_path: "1700000000000-a.pdf", storage_bucket: "pdfs", thumbnail_path: "thumbnails/1700000000000-a.jpg" }], error: null }) }),
       delete: () => ({ in: async () => { state.events.push("db"); return { error: null } } }),
     }),
     storage: {
@@ -38,7 +38,7 @@ describe("bulk PDF delete", () => {
   it("removes a PDF's thumbnail only after its database record is gone", async () => {
     const response = await POST(new Request("https://example.test/api/pdfs/bulk-delete", { method: "POST", body: JSON.stringify({ ids: [id] }) }))
     expect(response.status).toBe(200)
-    expect(state.events).toEqual(["db", "storage"])
-    expect(state.removed).toEqual(["1700000000000-a.pdf", "thumbnails/1700000000000-a.jpg"])
+    expect(state.events).toEqual(["db", "storage", "storage"])
+    expect(state.removed).toEqual(["thumbnails/1700000000000-a.jpg"])
   })
 })

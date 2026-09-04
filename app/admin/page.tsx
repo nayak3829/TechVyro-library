@@ -352,6 +352,12 @@ export default function AdminPage() {
               </div>
             )
           })}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 px-2 mb-1.5">Community</p>
+            <Link href="/admin/submissions" className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted">
+              <FileText className="h-4 w-4 shrink-0" /><span>Submissions</span>
+            </Link>
+          </div>
         </nav>
 
         {/* Sidebar Footer */}
@@ -472,6 +478,9 @@ export default function AdminPage() {
                     <CardDescription>Jump to common tasks</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
+                    <Link href="/admin/submissions" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-muted transition-colors text-left group">
+                      <FileText className="h-4 w-4 text-primary shrink-0" /><span className="flex-1">Moderate Submissions</span><ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
                     {[
                       { label: "Upload New PDF", icon: Upload, tab: "upload", color: "text-primary" },
                       { label: "Add Category", icon: FolderPlus, tab: "categories", color: "text-accent" },

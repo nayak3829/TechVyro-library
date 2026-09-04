@@ -20,6 +20,7 @@ AS $$
   FROM public.pdfs
   WHERE visibility = 'public'
     AND publish_status = 'published'
+    AND (storage_bucket <> 'community-pdfs' OR malware_status = 'clean')
     AND (scheduled_at IS NULL OR scheduled_at <= NOW());
 $$;
 

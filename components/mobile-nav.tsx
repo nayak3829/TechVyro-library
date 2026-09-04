@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BookOpen, Zap, User, FileCheck } from "lucide-react"
+import { Home, BookOpen, Zap, User, FileCheck, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { icon: BookOpen,  label: "Browse", href: "/browse" },
   { icon: FileCheck, label: "Tests",  href: "/test-series" },
   { icon: Zap,       label: "Quiz",   href: "/quiz" },
+  { icon: Upload,     label: "Contribute", href: "/submit" },
   { icon: User,      label: "Profile", href: "/profile" },
 ]
 
@@ -77,14 +78,14 @@ export function MobileNav() {
               href={item.href}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all duration-200",
-                "min-w-[56px] min-h-[50px] px-2 py-1.5",
+        "min-w-0 min-h-[44px] flex-1 px-0.5 py-1",
                 isActive
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground active:bg-muted/50 active:scale-95"
               )}
             >
               <div className={cn(
-                "relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200",
+                "relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-200",
                 isActive && "bg-primary/15"
               )}>
                 <Icon className={cn(

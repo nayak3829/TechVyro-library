@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
 import { NextRequest, NextResponse } from "next/server"
 import { PDF_CONTENT_TYPES, type PdfContentType } from "@/lib/pdf-content-metadata"
+import { applyPublicPdfVisibility } from "@/lib/pdf-access"
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,10 +67,7 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
 
     if (!isAdmin) {
-      query = query
-        .eq("visibility", "public")
-        .eq("publish_status", "published")
-        .or(`scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()}`)
+      query = applyPublicPdfVisibility(query)
     }
 
     if (search) {

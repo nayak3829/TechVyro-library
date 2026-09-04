@@ -4,6 +4,7 @@ import { enqueuePdfJob } from "@/lib/pdf-jobs"
 import { NextResponse } from "next/server"
 import { nextDailyDigestAt } from "@/lib/pdf-job-runner"
 import { publishInAppNotification } from "@/lib/notifications"
+import { communityPdfPassesSafety } from "@/lib/pdf-access"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const action = body.action
   if (!["publish", "reject", "retry"].includes(action)) return NextResponse.json({ error: "Action must be publish, reject, or retry" }, { status: 400 })
   const db = createAdminClient()
-  const { data: pdf, error: readError } = await db.from("pdfs").select("id,title,publish_status,visibility,review_warnings,notification_preference,scheduled_at").eq("id", id).maybeSingle()
+  const { data: pdf, error: readError } = await db.from("pdfs").select("id,title,publish_status,visibility,storage_bucket,malware_status,review_warnings,notification_preference,scheduled_at").eq("id", id).maybeSingle()
   if (readError) return NextResponse.json({ error: "Failed to load PDF" }, { status: 500 })
   if (!pdf) return NextResponse.json({ error: "PDF not found" }, { status: 404 })
   if (action === "retry") {
@@ -27,6 +28,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (result.error) return NextResponse.json({ error: "Failed to retry processing" }, { status: 500 })
     await enqueuePdfJob(id, "process")
     return NextResponse.json({ pdf: result.data })
+  }
+  if (action === "publish" && !communityPdfPassesSafety(pdf)) {
+    return NextResponse.json({ error: "Community PDF must pass safety checks before publishing" }, { status: 409 })
   }
   const warnings = Array.isArray(pdf.review_warnings) ? pdf.review_warnings : []
   if (action === "publish" && warnings.length && body.acknowledgeWarnings !== true) {

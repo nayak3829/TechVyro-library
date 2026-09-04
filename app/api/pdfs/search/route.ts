@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { applyPublicPdfVisibility } from "@/lib/pdf-access"
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -12,12 +13,10 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient()
     if (!supabase) return NextResponse.json({ error: "DB not configured" }, { status: 503 })
 
-    const { data, error } = await supabase
+    const { data, error } = await applyPublicPdfVisibility(supabase
       .from("pdfs")
       .select("id, title, download_count, view_count, created_at")
-      .eq("visibility", "public")
-      .eq("publish_status", "published")
-      .or(`scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()}`)
+      )
       .ilike("title", `%${q}%`)
       .order("download_count", { ascending: false })
       .limit(limit)

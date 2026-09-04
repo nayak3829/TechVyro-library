@@ -45,7 +45,7 @@ export async function GET(request: Request, { params }: RouteProps) {
     const identity = await getPDFRequestIdentity(request)
     let query = supabase
       .from("pdfs")
-      .select("title, thumbnail_path, visibility, scheduled_at, publish_status")
+      .select("title, thumbnail_path, storage_bucket, malware_status, visibility, scheduled_at, publish_status")
       .eq("id", id)
     if (!identity.isAdmin) query = applyPublicPdfVisibility(query)
     const { data: pdf, error } = await query.single()

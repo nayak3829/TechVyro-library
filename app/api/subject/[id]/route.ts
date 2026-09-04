@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { getQuizList } from "@/lib/quiz-cache"
+import { applyPublicPdfVisibility } from "@/lib/pdf-access"
 
 export const revalidate = 0
 export const dynamic = "force-dynamic"
@@ -34,12 +35,10 @@ export async function GET(
     }
 
     // 2. Fetch PDFs
-    const { data: allPdfs } = await supabase
+    const { data: allPdfs } = await applyPublicPdfVisibility(supabase
       .from("pdfs")
       .select("id, title, description, file_size, page_count, view_count, allow_download, tags, created_at, scheduled_at, structure_location, category:categories(id,name,color)")
-      .eq("visibility", "public")
-      .eq("publish_status", "published")
-      .or(`scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()}`)
+      )
       .order("created_at", { ascending: false })
 
     const pdfs = (allPdfs || []).filter((p: any) => {
@@ -47,7 +46,7 @@ export async function GET(
       if (loc?.folderId === folderId) return true
       const catName = (p.category as any)?.name?.toLowerCase()
       return catName && catNameToId[catName]
-    }).map((pdf) => ({
+    }).map((pdf: any) => ({
       ...pdf,
       thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
     }))

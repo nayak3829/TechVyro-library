@@ -109,7 +109,7 @@ export function clearPdfContentDependents(
 
 export function normalizePdfContentMetadata(
   input: Record<string, unknown>,
-  options: { allowEmpty?: boolean } = {},
+  options: { allowEmpty?: boolean; allowSubjectEmpty?: boolean } = {},
 ): PdfContentMetadata {
   const rawType = input.contentType ?? input.content_type
   const rawCategory = input.contentCategory ?? input.content_category
@@ -134,7 +134,7 @@ export function normalizePdfContentMetadata(
   } else if (contentType === "school") {
     oneOf(category, SCHOOL_CLASSES, "Class")
     oneOf(subcategory, SCHOOL_BOARDS, "Board")
-    if (!subject) throw new Error("Subject is required")
+    if (!subject && !options.allowSubjectEmpty) throw new Error("Subject is required")
   } else {
     if (contentType === "college") {
       oneOf(category, COLLEGE_COURSES, "Course")
@@ -147,7 +147,7 @@ export function normalizePdfContentMetadata(
       if (!split.detail) throw new Error("Branch/Stream is required")
       oneOf(split.semester, SEMESTERS, "Semester")
     }
-    if (!subject) throw new Error("Subject is required")
+    if (!subject && !options.allowSubjectEmpty) throw new Error("Subject is required")
   }
 
   return {

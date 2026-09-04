@@ -16,13 +16,12 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient()
 
-    const { data } = await supabase
-      .from("pdfs")
-      .select("id, title")
-      .ilike("title", title.trim())
-      .single()
+    const { data } = await supabase.rpc("find_pdfs_by_normalized_title", {
+      p_title: title.trim(), p_exclude_id: null, p_limit: 10,
+    })
 
-    return NextResponse.json({ exists: !!data, existingTitle: data?.title || null })
+    const matches = Array.isArray(data) ? data : []
+    return NextResponse.json({ exists: matches.length > 0, existingTitle: matches[0]?.title || null, matches })
   } catch {
     return NextResponse.json({ exists: false })
   }

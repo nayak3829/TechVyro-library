@@ -19,6 +19,12 @@ vi.mock("@/lib/admin-auth", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   isAdminConfigured: () => true,
   createAdminClient: () => ({
+    rpc: async (name: string) => ({
+      data: name === "find_pdfs_by_normalized_title" && state.replacement
+        ? [{ id: "pdf-1", title: "Replacement", file_path: "old-file.pdf", storage_bucket: "pdfs", thumbnail_path: null }]
+        : [],
+      error: null,
+    }),
     from: () => {
       const query = {
         select: () => query,

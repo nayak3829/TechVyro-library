@@ -4,6 +4,7 @@ import { after, NextResponse } from "next/server"
 import { enqueuePdfJob } from "@/lib/pdf-jobs"
 import { runDuePdfJobs } from "@/lib/pdf-job-runner"
 import { normalizePdfContentMetadata } from "@/lib/pdf-content-metadata"
+import { validPdfStorageLocation } from "@/lib/pdf-storage"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -52,16 +53,17 @@ function validateEditableFields(body: Record<string, unknown>): string | null {
 
 async function removeStorageObject(
   supabase: ReturnType<typeof createAdminClient>,
+  bucket: "pdfs" | "community-pdfs",
   filePath: unknown,
   context: string,
 ): Promise<boolean> {
-  if (!validStoragePath(filePath)) {
+  if (!validPdfStorageLocation(bucket, filePath)) {
     console.error(`[pdfs/id] ${context}: refusing to remove an invalid storage path`)
     return false
   }
 
   try {
-    const { error } = await supabase.storage.from("pdfs").remove([filePath])
+    const { error } = await supabase.storage.from(bucket).remove([filePath as string])
     if (error) {
       console.error(`[pdfs/id] ${context}:`, error)
       return false
@@ -126,12 +128,12 @@ export async function PATCH(request: Request, { params }: RouteProps) {
 
       const { data: current, error: currentError } = await supabase
         .from("pdfs")
-        .select("file_path, thumbnail_path")
+        .select("file_path, storage_bucket, thumbnail_path")
         .eq("id", id)
         .single()
 
       if (currentError || !current) {
-        const cleanedUp = await removeStorageObject(supabase, file_path, "replacement cleanup after lookup failure")
+        const cleanedUp = await removeStorageObject(supabase, "pdfs", file_path, "replacement cleanup after lookup failure")
         const notFound = currentError && (
           currentError.code === "PGRST116" ||
           (typeof currentError.message === "string" && currentError.message.toLowerCase().includes("0 rows"))
@@ -150,6 +152,7 @@ export async function PATCH(request: Request, { params }: RouteProps) {
 
       const updatePayload: Record<string, unknown> = {
         file_path,
+        storage_bucket: "pdfs",
         file_size: file_size ?? null,
         thumbnail_path: null,
         page_count: null,
@@ -171,7 +174,7 @@ export async function PATCH(request: Request, { params }: RouteProps) {
         console.error("[pdfs/id] replacement DB update error:", error)
         // Never remove the current object if a caller supplied its existing path.
         const cleanedUp = current.file_path !== file_path
-          ? await removeStorageObject(supabase, file_path, "replacement cleanup after DB failure")
+          ? await removeStorageObject(supabase, "pdfs", file_path, "replacement cleanup after DB failure")
           : true
         return NextResponse.json(
           {
@@ -187,11 +190,13 @@ export async function PATCH(request: Request, { params }: RouteProps) {
       // Cleanup is deliberately best-effort: failure here must not roll back metadata.
       let warning: string | undefined
       if (current.file_path !== file_path && current.file_path != null) {
-        const removed = await removeStorageObject(supabase, current.file_path, "old file cleanup after replacement")
+        const removed = validPdfStorageLocation(current.storage_bucket, current.file_path)
+          ? await removeStorageObject(supabase, current.storage_bucket, current.file_path, "old file cleanup after replacement") : false
         if (!removed) warning = "PDF was updated, but the old file could not be removed"
       }
       if (current.thumbnail_path) {
-        const removed = await removeStorageObject(supabase, current.thumbnail_path, "old thumbnail cleanup after replacement")
+        const removed = validStoragePath(current.thumbnail_path) &&
+          (await supabase.storage.from("pdfs").remove([current.thumbnail_path])).error == null
         if (!removed) warning = warning
           ? `${warning}; the old thumbnail could not be removed`
           : "PDF was updated, but the old thumbnail could not be removed"
@@ -257,14 +262,19 @@ export async function DELETE(request: Request, { params }: RouteProps) {
 
     const supabase = createAdminClient()
 
-    const { data: pdf, error: fetchError } = await supabase.from("pdfs").select("file_path, thumbnail_path").eq("id", id).single()
+    const { data: pdf, error: fetchError } = await supabase.from("pdfs").select("file_path, storage_bucket, thumbnail_path").eq("id", id).single()
     if (fetchError || !pdf) return NextResponse.json({ error: "PDF not found" }, { status: 404 })
 
     const { error: dbError } = await supabase.from("pdfs").delete().eq("id", id)
     if (dbError) return NextResponse.json({ error: "Failed to delete PDF" }, { status: 500 })
 
-    const paths = [pdf.file_path, pdf.thumbnail_path].filter((path): path is string => validStoragePath(path))
-    const removed = paths.length === 0 || (await supabase.storage.from("pdfs").remove(paths)).error == null
+    const sourceRemoved = !pdf.file_path || !validPdfStorageLocation(pdf.storage_bucket, pdf.file_path)
+      ? !pdf.file_path
+      : (await supabase.storage.from(pdf.storage_bucket).remove([pdf.file_path])).error == null
+    const thumbnailRemoved = !pdf.thumbnail_path || !validStoragePath(pdf.thumbnail_path)
+      ? !pdf.thumbnail_path
+      : (await supabase.storage.from("pdfs").remove([pdf.thumbnail_path])).error == null
+    const removed = sourceRemoved && thumbnailRemoved
     return NextResponse.json(removed
       ? { success: true }
       : {

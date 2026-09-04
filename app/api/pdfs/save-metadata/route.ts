@@ -7,6 +7,7 @@ import { createHash } from "node:crypto"
 import { simhashSimilarity } from "@/lib/pdf-similarity"
 import { runDuePdfJobs } from "@/lib/pdf-job-runner"
 import { normalizePdfContentMetadata } from "@/lib/pdf-content-metadata"
+import { validPdfStorageLocation } from "@/lib/pdf-storage"
 
 const STORAGE_PATH = /^[0-9]{10,20}-[^/\\]+\.pdf$/i
 const THUMBNAIL_PATH = /^thumbnails\/[0-9]{10,20}-[^/\\]+\.(?:jpg|jpeg|webp)$/i
@@ -216,11 +217,10 @@ export async function POST(request: Request) {
     }
 
     // Check for existing PDF with same title
-    const { data: existingPdf, error: existingPdfError } = await supabase
-      .from("pdfs")
-      .select("id, file_path, thumbnail_path")
-      .ilike("title", title.trim())
-      .maybeSingle()
+    const { data: titleMatches, error: existingPdfError } = await supabase.rpc("find_pdfs_by_normalized_title", {
+      p_title: title.trim(), p_exclude_id: null, p_limit: 10,
+    })
+    const existingPdf = Array.isArray(titleMatches) ? titleMatches[0] : null
 
     if (existingPdfError) {
       await supabase.storage.from("pdfs").remove([filePath]).catch(() => {})
@@ -238,7 +238,7 @@ export async function POST(request: Request) {
         .from("pdfs")
         .update({
           description: description?.trim() || null,
-          file_path: filePath,
+          file_path: filePath, storage_bucket: "pdfs",
           file_size: fileSize,
           category_id: categoryId || null,
           structure_location: structLocValue,
@@ -255,7 +255,7 @@ export async function POST(request: Request) {
       if (updateError?.message?.includes("structure_location")) {
         const result = await supabase.from("pdfs").update({
           description: description?.trim() || null,
-          file_path: filePath,
+            file_path: filePath, storage_bucket: "pdfs",
           file_size: fileSize,
           category_id: categoryId || null,
           ...advancedFields,
@@ -276,8 +276,8 @@ export async function POST(request: Request) {
       }
 
       const cleanupFailures: string[] = []
-      if (existingPdf.file_path && existingPdf.file_path !== filePath) {
-        const { error: cleanupError } = await supabase.storage.from("pdfs").remove([existingPdf.file_path])
+      if (existingPdf.file_path && existingPdf.file_path !== filePath && validPdfStorageLocation(existingPdf.storage_bucket, existingPdf.file_path)) {
+        const { error: cleanupError } = await supabase.storage.from(existingPdf.storage_bucket).remove([existingPdf.file_path])
         if (cleanupError) {
           console.error("[save-metadata] Old replacement object cleanup failed:", cleanupError)
           cleanupFailures.push("previous file")
@@ -309,7 +309,7 @@ export async function POST(request: Request) {
       .insert({
         title: title.trim(),
         description: description?.trim() || null,
-        file_path: filePath,
+        file_path: filePath, storage_bucket: "pdfs",
         file_size: fileSize,
         category_id: categoryId || null,
         structure_location: structLocValue,
@@ -326,7 +326,7 @@ export async function POST(request: Request) {
       const result = await supabase.from("pdfs").insert({
         title: title.trim(),
         description: description?.trim() || null,
-        file_path: filePath,
+        file_path: filePath, storage_bucket: "pdfs",
         file_size: fileSize,
         category_id: categoryId || null,
         ...advancedFields,

@@ -1,7 +1,6 @@
 import { PDFDocument } from "pdf-lib"
 import sharp from "sharp"
-
-const SUSPICIOUS_MARKERS = ["/JavaScript", "/JS", "/Launch", "/OpenAction", "/EmbeddedFile", "/RichMedia"]
+import { inspectPdfSafety } from "@/lib/pdf-safety"
 
 function escapeXml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -23,8 +22,7 @@ export function serverPdfTags(title: string, category?: string | null) {
 export async function analyzePdfOnServer(bytes: Uint8Array, title: string, hash: string, category?: string | null) {
   const document = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })
   const pageCount = document.getPageCount()
-  const buffer = Buffer.from(bytes)
-  const suspiciousMarkers = SUSPICIOUS_MARKERS.filter((marker) => buffer.includes(Buffer.from(marker)))
+  const safety = inspectPdfSafety(bytes)
   const tags = serverPdfTags(title, category)
   const description = `${title} — ${pageCount} page PDF study material available on TechVyro.`
   const safeCategory = escapeXml((category || "STUDY MATERIAL").replace(/[^\x20-\x7E]/g, "").slice(0, 30))
@@ -38,8 +36,7 @@ export async function analyzePdfOnServer(bytes: Uint8Array, title: string, hash:
   const thumbnail = await sharp(Buffer.from(svg)).webp({ quality: 84 }).toBuffer()
   return {
     pageCount,
-    malwareStatus: suspiciousMarkers.length ? "suspicious" : "clean",
-    warnings: suspiciousMarkers.map((marker) => `PDF contains active-content marker ${marker}`),
+    ...safety,
     tags,
     description,
     slug: serverPdfSlug(title, hash),
