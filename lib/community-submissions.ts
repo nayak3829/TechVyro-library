@@ -9,6 +9,10 @@ export const COMMUNITY_PDF_MIME = "application/pdf"
 export const COMMUNITY_PATH = /^community\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.pdf$/i
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+export function isSubmissionSecurityConfigured() {
+  return Boolean(process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16)
+}
+
 function text(value: unknown, label: string, maximum: number, optional = false) {
   if ((value === undefined || value === null || value === "") && optional) return null
   if (typeof value !== "string") throw new Error(`${label} is required`)
@@ -31,7 +35,7 @@ export const normalizeCommunityNote = (value: unknown) => text(value, "Submitter
 
 export function privacyHash(kind: "email" | "ip", value: string) {
   const secret = process.env.SESSION_SECRET
-  if (!secret || secret.length < 16) throw new Error("Submission security is not configured")
+  if (!isSubmissionSecurityConfigured() || !secret) throw new Error("Submission security is not configured")
   return createHmac("sha256", secret).update(`community:${kind}:${value}`).digest("hex")
 }
 

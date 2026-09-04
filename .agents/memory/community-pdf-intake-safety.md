@@ -14,3 +14,9 @@ Community PDFs may become public only when the exact immutable staged bytes have
 **Why:** Guarding only the download route still advertises unsafe records, and a later manual publish can undo a worker's suspicious-file quarantine.
 
 **How to apply:** Centralize the public-query predicate, reject unsafe approval/publish transitions, and atomically return a community PDF to private review if a later scan marks it suspicious.
+
+Public PDF analysis may prefill title, description, and hierarchy, but those values are assistive suggestions only. Never overwrite a contributor's manual edits when asynchronous analysis completes, and never weaken server-side metadata validation.
+
+**Why:** Contributors expect document details to appear automatically after file selection, while extracted metadata can be incomplete or wrong and must remain reviewable.
+
+**How to apply:** Provide an immediate filename-derived title, improve it from bounded local analysis when available, infer hierarchy only from confident signals, and keep submission APIs authoritative.

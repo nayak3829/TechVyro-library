@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest"
 import {
   COMMUNITY_MAX_PDF_BYTES, getCommunityRequestIp, hasPdfSignature,
-  normalizeCommunityDescription, normalizeCommunityEmail, privacyHash, validateUploadRequest,
+  isSubmissionSecurityConfigured, normalizeCommunityDescription, normalizeCommunityEmail, privacyHash, validateUploadRequest,
 } from "./community-submissions"
 
 const previousSecret = process.env.SESSION_SECRET
@@ -40,6 +40,14 @@ describe("community submission validation", () => {
     expect(email).toMatch(/^[a-f0-9]{64}$/)
     expect(email).not.toBe(privacyHash("ip", "student@example.test"))
     expect(email).not.toContain("student")
+  })
+
+  it("requires a sufficiently strong configured submission secret", () => {
+    process.env.SESSION_SECRET = "short"
+    expect(isSubmissionSecurityConfigured()).toBe(false)
+    expect(() => privacyHash("email", "student@example.test")).toThrow("Submission security is not configured")
+    process.env.SESSION_SECRET = "a-secure-test-secret-value"
+    expect(isSubmissionSecurityConfigured()).toBe(true)
   })
 
   it("prefers trusted single-value proxy headers and never trusts leftmost XFF", () => {

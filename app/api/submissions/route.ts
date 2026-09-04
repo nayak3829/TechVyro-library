@@ -5,7 +5,7 @@ import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import {
   COMMUNITY_MAX_PDF_BYTES, COMMUNITY_PATH, UUID, hasPdfSignature,
-  normalizeSubmission, privacyHash,
+  isSubmissionSecurityConfigured, normalizeSubmission, privacyHash,
 } from "@/lib/community-submissions"
 import { inspectPdfSafety } from "@/lib/pdf-safety"
 const NO_STORE = { headers: { "Cache-Control": "no-store" } }
@@ -15,7 +15,9 @@ async function removeObject(path: string) {
 }
 
 export async function POST(request: Request) {
-  if (!isAdminConfigured()) return NextResponse.json({ error: "Submission service is unavailable" }, { status: 503, ...NO_STORE })
+  if (!isAdminConfigured() || !isSubmissionSecurityConfigured()) {
+    return NextResponse.json({ error: "Submission service is temporarily unavailable" }, { status: 503, ...NO_STORE })
+  }
   let safePath: string | null = null
   try {
     const body = await request.json() as Record<string, unknown>

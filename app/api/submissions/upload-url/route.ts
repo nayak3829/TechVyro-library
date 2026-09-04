@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import {
-  getCommunityRequestIp, privacyHash, validateUploadRequest,
+  getCommunityRequestIp, isSubmissionSecurityConfigured, privacyHash, validateUploadRequest,
 } from "@/lib/community-submissions"
 
 const NO_STORE = { headers: { "Cache-Control": "no-store" } }
@@ -28,7 +28,9 @@ async function cleanExpiredUploads(db: ReturnType<typeof createAdminClient>) {
 }
 
 export async function POST(request: Request) {
-  if (!isAdminConfigured()) return NextResponse.json({ error: "Submission service is unavailable" }, { status: 503, ...NO_STORE })
+  if (!isAdminConfigured() || !isSubmissionSecurityConfigured()) {
+    return NextResponse.json({ error: "Submission service is temporarily unavailable" }, { status: 503, ...NO_STORE })
+  }
   try {
     const body = await request.json()
     const { email } = validateUploadRequest(body)
