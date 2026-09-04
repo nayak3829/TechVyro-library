@@ -5,6 +5,26 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { invalidateQuizCache } from "@/lib/quiz-cache"
 import { validateQuizPayload } from "@/lib/quiz-validation"
 import { isValidStructureLocation } from "@/lib/content-structure-validation"
+import { publishInAppNotification } from "@/lib/notifications"
+import { becamePublicQuiz } from "@/lib/quiz-publication"
+
+function studentQuizProjection(quiz: Record<string, unknown>) {
+  const questions = Array.isArray(quiz.questions) ? quiz.questions.map((value) => {
+    const question = value && typeof value === "object" ? value as Record<string, unknown> : {}
+    const id = typeof question.id === "string" ? question.id : typeof question.qid === "string" ? question.qid : ""
+    return {
+      id,
+      qid: id,
+      question: typeof question.question === "string" ? question.question : "",
+      options: Array.isArray(question.options) ? question.options.filter((option): option is string => typeof option === "string") : [],
+      marks: typeof question.marks === "number" && Number.isFinite(question.marks) ? question.marks : 1,
+    }
+  }) : []
+  return {
+    id: quiz.id, title: quiz.title, description: quiz.description, category: quiz.category,
+    time_limit: quiz.time_limit, enabled: quiz.enabled, questions,
+  }
+}
 
 async function structureLocationExists(supabase: any, location: unknown) {
   if (!location) return true
@@ -15,7 +35,6 @@ async function structureLocationExists(supabase: any, location: unknown) {
     .single()
   return !error && isValidStructureLocation(location, Array.isArray(data?.value) ? data.value : [])
 }
-
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -33,14 +52,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     let query = supabase
       .from("quizzes")
-      .select("*")
+      // Students receive only fields used to take the quiz; the question JSON
+      // is further projected below to remove answer keys and explanations.
+      .select(isAdmin ? "*" : "id,title,description,category,time_limit,enabled,questions")
       .eq("id", id)
     if (!isAdmin) query = query.eq("enabled", true).eq("visibility", "public")
     const { data, error } = await query.single()
 
     if (error || !data) return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
     return NextResponse.json(
-      { quiz: data },
+      { quiz: isAdmin ? data : studentQuizProjection(data as unknown as Record<string, unknown>) },
       { headers: { "Cache-Control": "no-store" } },
     )
   } catch {
@@ -59,6 +80,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const validated = validateQuizPayload(body, true)
     if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 })
     const supabase = createAdminClient()
+    const { data: previous, error: previousError } = await supabase
+      .from("quizzes")
+      .select("id,title,enabled,visibility")
+      .eq("id", id)
+      .maybeSingle()
+    if (previousError) return NextResponse.json({ error: "Failed to load quiz" }, { status: 500 })
+    if (!previous) return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
     if (!await structureLocationExists(supabase, validated.data.structure_location)) {
       return NextResponse.json({ error: "Selected content structure location no longer exists" }, { status: 400 })
     }
@@ -70,9 +98,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       .select()
       .single()
 
-    if (error?.code === "PGRST116") return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
     if (error) return NextResponse.json({ error: "Failed to update quiz" }, { status: 500 })
     invalidateQuizCache()
+    if (becamePublicQuiz(previous, data)) {
+      try {
+        await publishInAppNotification({
+          kind: "quiz", entityId: data.id, title: `New quiz: ${data.title}`, body: "A new quiz is ready to take.",
+          href: `/quiz/${data.id}`, payload: { quizId: data.id },
+        })
+      } catch (notificationError) {
+        console.error("[notifications] Quiz fan-out failed:", notificationError)
+      }
+    }
     return NextResponse.json({ quiz: data })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

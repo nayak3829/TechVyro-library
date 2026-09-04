@@ -4,7 +4,9 @@ const state = vi.hoisted(() => ({
   filters: [] as Array<[string, unknown]>,
   inserted: null as Record<string, unknown> | null,
   user: null as { id: string } | null,
-  submittedQuiz: { id: "quiz-public", title: "Public quiz", enabled: true, visibility: "public", questions: [{ id: "q1" }], time_limit: 60 } as Record<string, unknown> | null,
+  submittedQuiz: { id: "quiz-public", title: "Public quiz", enabled: true, visibility: "public", questions: [{ qid: "q1", options: ["A", "B"], correct: 1 }], time_limit: 60 } as Record<string, unknown> | null,
+  progressionCalls: [] as Array<[string, string]>,
+  existingResult: null as Record<string, unknown> | null,
 }))
 
 function resultQuery() {
@@ -22,6 +24,7 @@ function resultQuery() {
       state.inserted = value
       return { select: () => ({ single: async () => ({ data: { id: "result-1" }, error: null }) }) }
     },
+    maybeSingle: async () => ({ data: state.existingResult, error: null }),
   }
   return query
 }
@@ -52,6 +55,9 @@ vi.mock("@/lib/ai-request-security", () => ({
   RequestBodyError: class RequestBodyError extends Error { status = 400 },
 }))
 vi.mock("@/lib/admin-auth", () => ({ extractToken: () => null, verifyAdminToken: () => false }))
+vi.mock("@/lib/study-progression", () => ({
+  awardQuizProgress: async (userId: string, resultId: string) => { state.progressionCalls.push([userId, resultId]) },
+}))
 
 import { GET, POST } from "./route"
 
@@ -60,7 +66,9 @@ describe("public quiz result access", () => {
     state.filters.length = 0
     state.inserted = null
     state.user = null
-    state.submittedQuiz = { id: "quiz-public", title: "Public quiz", enabled: true, visibility: "public", questions: [{ id: "q1" }], time_limit: 60 }
+    state.submittedQuiz = { id: "quiz-public", title: "Public quiz", enabled: true, visibility: "public", questions: [{ qid: "q1", options: ["A", "B"], correct: 1 }], time_limit: 60 }
+    state.progressionCalls.length = 0
+    state.existingResult = null
   })
 
   it("only reads leaderboard results for enabled public quizzes and strips the join", async () => {
@@ -77,7 +85,7 @@ describe("public quiz result access", () => {
     const response = await POST(new Request("https://example.test/api/quiz-results", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Student", quizId: "quiz-unlisted", correct: 1, wrong: 0, skipped: 0, totalTime: 10 }),
+      body: JSON.stringify({ name: "Student", quizId: "quiz-unlisted", answers: {}, clientAttemptId: "00000000-0000-4000-8000-000000000001", totalTime: 10 }),
     }))
 
     expect(response.status).toBe(401)
@@ -89,11 +97,34 @@ describe("public quiz result access", () => {
     const response = await POST(new Request("https://example.test/api/quiz-results", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Student", quizId: "quiz-public", userId: "forged-user", correct: 1, wrong: 0, skipped: 0, totalTime: 10 }),
+      body: JSON.stringify({ name: "Student", quizId: "quiz-public", userId: "forged-user", answers: { q1: 1 }, clientAttemptId: "00000000-0000-4000-8000-000000000001", totalTime: 10 }),
     }))
 
     expect(response.status).toBe(200)
     expect(response.headers.get("Cache-Control")).toBe("no-store")
-    expect(state.inserted).toMatchObject({ user_id: "student-verified" })
+    expect(state.inserted).toMatchObject({ user_id: "student-verified", correct: 1, wrong: 0, skipped: 0, client_attempt_id: "00000000-0000-4000-8000-000000000001" })
+    expect(state.progressionCalls).toEqual([["student-verified", "result-1"]])
+  })
+
+  it("rejects forged client score counts instead of trusting them", async () => {
+    state.user = { id: "student-verified" }
+    const response = await POST(new Request("https://example.test/api/quiz-results", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Student", quizId: "quiz-public", correct: 999, answers: { q1: 1 }, clientAttemptId: "00000000-0000-4000-8000-000000000001", totalTime: 10 }),
+    }))
+    expect(response.status).toBe(400)
+    expect(state.inserted).toBeNull()
+  })
+
+  it("returns an existing attempt and reconciles its progression", async () => {
+    state.user = { id: "student-verified" }
+    state.existingResult = { id: "existing-result", percentage: 80 }
+    const response = await POST(new Request("https://example.test/api/quiz-results", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Student", quizId: "quiz-public", answers: { q1: 1 }, clientAttemptId: "00000000-0000-4000-8000-000000000001", totalTime: 10 }),
+    }))
+    await expect(response.json()).resolves.toMatchObject({ result: { id: "existing-result" }, duplicate: true })
+    expect(state.inserted).toBeNull()
+    expect(state.progressionCalls).toEqual([["student-verified", "existing-result"]])
   })
 })

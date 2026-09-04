@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { getQuizList, invalidateQuizCache } from "@/lib/quiz-cache"
 import { validateQuizPayload } from "@/lib/quiz-validation"
 import { isValidStructureLocation } from "@/lib/content-structure-validation"
+import { publishInAppNotification } from "@/lib/notifications"
 
 async function structureLocationExists(supabase: any, location: unknown) {
   if (!location) return true
@@ -60,6 +61,16 @@ export async function POST(request: Request) {
     if (error?.code === "23505") return NextResponse.json({ error: "A quiz with this ID already exists" }, { status: 409 })
     if (error) return NextResponse.json({ error: "Failed to create quiz" }, { status: 500 })
     invalidateQuizCache()
+    if (data.visibility === "public" && data.enabled) {
+      try {
+        await publishInAppNotification({
+          kind: "quiz", entityId: data.id, title: `New quiz: ${data.title}`, body: "A new quiz is ready to take.",
+          href: `/quiz/${data.id}`, payload: { quizId: data.id },
+        })
+      } catch (notificationError) {
+        console.error("[notifications] Quiz fan-out failed:", notificationError)
+      }
+    }
     return NextResponse.json({ quiz: data })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

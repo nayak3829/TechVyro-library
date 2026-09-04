@@ -9,6 +9,7 @@ export interface QuizProgressSnapshot {
   timeRemaining: number
   totalQuestions: number
   updatedAt: string
+  clientAttemptId?: string
 }
 
 const QUIZ_PROGRESS_PREFIX = "techvyro_quiz_progress"
@@ -63,6 +64,7 @@ function normalizeSnapshot(value: unknown): QuizProgressSnapshot | null {
     timeRemaining: asNonNegativeInteger(candidate.timeRemaining),
     totalQuestions,
     updatedAt: candidate.updatedAt,
+    ...(typeof candidate.clientAttemptId === "string" ? { clientAttemptId: candidate.clientAttemptId } : {}),
   }
 }
 

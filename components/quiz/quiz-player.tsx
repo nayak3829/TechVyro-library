@@ -19,7 +19,7 @@ interface Question {
   qid: string
   question: string
   options: string[]
-  correct: number
+  correct?: number
   marks: number
   explanation?: string
 }
@@ -32,6 +32,7 @@ interface QuizPlayerProps {
   onComplete?: (result: QuizResult) => void
   userName?: string
   userId?: string
+  serverGraded?: boolean
 }
 
 const LEADERBOARD_KEY = "techvyro-leaderboard" // kept for theme only
@@ -60,7 +61,7 @@ interface QuizResult {
   questionTimes: number[]
 }
 
-export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, userName, userId }: QuizPlayerProps) {
+export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, userName, userId, serverGraded = false }: QuizPlayerProps) {
   const [started, setStarted] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
@@ -77,10 +78,15 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
   const [nameEntered, setNameEntered] = useState(!!(userName && userName.trim()))
   const [savedToLeaderboard, setSavedToLeaderboard] = useState(false)
   const [topLeaderboard, setTopLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [serverResult, setServerResult] = useState<{ score: number; correct: number; wrong: number; skipped: number; percentage: number } | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submissionError, setSubmissionError] = useState("")
   
   const questionStartRef = useRef<number>(Date.now())
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const progressReadyRef = useRef(false)
+  // Kept for this mounted player so a transport retry identifies the same attempt.
+  const clientAttemptIdRef = useRef<string>(crypto.randomUUID())
 
   // Sync userName prop → auto-fill name if it arrives after mount
   useEffect(() => {
@@ -124,6 +130,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
       setVisited(fitBooleans(saved.visited))
       setQuestionTimes(fitTimes(saved.questionTimes))
       setTimeRemaining(Math.min(saved.timeRemaining, timeLimit))
+      if (saved.clientAttemptId) clientAttemptIdRef.current = saved.clientAttemptId
       setStarted(true)
       questionStartRef.current = Date.now()
     } else {
@@ -148,6 +155,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
       timeRemaining,
       totalQuestions: questions.length,
       updatedAt: new Date().toISOString(),
+      clientAttemptId: clientAttemptIdRef.current,
     })
   }, [
     answers,
@@ -360,13 +368,40 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
     let correct = 0, wrong = 0, skipped = 0
     questions.forEach((q, i) => {
       if (answers[i] === undefined) skipped++
-      else if (answers[i] === q.correct) correct++
+      else if (q.correct !== undefined && answers[i] === q.correct) correct++
       else wrong++
     })
 
     const score = correct - (wrong * 0.25)
     return { score, correct, wrong, skipped }
   }, [questions, answers])
+
+  const submissionAnswers = useCallback(() => Object.fromEntries(
+    Object.entries(answers)
+      .filter(([index]) => Number.isSafeInteger(Number(index)) && questions[Number(index)]?.qid)
+      .map(([index, answer]) => [questions[Number(index)].qid, answer]),
+  ), [answers, questions])
+
+  const saveServerResult = useCallback((entry: LeaderboardEntry) => {
+    setIsSubmitting(true)
+    setSubmissionError("")
+    return fetch("/api/quiz-results", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: entry.name, totalTime: entry.totalTime, quizId: entry.quizId, answers: submissionAnswers(), clientAttemptId: clientAttemptIdRef.current }),
+    }).then(async response => {
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.result) throw new Error(data.error || "Unable to save your result")
+      if (serverGraded) setServerResult({
+        score: Number(data.result.score), correct: Number(data.result.correct), wrong: Number(data.result.wrong),
+        skipped: Number(data.result.skipped), percentage: Number(data.result.percentage),
+      })
+      setSavedToLeaderboard(true)
+      setTopLeaderboard(prev => [data.result as LeaderboardEntry, ...prev].sort((a, b) => b.percentage - a.percentage).slice(0, 5))
+    }).catch(() => {
+      setSubmissionError("Your result could not be saved. Please retry.")
+    }).finally(() => setIsSubmitting(false))
+  }, [serverGraded, submissionAnswers])
 
   const handleAutoSubmit = useCallback(() => {
     if (submitted) return
@@ -407,7 +442,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
       }
 
       // Save to local quiz history
-      saveQuizHistory({
+      if (!serverGraded) saveQuizHistory({
         quizId: quizId || "unknown",
         quizTitle: title,
         score,
@@ -419,33 +454,9 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
         timestamp: entry.timestamp,
       })
       
-      fetch("/api/quiz-results", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: entry.id,
-          name: entry.name,
-          score: entry.score,
-          percentage: entry.percentage,
-          correct: entry.correct,
-          wrong: entry.wrong,
-          skipped: entry.skipped,
-          totalTime: entry.totalTime,
-          quizId: entry.quizId,
-          quizTitle: entry.quizTitle,
-          timestamp: entry.timestamp,
-        }),
-      })
-        .then(() => {
-          setSavedToLeaderboard(true)
-          setTopLeaderboard(prev => {
-            const updated = [entry, ...prev].sort((a, b) => b.percentage - a.percentage).slice(0, 5)
-            return updated
-          })
-        })
-        .catch(() => {})
+      saveServerResult(entry)
     }
-  }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete, playerName, questions.length, quizId, title, userId])
+  }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete, playerName, questions.length, quizId, title, userId, saveServerResult, serverGraded])
 
   const handleSubmit = () => {
     const unanswered = questions.length - Object.keys(answers).length
@@ -495,7 +506,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
       }
 
       // Save to local quiz history
-      saveQuizHistory({
+      if (!serverGraded) saveQuizHistory({
         quizId: quizId || "unknown",
         quizTitle: title,
         score,
@@ -507,31 +518,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
         timestamp: entry.timestamp,
       })
       
-      fetch("/api/quiz-results", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: entry.id,
-          name: entry.name,
-          score: entry.score,
-          percentage: entry.percentage,
-          correct: entry.correct,
-          wrong: entry.wrong,
-          skipped: entry.skipped,
-          totalTime: entry.totalTime,
-          quizId: entry.quizId,
-          quizTitle: entry.quizTitle,
-          timestamp: entry.timestamp,
-        }),
-      })
-        .then(() => {
-          setSavedToLeaderboard(true)
-          setTopLeaderboard(prev => {
-            const updated = [entry, ...prev].sort((a, b) => b.percentage - a.percentage).slice(0, 5)
-            return updated
-          })
-        })
-        .catch(() => {})
+      saveServerResult(entry)
     }
   }
 
@@ -553,6 +540,9 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
     setTimeRemaining(timeLimit)
     setShowConfirmSubmit(false)
     setSavedToLeaderboard(false)
+    setServerResult(null)
+    setSubmissionError("")
+    clientAttemptIdRef.current = crypto.randomUUID()
     // Keep the name for next attempt
   }
 
@@ -711,9 +701,24 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
   // Result Screen
   if (submitted && !reviewMode) {
     const { score, correct, wrong, skipped } = calculateResults()
-    const accuracy = answeredCount > 0 ? ((correct / answeredCount) * 100).toFixed(1) : "0"
+    if (serverGraded && !serverResult) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <Card className="max-w-md w-full p-8 text-center">
+            <h2 className="text-xl font-bold mb-3">{isSubmitting ? "Submitting your result…" : "Result not saved"}</h2>
+            <p className="text-muted-foreground mb-5">{submissionError || "Your score is being securely calculated."}</p>
+            {submissionError && <Button onClick={() => {
+              const totalTime = timeLimit - timeRemaining
+              saveServerResult({ id: "", name: playerName.trim(), score: 0, percentage: 0, correct: 0, wrong: 0, skipped: 0, totalTime, quizId: quizId || "unknown", quizTitle: title, timestamp: "" })
+            }}>Retry save</Button>}
+          </Card>
+        </div>
+      )
+    }
+    const displayed = serverGraded && serverResult ? serverResult : { score, correct, wrong, skipped, percentage: Math.round((correct / questions.length) * 100) }
+    const accuracy = displayed.correct + displayed.wrong > 0 ? ((displayed.correct / (displayed.correct + displayed.wrong)) * 100).toFixed(1) : "0"
     const totalTime = timeLimit - timeRemaining
-    const percentage = ((correct / questions.length) * 100).toFixed(0)
+    const percentage = String(displayed.percentage)
     const pct = parseFloat(percentage)
     const grade = pct >= 80 ? "Excellent!" : pct >= 60 ? "Good Job!" : pct >= 40 ? "Keep Practicing" : "Needs Improvement"
     const gradeColor = pct >= 70 ? "text-green-500" : pct >= 40 ? "text-amber-500" : "text-red-500"
@@ -756,10 +761,10 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
             {/* Stats grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
               {[
-                { label: "Total Score", value: score.toFixed(1), color: "text-primary", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-primary/8 border-primary/20" },
-                { label: "Correct", value: correct, color: "text-green-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-green-500/8 border-green-500/20" },
-                { label: "Wrong", value: wrong, color: "text-red-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-red-500/8 border-red-500/20" },
-                { label: "Skipped", value: skipped, color: "text-amber-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-amber-500/8 border-amber-500/20" },
+                { label: "Total Score", value: displayed.score.toFixed(1), color: "text-primary", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-primary/8 border-primary/20" },
+                { label: "Correct", value: displayed.correct, color: "text-green-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-green-500/8 border-green-500/20" },
+                { label: "Wrong", value: displayed.wrong, color: "text-red-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-red-500/8 border-red-500/20" },
+                { label: "Skipped", value: displayed.skipped, color: "text-amber-500", bg: darkMode ? "bg-gray-700 border-gray-600" : "bg-amber-500/8 border-amber-500/20" },
               ].map(s => (
                 <div key={s.label} className={`p-3 rounded-2xl border text-center ${s.bg}`}>
                   <div className={`text-2xl sm:text-3xl font-extrabold ${s.color}`}>{s.value}</div>
@@ -823,10 +828,10 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
             )}
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button variant="outline" className="flex-1" onClick={handleReview}>
+              {!serverGraded && <Button variant="outline" className="flex-1" onClick={handleReview}>
                 <Eye className="h-4 w-4 mr-2" />
                 Review Answers
-              </Button>
+              </Button>}
               <Button className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90" onClick={handleRestart}>
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Try Again

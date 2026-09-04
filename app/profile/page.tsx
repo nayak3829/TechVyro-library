@@ -340,6 +340,14 @@ export default function ProfilePage() {
           ))}
         </div>
 
+        <Link href="/progress" className="group flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 transition-colors hover:border-primary/40 hover:bg-primary/10">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><TrendingUp className="h-5 w-5 text-primary" /></div>
+            <div><p className="font-bold">Open your full progress</p><p className="text-xs text-muted-foreground">See score trends, achievements, and areas to revisit.</p></div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-primary transition-transform group-hover:translate-x-1" />
+        </Link>
+
         {/* Credits & Referral Card */}
         {credits && (
           <div className="rounded-2xl border border-violet-200 dark:border-violet-800/50 bg-gradient-to-br from-violet-500/5 to-blue-500/5 p-5">

@@ -13,11 +13,10 @@ import { loginHref } from "@/lib/auth-redirect"
 
 interface Question {
   id: string
+  qid: string
   question: string
   options: string[]
-  correct: number
   marks: number
-  explanation: string
 }
 
 interface Quiz {
@@ -123,9 +122,7 @@ export default function QuizPage() {
     qid: q.id,
     question: q.question,
     options: q.options,
-    correct: q.correct,
     marks: q.marks,
-    explanation: q.explanation
   }))
 
   // Extract user's display name: full_name → name → email prefix
@@ -144,6 +141,7 @@ export default function QuizPage() {
       timeLimit={quiz.time_limit}
       userName={userName}
       userId={user?.id}
+      serverGraded
     />
   )
 }

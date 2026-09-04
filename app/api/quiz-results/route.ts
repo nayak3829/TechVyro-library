@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendTelegramMessage } from "@/lib/telegram"
 import { checkRateLimit, clientAddress, readBoundedJson, RequestBodyError } from "@/lib/ai-request-security"
+import { awardQuizProgress } from "@/lib/study-progression"
 
 const LEADERBOARD_FIELDS = "id,name,score,percentage,correct,wrong,skipped,total_time,quiz_id,quiz_title,created_at"
 // Leaderboard needs the performance breakdown; never include user_id or other
@@ -11,6 +12,7 @@ const LEADERBOARD_FIELDS = "id,name,score,percentage,correct,wrong,skipped,total
 const PUBLIC_LEADERBOARD_FIELDS = "id,name,score,percentage,correct,wrong,skipped,total_time,quiz_id,quiz_title,created_at,quiz:quizzes!inner(enabled,visibility)"
 const MAX_NAME_LENGTH = 100
 const MAX_TOTAL_TIME_SECONDS = 86_400
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function escapeTelegramHtml(value: string): string {
   const entities: Record<string, string> = {
@@ -25,6 +27,33 @@ function escapeTelegramHtml(value: string): string {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+}
+
+function gradeAnswers(questions: unknown, answers: unknown) {
+  if (!Array.isArray(questions) || !answers || typeof answers !== "object" || Array.isArray(answers)) return null
+  const answerMap = answers as Record<string, unknown>
+  const questionIds = new Set<string>()
+  let correct = 0
+  let wrong = 0
+  for (const question of questions) {
+    if (!question || typeof question !== "object") return null
+    const raw = question as Record<string, unknown>
+    const id = typeof raw.qid === "string" ? raw.qid : typeof raw.id === "string" ? raw.id : ""
+    const options = raw.options
+    const correctOption = raw.correct
+    if (!id || questionIds.has(id) || !Array.isArray(options) || options.length === 0
+      || !options.every(option => typeof option === "string") || !Number.isSafeInteger(correctOption)
+      || (correctOption as number) < 1 || (correctOption as number) > options.length) return null
+    questionIds.add(id)
+    const answer = answerMap[id]
+    if (answer !== undefined) {
+      if (!Number.isSafeInteger(answer) || (answer as number) < 1 || (answer as number) > options.length) return null
+      if (answer === correctOption) correct++
+      else wrong++
+    }
+  }
+  if (Object.keys(answerMap).some(id => !questionIds.has(id))) return null
+  return { correct, wrong, skipped: questions.length - correct - wrong }
 }
 
 function formatTime(seconds: number): string {
@@ -123,21 +152,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A valid quiz ID is required" }, { status: 400 })
     }
 
-    const { correct, wrong, skipped } = payload
-    if (!isNonNegativeInteger(correct) || !isNonNegativeInteger(wrong) || !isNonNegativeInteger(skipped)) {
-      return NextResponse.json({ error: "Correct, wrong, and skipped must be non-negative integers" }, { status: 400 })
+    if ("correct" in payload || "wrong" in payload || "skipped" in payload || "score" in payload || "percentage" in payload) {
+      return NextResponse.json({ error: "Quiz scores must be calculated by the server" }, { status: 400 })
     }
-    const total = correct + wrong + skipped
-    if (total === 0) {
-      return NextResponse.json({ error: "At least one answered or skipped question is required" }, { status: 400 })
-    }
-
+    const clientAttemptId = typeof payload.clientAttemptId === "string" ? payload.clientAttemptId : ""
+    if (!UUID_PATTERN.test(clientAttemptId)) return NextResponse.json({ error: "A valid client attempt ID is required" }, { status: 400 })
     const totalTime = payload.totalTime
     if (!isNonNegativeInteger(totalTime) || totalTime > MAX_TOTAL_TIME_SECONDS) {
       return NextResponse.json({ error: `Total time must be a non-negative integer up to ${MAX_TOTAL_TIME_SECONDS} seconds` }, { status: 400 })
     }
 
     const admin = createAdminClient()
+    const { data: existing, error: existingError } = await admin
+      .from("quiz_results")
+      .select(LEADERBOARD_FIELDS)
+      .eq("user_id", user.id)
+      .eq("client_attempt_id", clientAttemptId)
+      .maybeSingle()
+    if (existingError) return NextResponse.json({ error: "Failed to check quiz attempt" }, { status: 500 })
+    if (existing) {
+      let progression = null
+      try { progression = await awardQuizProgress(user.id, existing.id) } catch {}
+      return NextResponse.json({ result: existing, progression, duplicate: true }, { headers: { "Cache-Control": "no-store" } })
+    }
     const { data: quiz, error: quizError } = await admin
       .from("quizzes")
       .select("id,title,enabled,questions,time_limit")
@@ -149,10 +186,10 @@ export async function POST(request: Request) {
     if (quizError) return NextResponse.json({ error: "Failed to validate quiz" }, { status: 500 })
     if (!quiz) return NextResponse.json({ error: "Quiz not found or unavailable" }, { status: 404 })
 
-    const questionCount = Array.isArray(quiz.questions) ? quiz.questions.length : 0
-    if (questionCount === 0 || total > questionCount) {
-      return NextResponse.json({ error: "Result counts do not match this quiz" }, { status: 400 })
-    }
+    const grading = gradeAnswers(quiz.questions, payload.answers)
+    if (!grading) return NextResponse.json({ error: "Answers do not match this quiz's question and option format" }, { status: 400 })
+    const { correct, wrong, skipped } = grading
+    const total = correct + wrong + skipped
     const quizTimeLimit = typeof quiz.time_limit === "number" && Number.isSafeInteger(quiz.time_limit) && quiz.time_limit >= 0
       ? quiz.time_limit
       : MAX_TOTAL_TIME_SECONDS
@@ -178,11 +215,33 @@ export async function POST(request: Request) {
         quiz_id: quiz.id,
         quiz_title: quiz.title,
         user_id: user.id,
+        client_attempt_id: clientAttemptId,
       })
       .select(LEADERBOARD_FIELDS)
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      // A concurrent retry may win after the initial existence check.
+      if (error.code === "23505") {
+        const { data: raced } = await admin.from("quiz_results").select(LEADERBOARD_FIELDS).eq("user_id", user.id).eq("client_attempt_id", clientAttemptId).maybeSingle()
+        if (raced) {
+          let progression = null
+          try { progression = await awardQuizProgress(user.id, raced.id) } catch {}
+          return NextResponse.json({ result: raced, progression, duplicate: true }, { headers: { "Cache-Control": "no-store" } })
+        }
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    // The RPC reads the persisted, server-computed result and uses its ID as
+    // an idempotency key. No client supplied XP or streak data is accepted.
+    let progression = null
+    try {
+      progression = await awardQuizProgress(user.id, data.id)
+    } catch (progressionError) {
+      // The result is already committed. Do not encourage a retry that would
+      // create a duplicate attempt; progression can be reconciled separately.
+      console.error("[quiz-results] Progression award failed:", progressionError)
+    }
 
     // Send Telegram notification (fire and forget)
     const medal = percentage >= 90 ? "🥇" : percentage >= 75 ? "🥈" : percentage >= 50 ? "🥉" : "📝"
@@ -201,7 +260,7 @@ export async function POST(request: Request) {
 
     sendTelegramMessage(message).catch(() => {})
 
-    return NextResponse.json({ result: data }, { headers: { "Cache-Control": "no-store" } })
+    return NextResponse.json({ result: data, progression }, { headers: { "Cache-Control": "no-store" } })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

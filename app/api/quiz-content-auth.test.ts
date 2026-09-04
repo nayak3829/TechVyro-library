@@ -3,6 +3,7 @@ import { NextRequest } from "next/server"
 
 const state = vi.hoisted(() => ({
   user: null as { id: string } | null,
+  admin: false,
 }))
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -18,7 +19,7 @@ vi.mock("@/lib/supabase/server", () => ({
             title: "Authenticated quiz",
             enabled: true,
             visibility: "public",
-            questions: [{ id: "q1", question: "Protected question", options: ["A", "B"], correct: 0 }],
+            questions: [{ id: "q1", question: "Protected question", options: ["A", "B"], correct: 1, explanation: "Private key" }],
           },
           error: null,
         }),
@@ -27,8 +28,14 @@ vi.mock("@/lib/supabase/server", () => ({
     },
   }),
 }))
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }))
-vi.mock("@/lib/admin-auth", () => ({ extractToken: () => null, verifyAdminToken: () => false }))
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({
+  from: () => {
+    const query = { select: () => query, eq: () => query, single: async () => ({ data: { id: "quiz-1", title: "Admin quiz", questions: [{ id: "q1", correct: 1, explanation: "Private key" }] }, error: null }) }
+    return query
+  },
+}) }))
+vi.mock("@/lib/admin-auth", () => ({ extractToken: () => null, verifyAdminToken: () => state.admin }))
+vi.mock("@/lib/notifications", () => ({ publishInAppNotification: vi.fn() }))
 
 import { GET as getQuiz } from "./quizzes/[id]/route"
 import { GET as getQuestions } from "./extract/questions/route"
@@ -37,6 +44,7 @@ import { GET as getQuizHtml } from "./quiz-html/route"
 describe("student quiz content authentication", () => {
   beforeEach(() => {
     state.user = null
+    state.admin = false
   })
 
   it("returns 401 for every anonymous content endpoint, including sample tests", async () => {
@@ -61,10 +69,20 @@ describe("student quiz content authentication", () => {
 
     expect(quiz.status).toBe(200)
     expect(quiz.headers.get("Cache-Control")).toBe("no-store")
+    const studentQuiz = await quiz.json()
+    expect(studentQuiz.quiz.questions[0]).toEqual({ id: "q1", qid: "q1", question: "Protected question", options: ["A", "B"], marks: 1 })
+    expect(JSON.stringify(studentQuiz)).not.toContain("correct")
+    expect(JSON.stringify(studentQuiz)).not.toContain("explanation")
     expect(questions.status).toBe(200)
     expect(questions.headers.get("Cache-Control")).toBe("no-store")
     expect(html.status).toBe(200)
     expect(html.headers.get("Cache-Control")).toBe("no-store")
+  })
+
+  it("keeps the full question model available to a verified admin", async () => {
+    state.admin = true
+    const response = await getQuiz(new Request("https://example.test/api/quizzes/quiz-1"), { params: Promise.resolve({ id: "quiz-1" }) })
+    await expect(response.json()).resolves.toMatchObject({ quiz: { questions: [{ correct: 1, explanation: "Private key" }] } })
   })
 
   it("rejects authenticated requests to unapproved question API hosts before fetching", async () => {

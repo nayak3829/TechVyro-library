@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import platformsData from "@/lib/appx-platforms.json"
 import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
+import { publishInAppNotification } from "@/lib/notifications"
 
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -238,6 +239,22 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    if (results.series > 0) {
+      const dateKey = new Date().toISOString().slice(0, 10)
+      try {
+        await publishInAppNotification({
+          kind: "test",
+          entityId: `catalog-${normalizedCategory.replace(/[^A-Za-z0-9_-]/g, "-")}-${dateKey}`,
+          title: "Mock test catalogue updated",
+          body: `${results.series} test series ${results.series === 1 ? "was" : "were"} refreshed in ${normalizedCategory}.`,
+          href: "/test-series",
+          payload: { category: normalizedCategory, series: results.series },
+        })
+      } catch (error) {
+        console.error("[notifications] Test catalogue fan-out failed:", error)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       ...results,

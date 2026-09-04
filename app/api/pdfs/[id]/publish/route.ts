@@ -3,6 +3,7 @@ import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
 import { enqueuePdfJob } from "@/lib/pdf-jobs"
 import { NextResponse } from "next/server"
 import { nextDailyDigestAt } from "@/lib/pdf-job-runner"
+import { publishInAppNotification } from "@/lib/notifications"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const action = body.action
   if (!["publish", "reject", "retry"].includes(action)) return NextResponse.json({ error: "Action must be publish, reject, or retry" }, { status: 400 })
   const db = createAdminClient()
-  const { data: pdf, error: readError } = await db.from("pdfs").select("id,publish_status,review_warnings,notification_preference,scheduled_at").eq("id", id).maybeSingle()
+  const { data: pdf, error: readError } = await db.from("pdfs").select("id,title,publish_status,visibility,review_warnings,notification_preference,scheduled_at").eq("id", id).maybeSingle()
   if (readError) return NextResponse.json({ error: "Failed to load PDF" }, { status: 500 })
   if (!pdf) return NextResponse.json({ error: "PDF not found" }, { status: 404 })
   if (action === "retry") {
@@ -46,6 +47,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ? nextDailyDigestAt().toISOString()
       : pdf.scheduled_at || undefined
     await enqueuePdfJob(id, "notify", {}, availableAt)
+  }
+  // This inbox event is intentionally independent from Telegram delivery.
+  // Publish transitions are idempotent at the notification table boundary.
+  if (action === "publish" && (pdf.publish_status !== "published" || pdf.visibility !== "public")) {
+    try {
+      await publishInAppNotification({
+        kind: "pdf", entityId: id, title: `New PDF: ${pdf.title}`, body: "A new PDF is now available.",
+        href: `/pdf/${id}`, payload: { pdfId: id },
+      })
+    } catch (error) {
+      console.error("[notifications] PDF fan-out failed:", error)
+    }
   }
   return NextResponse.json({ pdf: result.data })
 }

@@ -9,6 +9,7 @@ import {
   Info, Trophy, Zap, GraduationCap, Layers, ArrowRight,
   LayoutGrid
 } from "lucide-react"
+import { NotificationBell } from "@/components/notification-bell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -560,6 +561,8 @@ export function Header() {
           </Button>
 
           <ThemeToggle />
+
+          <NotificationBell />
 
           {/* Auth button */}
           <HeaderAuthControl user={user} loading={authLoading} onSignOut={signOut} />

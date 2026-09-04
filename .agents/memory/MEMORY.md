@@ -14,3 +14,4 @@
 - [Publish image size](publish-image-size.md) — exclude generated workspace state from publish sources; gitignore alone does not prevent oversized Replit image layers.
 - [Native packages in instrumentation](native-packages-in-instrumentation.md) — never transitively import native Node packages from Next instrumentation; trigger that work from Node request paths.
 - [Homepage visual direction](homepage-visual-direction.md) — keep public study surfaces warm, editorial, and academically premium rather than dashboard-like or gradient-heavy.
+- [Student engagement integrity](student-engagement-integrity.md) — progression comes only from hidden-answer, server-graded first attempts; notifications require provisioned preferences.
