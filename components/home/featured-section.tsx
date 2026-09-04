@@ -177,8 +177,8 @@ export function FeaturedSection({ featured, initialQuizzes }: FeaturedSectionPro
   }[activeTab]
 
   return (
-    <section className="py-14 sm:py-18 lg:py-22 bg-muted/20 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_100%,rgba(120,80,200,0.04),transparent)]" />
+    <section className="py-16 sm:py-20 lg:py-24 bg-muted/22 relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_100%,rgba(49,72,120,0.06),transparent)]" />
 
       <div className="container mx-auto px-4 relative">
 
@@ -189,7 +189,7 @@ export function FeaturedSection({ featured, initialQuizzes }: FeaturedSectionPro
               <Sparkles className="h-3 w-3" />
               Featured Content
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground tracking-tight">
+            <h2 className="study-display text-3xl font-bold tracking-[-0.04em] text-foreground sm:text-4xl lg:text-5xl">
               {heading}
             </h2>
             <p className="text-muted-foreground text-sm sm:text-base mt-1.5 max-w-sm">

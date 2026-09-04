@@ -22,14 +22,14 @@ interface LeaderboardEntry {
 }
 
 const categoryColors: Record<string, string> = {
-  Mathematics: "bg-blue-500",
-  Physics: "bg-purple-500",
-  Chemistry: "bg-green-500",
-  Biology: "bg-emerald-500",
-  English: "bg-amber-500",
-  General: "bg-gray-500",
-  NDA: "bg-red-500",
-  SSC: "bg-orange-500"
+  Mathematics: "bg-[#355b8c]",
+  Physics: "bg-[#596b9b]",
+  Chemistry: "bg-[#557e78]",
+  Biology: "bg-[#5f8066]",
+  English: "bg-[#b27d32]",
+  General: "bg-[#617080]",
+  NDA: "bg-[#9b514a]",
+  SSC: "bg-[#a66b3b]"
 }
 
 export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[] }) {
@@ -70,7 +70,8 @@ export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[]
   const quizMinutes = (seconds: number) => seconds > 0 ? Math.max(1, Math.floor(seconds / 60)) : null
 
   return (
-    <section className="py-12 sm:py-16 lg:py-20 bg-gradient-to-b from-background to-muted/30">
+    <section className="relative overflow-hidden bg-muted/25 py-14 sm:py-18 lg:py-22">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-primary/15" />
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-8 sm:mb-12">
@@ -78,7 +79,7 @@ export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[]
             <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
             Practice Tests
           </Badge>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-2 sm:mb-3">
+          <h2 className="study-display mb-2 text-3xl font-bold tracking-[-0.04em] text-foreground sm:text-4xl">
             Test Your Knowledge
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm max-w-md sm:max-w-xl mx-auto px-2">
@@ -177,7 +178,7 @@ export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[]
             {/* Leaderboard */}
             <div className="lg:col-span-1">
               <Card className="overflow-hidden border-border/50">
-                <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 p-3 sm:p-4 border-b border-border/50">
+                <div className="bg-primary/[0.06] p-3 sm:p-4 border-b border-border/50">
                   <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
                     <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                     <span className="truncate">Leaderboard</span>

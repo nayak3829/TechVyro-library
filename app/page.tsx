@@ -253,7 +253,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const hp = homepageSettings
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-[100dvh] bg-background">
       <Header />
 
       <main>
@@ -296,15 +296,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
 
         {/* 6. ALL PDFs GRID */}
-        <section id="content" className="py-14 sm:py-18 lg:py-22 bg-background relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(120,80,200,0.04),transparent)]" />
+        <section id="content" className="relative overflow-hidden bg-background py-16 sm:py-20 lg:py-24">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(49,72,120,0.07),transparent)]" />
           <div className="container mx-auto px-4 relative">
             <div className="text-center mb-10 sm:mb-14">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/8 border border-primary/20 text-primary text-xs font-semibold mb-4">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                 {hp.libraryBadge}
               </div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
+              <h2 className="study-display text-3xl font-bold tracking-[-0.04em] text-foreground sm:text-4xl lg:text-5xl mb-3">
                 {hp.libraryTitle}
               </h2>
               <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto">
@@ -349,11 +349,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
         <TestimonialsSection />
 
-        <section className="relative py-20 sm:py-24 lg:py-32 overflow-hidden bg-background">
+        <section className="relative overflow-hidden bg-background py-20 sm:py-24 lg:py-32">
           {/* Sophisticated layered bg */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_120%,rgba(120,80,200,0.12),transparent)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_30%_at_10%_0%,rgba(239,68,68,0.06),transparent)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(120,80,200,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(120,80,200,0.022)_1px,transparent_1px)] bg-[size:72px_72px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_120%,rgba(49,72,120,0.14),transparent)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_30%_at_10%_0%,rgba(183,129,48,0.09),transparent)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(49,72,120,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(49,72,120,0.025)_1px,transparent_1px)] bg-[size:72px_72px]" />
           {/* Glow orbs */}
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/8 rounded-full blur-[100px] pointer-events-none" />
 
@@ -366,7 +366,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               </div>
 
               {/* Headline */}
-              <h3 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground mb-5 tracking-tight leading-[1.1] text-balance">
+              <h3 className="study-display mb-5 text-4xl font-bold leading-[1.04] tracking-[-0.045em] text-foreground sm:text-5xl lg:text-6xl text-balance">
                 {hp.ctaTitle}
               </h3>
 
@@ -378,7 +378,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <a
                   href="#content"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-accent text-white text-sm font-semibold hover:opacity-92 transition-all duration-200 shadow-2xl shadow-primary/25 hover:-translate-y-0.5"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-92 transition-all duration-200 shadow-xl shadow-primary/20 hover:-translate-y-0.5"
                 >
                   {hp.ctaPrimaryBtn}
                 </a>

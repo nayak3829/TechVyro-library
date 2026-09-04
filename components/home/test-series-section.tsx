@@ -147,15 +147,16 @@ export function TestSeriesSection() {
   }
 
   return (
-    <section className="py-12 sm:py-16 lg:py-20 bg-gradient-to-b from-muted/30 to-background">
+    <section className="relative overflow-hidden bg-background py-14 sm:py-18 lg:py-22">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-border/70" />
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-8 sm:mb-12">
-          <Badge className="mb-3 sm:mb-4 bg-violet-500/10 text-violet-600 border-violet-500/20 text-xs sm:text-sm px-3 sm:px-4 py-1 sm:py-1.5">
+          <Badge className="mb-3 sm:mb-4 bg-primary/10 text-primary border-primary/20 text-xs sm:text-sm px-3 sm:px-4 py-1 sm:py-1.5">
             <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
             Mock Tests
           </Badge>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-2 sm:mb-3 text-balance">
+          <h2 className="study-display mb-2 text-3xl font-bold tracking-[-0.04em] text-foreground sm:text-4xl text-balance">
             Practice Mock Tests
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm max-w-md sm:max-w-xl mx-auto px-2">
@@ -219,7 +220,7 @@ export function TestSeriesSection() {
                     series.slug || "unknown-slug",
                     idx,
                   ].join(":")}
-                  className="group overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/50 hover:border-violet-400/40 flex flex-col"
+                  className="group overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/50 hover:border-primary/40 flex flex-col"
                 >
                   <div className="p-3 sm:p-4 flex flex-col flex-1">
                     {/* Header */}
@@ -250,7 +251,7 @@ export function TestSeriesSection() {
                     </div>
 
                     {/* Title */}
-                    <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 group-hover:text-violet-600 transition-colors mb-1">
+                    <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 group-hover:text-primary transition-colors mb-1">
                       {series.title}
                     </h3>
                     
@@ -286,7 +287,7 @@ export function TestSeriesSection() {
                     <Button 
                       onClick={() => handleStartSeries(series)}
                       size="sm" 
-                      className="w-full h-8 sm:h-9 text-[11px] sm:text-xs bg-violet-600 hover:bg-violet-700 gap-1"
+                      className="w-full h-8 sm:h-9 text-[11px] sm:text-xs bg-primary hover:bg-primary/90 gap-1"
                     >
                       <Play className="h-3 w-3" />
                       Start Now

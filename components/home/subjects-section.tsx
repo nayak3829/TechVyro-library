@@ -80,7 +80,7 @@ export function SubjectsSection() {
                     {iconIsNamedToken ? (
                       <FolderOpen className="h-6 w-6" style={{ color }} aria-hidden="true" />
                     ) : (
-                      <span aria-hidden="true">{folder.icon || "📚"}</span>
+                      <FolderOpen className="h-6 w-6" style={{ color }} aria-hidden="true" />
                     )}
                   </div>
 
