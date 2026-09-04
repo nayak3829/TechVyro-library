@@ -22,8 +22,25 @@ vi.mock("@/hooks/use-auth", () => ({
 describe("TestSeriesSection", () => {
   beforeEach(() => {
     push.mockReset()
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      json: async () => ({
+    vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+      if (String(input).includes("/api/content-structure")) {
+        return {
+          ok: true,
+          json: async () => ({
+            folders: [{
+              categories: [{
+                name: "SSC",
+                pdfCount: 4,
+                sections: [{ name: "SSC PDF", pdfCount: 4 }],
+              }],
+            }],
+          }),
+        } as Response
+      }
+      return {
+        ok: true,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({
         success: true,
         testSeries: [
           {
@@ -55,7 +72,8 @@ describe("TestSeriesSection", () => {
           },
         ],
       }),
-    } as Response)
+      } as Response
+    })
   })
 
   afterEach(() => {
@@ -95,5 +113,14 @@ describe("TestSeriesSection", () => {
     expect(url.searchParams.get("category")).toBe("ssc")
     expect(url.searchParams.get("location")).toBe("homepage")
     expect(track).not.toHaveBeenCalled()
+  })
+
+  it("marks missing study-PDF inventory without disabling runnable mock tests", async () => {
+    render(createElement(TestSeriesSection))
+
+    expect(await screen.findByRole("link", { name: /Banking.*PDFs soon/i })).toBeVisible()
+    expect(screen.getByRole("link", { name: /SSC/ })).not.toHaveTextContent("PDFs soon")
+    expect(screen.getByText("Mock tests are available now; study PDFs are coming soon.")).toBeVisible()
+    expect(screen.getAllByRole("button", { name: /start now/i }).length).toBeGreaterThan(0)
   })
 })

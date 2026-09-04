@@ -235,11 +235,11 @@ export default function LeaderboardPage() {
             <div className="h-20 w-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-5">
               <Trophy className="h-10 w-10 text-muted-foreground/30" />
             </div>
-            <h3 className="text-xl font-bold mb-2">No Scores Yet</h3>
+            <h3 className="text-xl font-bold mb-2">No completed quiz attempts yet</h3>
             <p className="text-sm text-muted-foreground max-w-xs mb-6">
               {filter !== "all"
                 ? "No scores found for this time period. Try a different filter."
-                : "Be the first to take a quiz and claim the top spot!"}
+                : "Scores appear here after signed-in students complete a public quiz. Be the first to finish one."}
             </p>
             <Button asChild className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
               <Link href="/quiz">

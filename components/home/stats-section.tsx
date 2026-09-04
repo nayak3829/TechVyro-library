@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
 import { FileText, FolderOpen, Download, Eye, Star, TrendingUp, Target, BookOpen, Zap, ArrowUpRight, Sparkles } from "lucide-react"
 
 interface LiveStats {
@@ -17,34 +16,10 @@ interface StatsSectionProps {
   stats: LiveStats
 }
 
-function AnimatedCounter({ value, duration = 1800 }: { value: number; duration?: number }) {
-  const [count, setCount] = useState(0)
-  const ref = useRef<HTMLSpanElement>(null)
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect() } },
-      { threshold: 0.3 }
-    )
-    if (ref.current) observer.observe(ref.current)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (!visible) return
-    let start: number
-    function tick(ts: number) {
-      if (!start) start = ts
-      const p = Math.min((ts - start) / duration, 1)
-      const ease = 1 - Math.pow(1 - p, 3)
-      setCount(Math.floor(value * ease))
-      if (p < 1) requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
-  }, [value, duration, visible])
-
-  return <span ref={ref}>{count.toLocaleString()}</span>
+function AnimatedCounter({ value }: { value: number }) {
+  // Render server truth immediately. Starting from zero creates contradictory
+  // pre-hydration HTML while the trend text already contains the real totals.
+  return <span>{value.toLocaleString()}</span>
 }
 
 const STAT_BASE = [

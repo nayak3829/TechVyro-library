@@ -13,6 +13,7 @@ import {
   GraduationCap, Loader2, Lock, Globe, Brain
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
+import { deriveStudyPdfAvailability, type StudyPdfAvailability } from "@/lib/study-pdf-availability"
 
 interface TestSeries {
   id: string
@@ -46,22 +47,22 @@ const FALLBACK_SERIES: TestSeries[] = [
   {
     id: "ssc-cgl-1", title: "SSC CGL Full Mock Test", slug: "ssc-cgl-general-knowledge",
     description: "Complete SSC CGL preparation with practice tests",
-    total_tests: 25, total_questions: 375, duration: 60, is_free: true, category: "ssc", isSample: true
+    total_tests: 1, total_questions: 0, duration: 60, is_free: true, category: "ssc", isSample: true
   },
   {
     id: "ibps-po-1", title: "IBPS PO Complete Series", slug: "banking-reasoning-aptitude",
     description: "Banking exam preparation with reasoning & aptitude",
-    total_tests: 30, total_questions: 450, duration: 60, is_free: true, category: "banking", isSample: true
+    total_tests: 1, total_questions: 0, duration: 60, is_free: true, category: "banking", isSample: true
   },
   {
     id: "nda-full-1", title: "NDA & NA Mock Test Series", slug: "nda-general-knowledge",
     description: "Defence exam preparation for NDA aspirants",
-    total_tests: 20, total_questions: 600, duration: 150, is_free: true, category: "defence", isSample: true
+    total_tests: 1, total_questions: 0, duration: 150, is_free: true, category: "defence", isSample: true
   },
   {
     id: "rrb-ntpc-1", title: "RRB NTPC Complete Series", slug: "rrb-ntpc-general-knowledge",
     description: "Railway exam preparation with full test series",
-    total_tests: 25, total_questions: 375, duration: 90, is_free: true, category: "railways", isSample: true
+    total_tests: 1, total_questions: 0, duration: 90, is_free: true, category: "railways", isSample: true
   },
 ]
 
@@ -81,6 +82,7 @@ export function TestSeriesSection() {
   const [testSeries, setTestSeries] = useState<TestSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
+  const [studyPdfAvailability, setStudyPdfAvailability] = useState<StudyPdfAvailability | null>(null)
 
   const fetchTestSeries = useCallback(async () => {
     setLoading(true)
@@ -133,6 +135,15 @@ export function TestSeriesSection() {
     fetchTestSeries()
   }, [fetchTestSeries])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch("/api/content-structure", { signal: controller.signal })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error("Content inventory unavailable")))
+      .then(data => setStudyPdfAvailability(deriveStudyPdfAvailability(data)))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [])
+
   const handleStartSeries = (series: TestSeries) => {
     const params = new URLSearchParams({
       slug: series.slug || series.id,
@@ -169,6 +180,7 @@ export function TestSeriesSection() {
           {CATEGORIES.map(cat => {
             const Icon = cat.icon
             const count = categoryCounts[cat.id] || 0
+            const studyPdfsComingSoon = studyPdfAvailability?.[cat.id] === false
             return (
               <Link
                 key={cat.id}
@@ -182,7 +194,8 @@ export function TestSeriesSection() {
               >
                 <Icon className="h-3 w-3" />
                 {cat.label}
-                {count > 0 && <span className="text-[10px] opacity-70">({count}+)</span>}
+                {count > 0 && <span className="text-[10px] opacity-70">· {count} tests</span>}
+                {studyPdfsComingSoon && <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-700 dark:text-amber-300">PDFs soon</span>}
               </Link>
             )
           })}
@@ -211,6 +224,7 @@ export function TestSeriesSection() {
             {testSeries.map((series, idx) => {
               const color = getCategoryColor(series.category)
               const Icon = getCategoryIcon(series.category)
+              const studyPdfsComingSoon = studyPdfAvailability?.[series.category] === false
               
               return (
                 <Card 
@@ -266,6 +280,11 @@ export function TestSeriesSection() {
                     {series.description && !series._platformName && (
                       <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2 mb-2">
                         {series.description}
+                      </p>
+                    )}
+                    {studyPdfsComingSoon && (
+                      <p className="mb-2 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                        Mock tests are available now; study PDFs are coming soon.
                       </p>
                     )}
                     

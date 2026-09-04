@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/hooks/use-auth"
 import { loginHref } from "@/lib/auth-redirect"
+import { deriveStudyPdfAvailability, type StudyPdfAvailability } from "@/lib/study-pdf-availability"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import {
@@ -147,6 +148,7 @@ export default function TestSeriesPage() {
   const [liveCount, setLiveCount]               = useState(0)
   const [viewMode, setViewMode]                 = useState<"grid" | "list">("grid")
   const [sortBy, setSortBy]                     = useState<"default" | "duration" | "questions">("default")
+  const [studyPdfAvailability, setStudyPdfAvailability] = useState<StudyPdfAvailability | null>(null)
 
   // Platform search state
   const [platformQuery, setPlatformQuery]             = useState("")
@@ -178,6 +180,15 @@ export default function TestSeriesPage() {
       platformTestsRequestRef.current?.abort()
       clearTimeout(platformDebounceRef.current)
     }
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch("/api/content-structure", { signal: controller.signal })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error("Content inventory unavailable")))
+      .then(data => setStudyPdfAvailability(deriveStudyPdfAvailability(data)))
+      .catch(() => {})
+    return () => controller.abort()
   }, [])
 
   // close dropdown on outside click
@@ -519,8 +530,8 @@ export default function TestSeriesPage() {
 
             {/* Description */}
             <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto mb-6 leading-relaxed">
-              Access 9,686+ platforms with free mock tests for SSC, Banking, Defence, Railways, UPSC and more. 
-              Practice anytime, anywhere with auto-graded tests.
+              Search supported platforms for free mock tests across SSC, Banking, Defence, Railways, UPSC and more.
+              Practice anytime with auto-graded tests.
             </p>
 
             {/* Stats pills */}
@@ -573,7 +584,7 @@ export default function TestSeriesPage() {
             <Database className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary z-10 pointer-events-none" />
             <Input
               aria-label="Search mock-test platforms"
-              placeholder="Search 9,686+ platforms... (e.g. parmaracademy, ssccglpinnacle, oliveboard)"
+              placeholder="Search mock-test platforms... (e.g. parmaracademy, ssccglpinnacle, oliveboard)"
               value={platformQuery}
               onChange={e => { setPlatformQuery(e.target.value); if (!e.target.value) clearPlatform() }}
               className="pl-9 pr-9 h-10 text-sm border-border/50 focus:border-primary/50 bg-muted/30"
@@ -633,6 +644,7 @@ export default function TestSeriesPage() {
                 {CATEGORIES.map(cat => {
                   const Icon   = cat.icon
                   const active = selectedCategory === cat.id
+                  const studyPdfsComingSoon = !["all", "general"].includes(cat.id) && studyPdfAvailability?.[cat.id] === false
                   return (
                     <button
                       key={cat.id}
@@ -646,12 +658,18 @@ export default function TestSeriesPage() {
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {cat.label}
+                      {studyPdfsComingSoon && <span className={`text-[9px] ${active ? "text-white/80" : "text-amber-700 dark:text-amber-300"}`}>PDFs soon</span>}
                     </button>
                   )
                 })}
               </div>
               <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-background to-transparent" />
             </div>
+          )}
+          {!selectedPlatform && !["all", "general"].includes(selectedCategory) && studyPdfAvailability?.[selectedCategory] === false && (
+            <p role="status" className="rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              Mock tests are available now. Study PDFs for {CATEGORIES.find(category => category.id === selectedCategory)?.label || selectedCategory} are coming soon.
+            </p>
           )}
 
           {/* Sort + view toggle — only in bulk mode */}
