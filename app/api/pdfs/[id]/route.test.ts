@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   currentThumbnail: "thumbnails/1700000000000-old.jpg",
   updateError: null as null | { message: string },
   storageError: false,
+  updatePayload: null as Record<string, unknown> | null,
 }))
 
 vi.mock("@/lib/admin-auth", () => ({
@@ -25,7 +26,8 @@ vi.mock("@/lib/supabase/admin", () => ({
           },
         }
       },
-      update() {
+      update(payload: Record<string, unknown>) {
+        state.updatePayload = payload
         return {
           eq() {
             return {
@@ -75,6 +77,7 @@ describe("PDF replacement ordering", () => {
     state.currentThumbnail = "thumbnails/1700000000000-old.jpg"
     state.updateError = null
     state.storageError = false
+    state.updatePayload = null
   })
 
   it("updates metadata before removing the old object", async () => {
@@ -82,6 +85,26 @@ describe("PDF replacement ordering", () => {
 
     expect(response.status).toBe(200)
     expect(state.events).toEqual(["db-update", "remove:old.pdf", "remove:thumbnails/1700000000000-old.jpg"])
+  })
+
+  it("rejects incomplete hierarchy edits before database access", async () => {
+    const response = await PATCH(new Request("https://example.test/api/pdfs/pdf-1", {
+      method: "PATCH",
+      body: JSON.stringify({ contentType: "school", contentCategory: "Class 10" }),
+    }), { params: Promise.resolve({ id: "pdf-1" }) })
+    expect(response.status).toBe(400)
+    expect(state.events).toEqual([])
+  })
+
+  it("preserves migrated SSC classification for a title-only edit", async () => {
+    const response = await PATCH(new Request("https://example.test/api/pdfs/pdf-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Renamed SSC notes" }),
+    }), { params: Promise.resolve({ id: "pdf-1" }) })
+    expect(response.status).toBe(200)
+    expect(state.updatePayload).toMatchObject({ title: "Renamed SSC notes" })
+    expect(state.updatePayload).not.toHaveProperty("content_type")
+    expect(state.updatePayload).not.toHaveProperty("content_subcategory")
   })
 
   it("removes the replacement and leaves the old object when the update fails", async () => {

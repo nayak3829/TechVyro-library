@@ -6,6 +6,7 @@ import { enqueuePdfJob } from "@/lib/pdf-jobs"
 import { createHash } from "node:crypto"
 import { simhashSimilarity } from "@/lib/pdf-similarity"
 import { runDuePdfJobs } from "@/lib/pdf-job-runner"
+import { normalizePdfContentMetadata } from "@/lib/pdf-content-metadata"
 
 const STORAGE_PATH = /^[0-9]{10,20}-[^/\\]+\.pdf$/i
 const THUMBNAIL_PATH = /^thumbnails\/[0-9]{10,20}-[^/\\]+\.(?:jpg|jpeg|webp)$/i
@@ -80,6 +81,16 @@ export async function POST(request: Request) {
     }
     if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > MAX_PDF_BYTES) {
       return NextResponse.json({ error: "PDF size must be between 1 byte and 100 MB" }, { status: 400 })
+    }
+    const hasHierarchyKeys = ["contentType", "contentCategory", "contentSubcategory", "content_type", "content_category", "content_subcategory", "subject"]
+      .some((key) => Object.prototype.hasOwnProperty.call(body, key))
+    let contentMetadata: ReturnType<typeof normalizePdfContentMetadata> | undefined
+    try {
+      // New uploads always have a complete hierarchy. A replacement with no
+      // hierarchy keys deliberately keeps the existing row's classification.
+      if (!replace || hasHierarchyKeys) contentMetadata = normalizePdfContentMetadata(body)
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Content hierarchy is invalid" }, { status: 400 })
     }
 
     const supabase = createAdminClient()
@@ -232,6 +243,7 @@ export async function POST(request: Request) {
           category_id: categoryId || null,
           structure_location: structLocValue,
           ...advancedFields,
+          ...(contentMetadata || {}),
           visibility: "private",
           updated_at: new Date().toISOString(),
         })
@@ -247,6 +259,7 @@ export async function POST(request: Request) {
           file_size: fileSize,
           category_id: categoryId || null,
           ...advancedFields,
+          ...(contentMetadata || {}),
           updated_at: new Date().toISOString(),
         }).eq("id", existingPdf.id).select().single()
         updatedPdf = result.data
@@ -301,6 +314,7 @@ export async function POST(request: Request) {
         category_id: categoryId || null,
         structure_location: structLocValue,
         ...advancedFields,
+        ...contentMetadata!,
         visibility: "private",
         view_count: 0,
       })
@@ -316,6 +330,7 @@ export async function POST(request: Request) {
         file_size: fileSize,
         category_id: categoryId || null,
         ...advancedFields,
+        ...contentMetadata!,
         view_count: 0,
       }).select().single()
       pdf = result.data

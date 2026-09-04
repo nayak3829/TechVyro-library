@@ -24,6 +24,11 @@ import { StructureSelector } from "./structure-selector"
 import { findStructureLocationByCategoryName } from "@/lib/structure-matching"
 import { analyzePdfFile, type PdfAnalysisResult } from "@/lib/pdf-smart-analysis"
 import { isUploadReady, normalizeRestoredQueueState, queueConcurrency, selectMeaningfulCategory, sourceBlobKey, thumbnailBlobKey } from "@/lib/pdf-upload-queue"
+import {
+  COLLEGE_COURSES, DIPLOMA_BRANCHES, EXAM_GROUPS, PDF_CONTENT_TYPE_OPTIONS,
+  SCHOOL_BOARDS, SCHOOL_CLASSES, SEMESTERS, clearPdfContentDependents,
+  formValueToMetadata, normalizePdfContentMetadata, type PdfContentFormValue,
+} from "@/lib/pdf-content-metadata"
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 const MAX_PARALLEL_UPLOADS = 6
@@ -38,6 +43,11 @@ interface FileEntry {
   title: string
   description: string
   categoryId: string
+  contentType: PdfContentFormValue["contentType"]
+  contentCategory: string
+  detail: string
+  semester: string
+  subject: string
   structureLocation: {
     folderId: string
     categoryId: string
@@ -245,10 +255,85 @@ const visibilityOptions: { value: VisibilityType; label: string; icon: React.Rea
   { value: "private", label: "Private", icon: <Lock className="h-3.5 w-3.5" />, description: "Only admin can view" },
 ]
 
+const emptyContentValue: PdfContentFormValue = {
+  contentType: "", contentCategory: "", detail: "", semester: "", subject: "",
+}
+
+function ContentHierarchyFields({ value, onChange, disabled = false }: {
+  value: PdfContentFormValue
+  onChange: (value: PdfContentFormValue) => void
+  disabled?: boolean
+}) {
+  const change = (field: "contentType" | "contentCategory" | "detail" | "semester", next: string) =>
+    onChange(clearPdfContentDependents(value, field, next))
+  const categoryOptions = value.contentType === "exams" ? EXAM_GROUPS
+    : value.contentType === "school" ? SCHOOL_CLASSES
+    : value.contentType === "college" ? COLLEGE_COURSES
+    : value.contentType === "diploma" ? DIPLOMA_BRANCHES : []
+  const categoryLabel = value.contentType === "exams" ? "Exam Group"
+    : value.contentType === "school" ? "Class"
+    : value.contentType === "college" ? "Course" : "Branch"
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="space-y-1.5">
+        <Label>Content Type</Label>
+        <Select value={value.contentType} onValueChange={(next) => change("contentType", next)} disabled={disabled}>
+          <SelectTrigger><SelectValue placeholder="Select content type" /></SelectTrigger>
+          <SelectContent>{PDF_CONTENT_TYPE_OPTIONS.map((option) =>
+            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+          )}</SelectContent>
+        </Select>
+      </div>
+      {value.contentType && <div className="space-y-1.5">
+        <Label>{categoryLabel}</Label>
+        <Select value={value.contentCategory} onValueChange={(next) => change("contentCategory", next)} disabled={disabled}>
+          <SelectTrigger><SelectValue placeholder={`Select ${categoryLabel.toLowerCase()}`} /></SelectTrigger>
+          <SelectContent>{categoryOptions.map((option) =>
+            <SelectItem key={option} value={option}>{option}</SelectItem>
+          )}</SelectContent>
+        </Select>
+      </div>}
+      {value.contentCategory && value.contentType === "exams" && <div className="space-y-1.5">
+        <Label>Specific Exam</Label>
+        <Input value={value.detail} maxLength={160} placeholder="e.g. SSC CGL" disabled={disabled}
+          onChange={(event) => change("detail", event.target.value)} />
+      </div>}
+      {value.contentCategory && value.contentType === "school" && <div className="space-y-1.5">
+        <Label>Board</Label>
+        <Select value={value.detail} onValueChange={(next) => change("detail", next)} disabled={disabled}>
+          <SelectTrigger><SelectValue placeholder="Select board" /></SelectTrigger>
+          <SelectContent>{SCHOOL_BOARDS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>}
+      {value.contentCategory && value.contentType === "college" && <div className="space-y-1.5">
+        <Label>Branch/Stream</Label>
+        <Input value={value.detail} maxLength={80} placeholder="e.g. Computer Science" disabled={disabled}
+          onChange={(event) => change("detail", event.target.value)} />
+      </div>}
+      {((value.contentType === "college" && value.detail) || (value.contentType === "diploma" && value.contentCategory)) && <div className="space-y-1.5">
+        <Label>Semester</Label>
+        <Select value={value.semester} onValueChange={(next) => change("semester", next)} disabled={disabled}>
+          <SelectTrigger><SelectValue placeholder="Select semester" /></SelectTrigger>
+          <SelectContent>{SEMESTERS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>}
+      {((value.contentType === "school" && value.detail) ||
+        (value.contentType === "college" && value.semester) ||
+        (value.contentType === "diploma" && value.semester)) && <div className="space-y-1.5">
+        <Label>Subject</Label>
+        <Input value={value.subject} maxLength={120} placeholder="Enter subject" disabled={disabled}
+          onChange={(event) => onChange({ ...value, subject: event.target.value })} />
+      </div>}
+    </div>
+  )
+}
+
 export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFUploadFormProps) {
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [categoriesList, setCategoriesList] = useState<Category[]>(initialCategories)
   const [globalCategory, setGlobalCategory] = useState<string>(() => initialCategories[0]?.id ?? "")
+  const [globalContent, setGlobalContent] = useState<PdfContentFormValue>(emptyContentValue)
   const [globalVisibility, setGlobalVisibility] = useState<VisibilityType>("public")
   const [globalNotificationPreference, setGlobalNotificationPreference] = useState<"none" | "immediate" | "daily">("none")
   const [globalTags, setGlobalTags] = useState<string[]>([])
@@ -431,6 +516,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
       id: generateId(), file, title,
       description: "",
       categoryId: globalCategory,
+      ...globalContent,
       structureLocation: { ...globalStructureLocation },
       tags: [...globalTags],
       visibility: globalVisibility,
@@ -934,6 +1020,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
       prev.map((e) => (e.status === "pending" ? {
         ...e,
         categoryId: globalCategory || e.categoryId,
+        ...(globalContent.contentType ? globalContent : {}),
         visibility: globalVisibility,
         notificationPreference: globalNotificationPreference,
         tags: [...new Set([...e.tags, ...globalTags])],
@@ -966,6 +1053,13 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
   const uploadEntry = useCallback(async (entry: FileEntry): Promise<boolean> => {
     if (!isUploadReady(entry) || uploadingIdsRef.current.has(entry.id) || analyzingIdsRef.current.has(entry.id)) {
       toast.error("This file is currently being analyzed or uploaded.")
+      return false
+    }
+    try {
+      normalizePdfContentMetadata(formValueToMetadata(entry))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Complete the content hierarchy")
+      updateEntry(entry.id, { showAdvanced: true })
       return false
     }
     if (activeUploadCountRef.current >= MAX_PARALLEL_UPLOADS) {
@@ -1105,6 +1199,7 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
         body: JSON.stringify({
           title, description: entry.description, filePath,
           fileSize: entry.file.size, categoryId: entry.categoryId || null,
+          ...formValueToMetadata(entry),
           structureLocation: entry.structureLocation?.folderId ? entry.structureLocation : null,
           tags: entry.tags, visibility: entry.visibility,
           scheduledAt: entry.scheduledAt, allowDownload: entry.allowDownload,
@@ -1366,6 +1461,10 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="p-4 pt-0 space-y-4 border-t border-border/50">
+                <div className="space-y-2 pt-4">
+                  <p className="text-xs text-muted-foreground">Required content hierarchy for new PDFs</p>
+                  <ContentHierarchyFields value={globalContent} onChange={setGlobalContent} />
+                </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium flex items-center gap-2">
@@ -1864,6 +1963,21 @@ export function PDFUploadForm({ categories: initialCategories, onSuccess }: PDFU
                   </div>
                 )}
               </div>
+
+              {entry.status === "pending" && (
+                <div className="border-t border-border/50 bg-muted/10 p-3 sm:p-4">
+                  <ContentHierarchyFields
+                    value={{
+                      contentType: entry.contentType || "",
+                      contentCategory: entry.contentCategory || "",
+                      detail: entry.detail || "",
+                      semester: entry.semester || "",
+                      subject: entry.subject || "",
+                    }}
+                    onChange={(value) => updateEntry(entry.id, value)}
+                  />
+                </div>
+              )}
 
               {/* Advanced Options */}
               {entry.showAdvanced && entry.status === "pending" && (

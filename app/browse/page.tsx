@@ -19,6 +19,7 @@ import {
   ChevronRight, SlidersHorizontal
 } from "lucide-react"
 import { toast } from "sonner"
+import { matchesContentHierarchy, PdfContentFilter, type ContentHierarchyFilterValue } from "@/components/pdf-content-filter"
 
 interface PDF {
   id: string
@@ -31,6 +32,10 @@ interface PDF {
   created_at: string
   structure_location: { folderId: string; categoryId: string; sectionId: string } | null
   category: { id: string; name: string; color?: string } | null
+  content_type?: string | null
+  content_category?: string | null
+  content_subcategory?: string | null
+  subject?: string | null
 }
 
 interface Quiz {
@@ -79,6 +84,9 @@ export default function BrowsePage() {
     folderId: null, categoryId: null, sectionId: null
   })
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  const [contentFilter, setContentFilter] = useState<ContentHierarchyFilterValue>({
+    contentType: "", contentCategory: "", branch: "", contentSubcategory: "", subject: "",
+  })
   // Keep the clock client-only so the NEW badge cannot differ between SSR and hydration.
   const [now, setNow] = useState<number | null>(null)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -204,8 +212,9 @@ export default function BrowsePage() {
         p.category?.name?.toLowerCase().includes(q)
       )
     }
+    result = result.filter((pdf) => matchesContentHierarchy(pdf, contentFilter))
     return result
-  }, [pdfs, filter, search, catNameMap, catToFolder])
+  }, [pdfs, filter, search, catNameMap, catToFolder, contentFilter])
 
   const filteredQuizzes = useMemo(() => {
     let result = quizzes
@@ -254,7 +263,7 @@ export default function BrowsePage() {
     }
   }
 
-  const hasFilter = !!filter.folderId
+  const hasFilter = !!filter.folderId || !!contentFilter.contentType
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -367,7 +376,7 @@ export default function BrowsePage() {
                       />
                       {hasFilter && (
                         <button
-                          onClick={() => { setFilter({ folderId: null, categoryId: null, sectionId: null }); setFilterDrawerOpen(false) }}
+                          onClick={() => { setFilter({ folderId: null, categoryId: null, sectionId: null }); setContentFilter({ contentType: "", contentCategory: "", branch: "", contentSubcategory: "", subject: "" }); setFilterDrawerOpen(false) }}
                           className="w-full flex items-center justify-center gap-2 py-3 mt-4 rounded-xl border border-rose-500/30 text-rose-500 text-sm font-semibold hover:bg-rose-500/5 transition-colors"
                         >
                           <X className="h-4 w-4" /> Clear Filter
@@ -395,6 +404,13 @@ export default function BrowsePage() {
                   </button>
                 )}
               </div>
+              {showPdfs && (
+                <PdfContentFilter
+                  pdfs={pdfs}
+                  value={contentFilter}
+                  onChange={setContentFilter}
+                />
+              )}
             </div>
 
             {loading ? (
@@ -566,7 +582,7 @@ export default function BrowsePage() {
                     <GraduationCap className="h-16 w-16 text-muted-foreground/30 mb-4" />
                     <h3 className="text-lg font-bold mb-2">No content found</h3>
                     <p className="text-sm text-muted-foreground mb-5">Try changing the filter or searching something else</p>
-                    <Button variant="outline" size="sm" onClick={() => { setFilter({ folderId: null, categoryId: null, sectionId: null }); setSearch("") }}>
+                    <Button variant="outline" size="sm" onClick={() => { setFilter({ folderId: null, categoryId: null, sectionId: null }); setContentFilter({ contentType: "", contentCategory: "", branch: "", contentSubcategory: "", subject: "" }); setSearch("") }}>
                       Show All Content
                     </Button>
                   </div>

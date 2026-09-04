@@ -15,3 +15,4 @@
 - [Native packages in instrumentation](native-packages-in-instrumentation.md) — never transitively import native Node packages from Next instrumentation; trigger that work from Node request paths.
 - [Homepage visual direction](homepage-visual-direction.md) — keep public study surfaces warm, editorial, and academically premium rather than dashboard-like or gradient-heavy.
 - [Student engagement integrity](student-engagement-integrity.md) — progression comes only from hidden-answer, server-graded first attempts; notifications require provisioned preferences.
+- [PDF content taxonomy](pdf-content-taxonomy.md) — generic study hierarchy supplements, never replaces, relational categories and the folder structure.

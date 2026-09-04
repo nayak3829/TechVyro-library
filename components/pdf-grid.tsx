@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/sheet"
 import { useFavorites } from "@/hooks/use-favorites"
 import type { PDF, Category } from "@/lib/types"
+import { matchesContentHierarchy, PdfContentFilter } from "@/components/pdf-content-filter"
 
 type SortOption = "newest" | "oldest" | "most-viewed" | "most-downloaded" | "alphabetical" | "rating"
 type ViewMode = "grid" | "compact"
@@ -47,6 +48,11 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
   const isPartialCatalogue = totalPdfs > pdfs.length
   const [search, setSearch] = useState(initialSearch)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [contentType, setContentType] = useState("")
+  const [contentCategory, setContentCategory] = useState("")
+  const [contentBranch, setContentBranch] = useState("")
+  const [contentSubcategory, setContentSubcategory] = useState("")
+  const [subject, setSubject] = useState("")
   const [sortBy, setSortBy] = useState<SortOption>("newest")
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -79,10 +85,12 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
       const matchesSearch = pdf.title.toLowerCase().includes(search.toLowerCase()) ||
         (pdf.description?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
         (pdf.category?.name.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+        (pdf.subject?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
         (pdf.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase())) ?? false)
       const matchesCategory = !selectedCategory || pdf.category_id === selectedCategory
+      const matchesHierarchy = matchesContentHierarchy(pdf, { contentType, contentCategory, branch: contentBranch, contentSubcategory, subject })
       const matchesFavorites = !showFavoritesOnly || favorites.includes(pdf.id)
-      return matchesSearch && matchesCategory && matchesFavorites
+      return matchesSearch && matchesCategory && matchesHierarchy && matchesFavorites
     })
 
     switch (sortBy) {
@@ -107,12 +115,12 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
     }
 
     return result
-  }, [pdfs, search, selectedCategory, sortBy, showFavoritesOnly, favorites])
+  }, [pdfs, search, selectedCategory, contentType, contentCategory, contentBranch, contentSubcategory, subject, sortBy, showFavoritesOnly, favorites])
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, selectedCategory, sortBy, showFavoritesOnly])
+  }, [search, selectedCategory, contentType, contentCategory, contentBranch, contentSubcategory, subject, sortBy, showFavoritesOnly])
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedPdfs.length / ITEMS_PER_PAGE)
@@ -140,6 +148,11 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
   const clearAllFilters = useCallback(() => {
     setSearch("")
     setSelectedCategory(null)
+    setContentType("")
+    setContentCategory("")
+    setContentBranch("")
+    setContentSubcategory("")
+    setSubject("")
     setShowFavoritesOnly(false)
     setSortBy("newest")
   }, [])
@@ -147,6 +160,11 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
   const activeFiltersCount = [
     search,
     selectedCategory,
+    contentType,
+    contentCategory,
+    contentBranch,
+    contentSubcategory,
+    subject,
     showFavoritesOnly,
     sortBy !== "newest"
   ].filter(Boolean).length
@@ -279,6 +297,17 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
             className="h-11 w-full rounded-xl border border-border/70 bg-card pl-10 pr-4 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
         </div>
+        <PdfContentFilter
+          pdfs={pdfs}
+          value={{ contentType, contentCategory, branch: contentBranch, contentSubcategory, subject }}
+          onChange={(next) => {
+            setContentType(next.contentType)
+            setContentCategory(next.contentCategory)
+            setContentBranch(next.branch)
+            setContentSubcategory(next.contentSubcategory)
+            setSubject(next.subject)
+          }}
+        />
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Mobile Filter Button + Results */}
           <div className="flex sm:hidden items-center gap-2">
@@ -477,7 +506,7 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
         </div>
 
         {/* Active Filters Display */}
-        {(search || selectedCategory || showFavoritesOnly) && (
+        {(search || selectedCategory || contentType || contentCategory || contentBranch || contentSubcategory || subject || showFavoritesOnly) && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-muted-foreground">Active filters:</span>
             {search && (
@@ -506,6 +535,11 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
                 </Button>
               </Badge>
             )}
+            {contentType && <Badge variant="secondary">{contentType}</Badge>}
+            {contentCategory && <Badge variant="secondary">{contentCategory}</Badge>}
+            {contentBranch && <Badge variant="secondary">{contentBranch}</Badge>}
+            {contentSubcategory && <Badge variant="secondary">{contentSubcategory}</Badge>}
+            {subject && <Badge variant="secondary">{subject}</Badge>}
             {showFavoritesOnly && (
               <Badge variant="secondary" className="gap-1 pr-1 bg-pink-500/10 text-pink-600">
                 Favorites
@@ -527,7 +561,7 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
           <Empty
             icon={FileText}
             title="No PDFs found"
-            description={search || selectedCategory || showFavoritesOnly 
+            description={search || selectedCategory || contentType || showFavoritesOnly
               ? "Try adjusting your search or filters" 
               : "No PDFs have been uploaded yet"}
           />

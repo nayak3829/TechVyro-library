@@ -25,6 +25,10 @@ export interface PDF {
   file_url?: string | null
   file_size: number | null
   category_id: string | null
+  content_type?: import("./pdf-content-metadata").PdfContentType | null
+  content_category?: string | null
+  content_subcategory?: string | null
+  subject?: string | null
   download_count: number
   view_count: number
   average_rating: number | null

@@ -3,6 +3,7 @@ import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
 import { after, NextResponse } from "next/server"
 import { enqueuePdfJob } from "@/lib/pdf-jobs"
 import { runDuePdfJobs } from "@/lib/pdf-job-runner"
+import { normalizePdfContentMetadata } from "@/lib/pdf-content-metadata"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -92,6 +93,16 @@ export async function PATCH(request: Request, { params }: RouteProps) {
     const validationError = validateEditableFields(requestBody)
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
     const { title, description, category_id, file_path, file_size, visibility, tags, allow_download } = requestBody
+    const hasContentMetadata = ["contentType", "contentCategory", "contentSubcategory", "content_type", "content_category", "content_subcategory", "subject"]
+      .some((key) => Object.prototype.hasOwnProperty.call(requestBody, key))
+    let contentMetadata: ReturnType<typeof normalizePdfContentMetadata> | undefined
+    if (hasContentMetadata) {
+      try {
+        contentMetadata = normalizePdfContentMetadata(requestBody, { allowEmpty: true })
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Content hierarchy is invalid" }, { status: 400 })
+      }
+    }
 
     const supabase = createAdminClient()
     if (typeof category_id === "string" && category_id) {
@@ -153,6 +164,7 @@ export async function PATCH(request: Request, { params }: RouteProps) {
       if (visibility !== undefined) updatePayload.visibility = visibility
       if (tags !== undefined) updatePayload.tags = Array.isArray(tags) && tags.length > 0 ? tags.map((tag) => String(tag).trim()) : null
       if (allow_download !== undefined) updatePayload.allow_download = allow_download
+      if (contentMetadata) Object.assign(updatePayload, contentMetadata)
 
       const { data, error } = await supabase.from("pdfs").update(updatePayload).eq("id", id).select().single()
       if (error) {
@@ -213,6 +225,7 @@ export async function PATCH(request: Request, { params }: RouteProps) {
     if (visibility !== undefined) updatePayload.visibility = visibility
     if (tags !== undefined) updatePayload.tags = Array.isArray(tags) && tags.length > 0 ? tags.map((tag) => String(tag).trim()) : null
     if (allow_download !== undefined) updatePayload.allow_download = allow_download
+    if (contentMetadata) Object.assign(updatePayload, contentMetadata)
 
     if (Object.keys(updatePayload).length <= 1) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 })

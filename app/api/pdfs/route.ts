@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
 import { NextRequest, NextResponse } from "next/server"
+import { PDF_CONTENT_TYPES, type PdfContentType } from "@/lib/pdf-content-metadata"
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,11 +31,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "limit must be an integer from 1 to 1000 and offset must be a non-negative integer" }, { status: 400 })
     }
     const categoryId = searchParams.get("categoryId") || ""
+    const contentType = searchParams.get("contentType") || ""
+    const contentCategory = searchParams.get("contentCategory") || ""
+    const contentSubcategory = searchParams.get("contentSubcategory") || ""
+    const subject = searchParams.get("subject") || ""
+    const hierarchyFilters = [contentCategory, contentSubcategory, subject]
+    if (
+      (contentType && !PDF_CONTENT_TYPES.includes(contentType as PdfContentType)) ||
+      hierarchyFilters.some((value) => value.length > 160 || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) ||
+      (contentCategory && !contentType) ||
+      (contentSubcategory && !contentCategory) ||
+      (subject && !contentSubcategory)
+    ) {
+      return NextResponse.json({ error: "Content hierarchy filters are invalid or out of order" }, { status: 400 })
+    }
 
     const publicFields = `
       id, title, description, file_size, category_id, download_count,
       view_count, average_rating, review_count, created_at, updated_at,
-      visibility, allow_download, tags, structure_location, thumbnail_path, category:categories(*)
+      visibility, allow_download, tags, structure_location, thumbnail_path,
+      content_type, content_category, content_subcategory, subject, category:categories(*)
     `
     const adminFields = `
       ${publicFields}, scheduled_at, publish_status, processing_status,
@@ -63,6 +79,10 @@ export async function GET(request: NextRequest) {
     if (categoryId) {
       query = query.eq("category_id", categoryId)
     }
+    if (contentType) query = query.eq("content_type", contentType)
+    if (contentCategory) query = query.eq("content_category", contentCategory)
+    if (contentSubcategory) query = query.eq("content_subcategory", contentSubcategory)
+    if (subject) query = query.eq("subject", subject)
 
     if (limit < 1000) {
       query = query.range(offset, offset + limit - 1)

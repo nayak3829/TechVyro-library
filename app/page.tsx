@@ -96,6 +96,7 @@ async function getPDFs(): Promise<PDF[]> {
       id, title, description, file_size, page_count, category_id, download_count,
       view_count, average_rating, review_count, created_at, updated_at,
       visibility, allow_download, tags, thumbnail_path,
+      content_type, content_category, content_subcategory, subject,
       category:categories(id, name, slug, color, created_at)
     `)
     )
@@ -177,6 +178,7 @@ const HOMEPAGE_PDF_SELECT = `
   id, title, description, file_size, page_count, category_id, download_count,
   view_count, average_rating, review_count, created_at, updated_at,
   visibility, allow_download, tags, thumbnail_path,
+  content_type, content_category, content_subcategory, subject,
   category:categories(id, name, slug, color, created_at)
 `
 

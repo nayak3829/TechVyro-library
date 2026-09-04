@@ -14,6 +14,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import type { PDF, Category } from "@/lib/types"
 import { StructureSelector } from "@/components/admin/structure-selector"
+import {
+  COLLEGE_COURSES, DIPLOMA_BRANCHES, EXAM_GROUPS, PDF_CONTENT_TYPE_OPTIONS,
+  SCHOOL_BOARDS, SCHOOL_CLASSES, SEMESTERS, clearPdfContentDependents,
+  formValueToMetadata, metadataToFormValue, normalizePdfContentMetadata, type PdfContentFormValue,
+} from "@/lib/pdf-content-metadata"
 
 interface PDFListProps {
   pdfs: PDF[]
@@ -107,13 +112,46 @@ function reconcilePdfs(
   return result
 }
 
-interface EditState {
+interface EditState extends PdfContentFormValue {
   title: string
   category_id: string
   description: string
   tags: string
   visibility: string
   allow_download: boolean
+  hierarchyTouched: boolean
+}
+
+function HierarchyEditor({ value, onChange, disabled }: {
+  value: PdfContentFormValue
+  onChange: (value: PdfContentFormValue) => void
+  disabled: boolean
+}) {
+  const change = (field: "contentType" | "contentCategory" | "detail" | "semester", next: string) =>
+    onChange(clearPdfContentDependents(value, field, next))
+  const options = value.contentType === "exams" ? EXAM_GROUPS : value.contentType === "school" ? SCHOOL_CLASSES
+    : value.contentType === "college" ? COLLEGE_COURSES : value.contentType === "diploma" ? DIPLOMA_BRANCHES : []
+  return <div className="grid grid-cols-2 gap-2">
+    <Select value={value.contentType} onValueChange={(v) => change("contentType", v)} disabled={disabled}>
+      <SelectTrigger aria-label="Edit content type" className="h-8 text-xs"><SelectValue placeholder="Content Type" /></SelectTrigger>
+      <SelectContent>{PDF_CONTENT_TYPE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+    </Select>
+    {value.contentType && <Select value={value.contentCategory} onValueChange={(v) => change("contentCategory", v)} disabled={disabled}>
+      <SelectTrigger aria-label="Edit content category" className="h-8 text-xs"><SelectValue placeholder={value.contentType === "exams" ? "Exam Group" : value.contentType === "school" ? "Class" : value.contentType === "college" ? "Course" : "Branch"} /></SelectTrigger>
+      <SelectContent>{options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
+    </Select>}
+    {value.contentCategory && value.contentType === "exams" && <Input aria-label="Edit specific exam" className="h-8 text-xs" maxLength={160} value={value.detail} placeholder="Specific Exam" onChange={(e) => change("detail", e.target.value)} disabled={disabled} />}
+    {value.contentCategory && value.contentType === "school" && <Select value={value.detail} onValueChange={(v) => change("detail", v)} disabled={disabled}>
+      <SelectTrigger aria-label="Edit board" className="h-8 text-xs"><SelectValue placeholder="Board" /></SelectTrigger>
+      <SelectContent>{SCHOOL_BOARDS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
+    </Select>}
+    {value.contentCategory && value.contentType === "college" && <Input aria-label="Edit branch or stream" className="h-8 text-xs" maxLength={80} value={value.detail} placeholder="Branch/Stream" onChange={(e) => change("detail", e.target.value)} disabled={disabled} />}
+    {((value.contentType === "college" && value.detail) || (value.contentType === "diploma" && value.contentCategory)) && <Select value={value.semester} onValueChange={(v) => change("semester", v)} disabled={disabled}>
+      <SelectTrigger aria-label="Edit semester" className="h-8 text-xs"><SelectValue placeholder="Semester" /></SelectTrigger>
+      <SelectContent>{SEMESTERS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
+    </Select>}
+    {((value.contentType === "school" && value.detail) || value.semester) && <Input aria-label="Edit subject" className="h-8 text-xs" maxLength={120} value={value.subject} placeholder="Subject" onChange={(e) => onChange({ ...value, subject: e.target.value })} disabled={disabled} />}
+  </div>
 }
 
 export function PDFList({ pdfs: initialPdfs, categories, loading: initialLoading, onDelete, onUpdate }: PDFListProps) {
@@ -129,6 +167,8 @@ export function PDFList({ pdfs: initialPdfs, categories, loading: initialLoading
     tags: "",
     visibility: "public",
     allow_download: true,
+    hierarchyTouched: false,
+    ...metadataToFormValue({}),
   })
   const [saving, setSaving] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -424,12 +464,14 @@ export function PDFList({ pdfs: initialPdfs, categories, loading: initialLoading
       tags: Array.isArray(pdf.tags) ? pdf.tags.join(", ") : "",
       visibility: pdf.visibility || "public",
       allow_download: pdf.allow_download !== false,
+      hierarchyTouched: false,
+      ...metadataToFormValue(pdf),
     })
   }
 
   function cancelEdit() {
     setEditingId(null)
-    setEditState({ title: "", category_id: "", description: "", tags: "", visibility: "public", allow_download: true })
+    setEditState({ title: "", category_id: "", description: "", tags: "", visibility: "public", allow_download: true, hierarchyTouched: false, ...metadataToFormValue({}) })
   }
 
   async function quickToggleVisibility(pdf: PDF) {
@@ -454,6 +496,16 @@ export function PDFList({ pdfs: initialPdfs, categories, loading: initialLoading
       toast.error("Title cannot be empty")
       return
     }
+    let hierarchyPayload: Record<string, string | null> = {}
+    if (editState.hierarchyTouched) {
+      try {
+        normalizePdfContentMetadata(formValueToMetadata(editState))
+        hierarchyPayload = formValueToMetadata(editState)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Complete the content hierarchy")
+        return
+      }
+    }
 
     setSaving(true)
     try {
@@ -475,6 +527,7 @@ export function PDFList({ pdfs: initialPdfs, categories, loading: initialLoading
           tags: tagsArray.length > 0 ? tagsArray : null,
           visibility: editState.visibility,
           allow_download: editState.allow_download,
+          ...hierarchyPayload,
         }),
       })
 
@@ -902,6 +955,7 @@ export function PDFList({ pdfs: initialPdfs, categories, loading: initialLoading
                           </SelectContent>
                         </Select>
                       </div>
+                      <HierarchyEditor value={editState} onChange={(value) => setEditState((state) => ({ ...state, ...value, hierarchyTouched: true }))} disabled={saving} />
                       <Textarea
                         aria-label="PDF description"
                         value={editState.description}
@@ -936,6 +990,11 @@ export function PDFList({ pdfs: initialPdfs, categories, loading: initialLoading
                         {category && (
                           <Badge className="text-[10px] sm:text-xs shrink-0" style={{ backgroundColor: category.color, color: "#fff" }}>
                             {category.name}
+                          </Badge>
+                        )}
+                        {pdf.content_type && (
+                          <Badge variant="secondary" className="text-[10px] sm:text-xs shrink-0">
+                            {pdf.content_type} · {pdf.content_category}{pdf.content_subcategory ? ` · ${pdf.content_subcategory}` : ""}
                           </Badge>
                         )}
                         {pdf.visibility && pdf.visibility !== "public" && (
