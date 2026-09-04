@@ -41,7 +41,7 @@ export async function getQuizList(options: { bypassCache?: boolean } = {}): Prom
 
     let { data, error } = await queryQuizzes()
     if (error?.message?.includes("JWT issued at future")) {
-      await new Promise(resolve => setTimeout(resolve, 750))
+      await new Promise(resolve => setTimeout(resolve, 1_500))
       const retry = await queryQuizzes()
       data = retry.data
       error = retry.error

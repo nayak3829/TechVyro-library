@@ -143,6 +143,7 @@ export default function QuizPage() {
       questions={transformedQuestions}
       timeLimit={quiz.time_limit}
       userName={userName}
+      userId={user?.id}
     />
   )
 }

@@ -9,16 +9,7 @@ import {
   Clock, FileText, Play, Trophy, Users, Target, 
   ArrowRight, Zap, Crown, Medal, Star
 } from "lucide-react"
-
-interface Quiz {
-  id: string
-  title: string
-  description: string
-  category: string
-  time_limit: number
-  questions: { id: string }[]
-  enabled: boolean
-}
+import type { HomepageQuiz } from "@/lib/types"
 
 interface LeaderboardEntry {
   id: string
@@ -41,24 +32,15 @@ const categoryColors: Record<string, string> = {
   SSC: "bg-orange-500"
 }
 
-export function QuizSection() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([])
+export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[] }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const quizzes = initialQuizzes.slice(0, 4)
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/quizzes").then(r => r.json()).catch(() => ({ quizzes: [] })),
-      fetch("/api/quiz-results").then(r => r.json()).catch(() => ({ results: [] })),
-    ]).then(([quizData, resultsData]) => {
-      const allQuizzes: Quiz[] = Array.isArray(quizData.quizzes)
-        ? quizData.quizzes.map((quiz: Quiz) => ({
-            ...quiz,
-            questions: Array.isArray(quiz.questions) ? quiz.questions : [],
-          }))
-        : []
-      setQuizzes(allQuizzes.filter(q => q.enabled && q.questions.length > 0).slice(0, 4))
-
+    fetch("/api/quiz-results")
+      .then(response => response.ok ? response.json() : { results: [] })
+      .catch(() => ({ results: [] }))
+      .then(resultsData => {
       const results: LeaderboardEntry[] = resultsData.results || []
       const uniqueUsers = new Map<string, LeaderboardEntry>()
       results
@@ -69,7 +51,7 @@ export function QuizSection() {
           }
         })
       setLeaderboard(Array.from(uniqueUsers.values()).slice(0, 5))
-    }).finally(() => setLoading(false))
+      })
   }, [])
 
   const getRankIcon = (rank: number) => {
@@ -85,22 +67,7 @@ export function QuizSection() {
     if (rank === 2) return "bg-gradient-to-r from-amber-700/20 to-amber-800/20 border-amber-700/30"
     return "bg-card border-border/50"
   }
-
-  if (loading) {
-    return (
-      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-b from-background to-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-muted rounded w-1/3 mx-auto"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="h-64 bg-muted rounded-xl"></div>
-              <div className="h-64 bg-muted rounded-xl"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-    )
-  }
+  const quizMinutes = (seconds: number) => seconds > 0 ? Math.max(1, Math.floor(seconds / 60)) : null
 
   return (
     <section className="py-12 sm:py-16 lg:py-20 bg-gradient-to-b from-background to-muted/30">
@@ -115,7 +82,7 @@ export function QuizSection() {
             Test Your Knowledge
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm max-w-md sm:max-w-xl mx-auto px-2">
-            Challenge yourself with our curated quizzes and compete on the leaderboard
+            Pick a focused practice set, see the format upfront, and begin when you are ready.
           </p>
         </div>
 
@@ -167,22 +134,21 @@ export function QuizSection() {
                         <h4 className="font-semibold text-xs sm:text-sm line-clamp-2 group-hover:text-primary transition-colors">
                           {quiz.title}
                         </h4>
-                        <Badge 
-                          className={`shrink-0 text-[9px] sm:text-[10px] text-white py-0.5 px-1.5 ${categoryColors[quiz.category] || "bg-gray-500"}`}
-                        >
-                          {quiz.category}
-                        </Badge>
+                        <Badge className={`shrink-0 text-[9px] sm:text-[10px] text-white py-0.5 px-1.5 ${categoryColors[quiz.category] || "bg-primary"}`}>{quiz.category || "General"}</Badge>
                       </div>
-                      
+                      <div className="mb-3 flex flex-wrap gap-1.5">
+                        {quiz.section && <span className="rounded-md bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground">{quiz.section}</span>}
+                        <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold capitalize text-primary">{quiz.difficulty || "Practice"}</span>
+                      </div>
                       <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-muted-foreground mb-3 sm:mb-4">
                         <div className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           <span>{quiz.questions.length} Qs</span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        {quizMinutes(quiz.time_limit) && <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          <span>{Math.floor(quiz.time_limit / 60)} min</span>
-                        </div>
+                          <span>{quizMinutes(quiz.time_limit)} min</span>
+                        </div>}
                       </div>
                       
                       <Button asChild size="sm" className="w-full h-8 sm:h-9 text-[11px] sm:text-xs mt-auto">

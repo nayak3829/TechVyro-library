@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { FileText, Download, Eye, Star, Sparkles, Calendar, TrendingUp, Award, Flame, Clock, Bookmark, CheckCircle2 } from "lucide-react"
+import { FileText, Download, Eye, Star, Sparkles, Flame } from "lucide-react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -265,24 +265,11 @@ export function PDFCard({ pdf, compact = false, showRank = false, rank }: PDFCar
         </CardContent>
         
         {/* Footer Stats */}
-        <CardFooter className="px-2.5 sm:px-4 pb-2.5 sm:pb-4 pt-0 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground">
-            {pdf.average_rating ? (
-              <span className="flex items-center gap-0.5 sm:gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
-                <Star className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 fill-amber-400 text-amber-400" />
-                <span className="font-medium text-amber-600 dark:text-amber-400">{pdf.average_rating.toFixed(1)}</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-0.5 sm:gap-1 bg-muted/50 px-1.5 py-0.5 rounded-md">
-                <Eye className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" />
-                <span>{(pdf.view_count || 0).toLocaleString()}</span>
-              </span>
-            )}
-          </div>
-          <span className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs text-muted-foreground bg-green-500/10 px-1.5 py-0.5 rounded-md">
-            <Download className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-green-500" />
-            <span className="font-medium text-green-600 dark:text-green-400">{pdf.download_count.toLocaleString()}</span>
-          </span>
+        <CardFooter className="flex flex-wrap items-center gap-1.5 px-2.5 pb-2.5 pt-0 sm:px-4 sm:pb-4">
+          {pdf.page_count && <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{pdf.page_count} pages</span>}
+          {pdf.file_size && <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{formatFileSize(pdf.file_size)}</span>}
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{formatDate(pdf.updated_at)} updated</span>
+          {pdf.allow_download && <span className="ml-auto flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary"><Download className="h-3 w-3" /> Download</span>}
         </CardFooter>
       </Card>
     </Link>

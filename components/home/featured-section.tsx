@@ -1,26 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import {
   Flame, Clock, TrendingUp, Star, ChevronRight, Eye, Download,
-  RefreshCw, Sparkles, Trophy, Play, ListChecks, Brain, Zap
+  Sparkles, Trophy, Play, ListChecks, Brain, Zap
 } from "lucide-react"
-import type { PDF } from "@/lib/types"
-
-const REFRESH_INTERVAL = 2 * 60 * 1000
-
-interface Quiz {
-  id: string
-  title: string
-  description: string
-  category: string
-  difficulty: string
-  time_limit: number
-  questions: { id: string }[]
-  url_slug?: string
-  created_at: string
-}
+import type { HomepageQuiz, PDF } from "@/lib/types"
 
 interface FeaturedData {
   popular: PDF[]
@@ -31,18 +17,19 @@ interface FeaturedData {
 
 interface FeaturedSectionProps {
   featured: FeaturedData
+  initialQuizzes: HomepageQuiz[]
 }
 
 const PDF_TABS = [
   { id: "popular",  label: "Most Downloaded", short: "Popular",  icon: Flame,       color: "text-orange-500",  activeBg: "bg-orange-500/10",   activeBorder: "border-orange-500/30",   dot: "bg-orange-500"  },
-  { id: "trending", label: "Trending",         short: "Trending", icon: TrendingUp,  color: "text-blue-500",    activeBg: "bg-blue-500/10",     activeBorder: "border-blue-500/30",     dot: "bg-blue-500"    },
-  { id: "recent",   label: "New PDFs",          short: "New",      icon: Clock,       color: "text-emerald-500", activeBg: "bg-emerald-500/10",  activeBorder: "border-emerald-500/30",  dot: "bg-emerald-500" },
+  { id: "trending", label: "Most Viewed",       short: "Viewed",   icon: TrendingUp,  color: "text-blue-500",    activeBg: "bg-blue-500/10",     activeBorder: "border-blue-500/30",     dot: "bg-blue-500"    },
+  { id: "recent",   label: "Recently Updated",  short: "Updated",  icon: Clock,       color: "text-emerald-500", activeBg: "bg-emerald-500/10",  activeBorder: "border-emerald-500/30",  dot: "bg-emerald-500" },
   { id: "topRated", label: "Top Rated",          short: "Rated",    icon: Star,        color: "text-amber-500",   activeBg: "bg-amber-500/10",    activeBorder: "border-amber-500/30",    dot: "bg-amber-500"   },
 ]
 
 const QUIZ_TABS = [
-  { id: "quiz_popular",  label: "Popular Quizzes", short: "Popular", icon: Trophy, color: "text-violet-500",  activeBg: "bg-violet-500/10",  activeBorder: "border-violet-500/30"  },
-  { id: "quiz_recent",   label: "New Quizzes",      short: "New",     icon: Zap,    color: "text-cyan-500",    activeBg: "bg-cyan-500/10",    activeBorder: "border-cyan-500/30"    },
+  { id: "quiz_popular",  label: "Most Questions",   short: "Largest", icon: Trophy, color: "text-violet-500",  activeBg: "bg-violet-500/10",  activeBorder: "border-violet-500/30"  },
+  { id: "quiz_recent",   label: "Recently Added",   short: "Recent",  icon: Zap,    color: "text-cyan-500",    activeBg: "bg-cyan-500/10",    activeBorder: "border-cyan-500/30"    },
   { id: "quiz_hard",     label: "Challenging",       short: "Hard",    icon: Brain,  color: "text-rose-500",    activeBg: "bg-rose-500/10",    activeBorder: "border-rose-500/30"    },
 ]
 
@@ -106,9 +93,10 @@ function PdfCard({ pdf, index }: { pdf: PDF; index: number }) {
   )
 }
 
-function QuizCard({ quiz, index }: { quiz: Quiz; index: number }) {
-  const href = quiz.url_slug ? `/quiz/${quiz.url_slug}` : `/quiz/${quiz.id}`
+function QuizCard({ quiz, index }: { quiz: HomepageQuiz; index: number }) {
+  const href = `/quiz/${quiz.id}`
   const diffColor = DIFF_COLORS[quiz.difficulty] || "#6366f1"
+  const duration = quiz.time_limit > 0 ? Math.max(1, Math.floor(quiz.time_limit / 60)) : null
   return (
     <Link href={href} className="group block h-full">
       <div className="h-full bg-card rounded-2xl p-4 sm:p-5 border border-border/50 hover:border-violet-400/40 hover:shadow-xl hover:shadow-violet-500/8 transition-all duration-300 hover:-translate-y-1.5 overflow-hidden relative">
@@ -125,11 +113,8 @@ function QuizCard({ quiz, index }: { quiz: Quiz; index: number }) {
               <Play className="h-4 w-4 shrink-0 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-all mt-0.5" />
             </div>
             <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-              {quiz.category && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-violet-500/10 text-violet-500">
-                  {quiz.category}
-                </span>
-              )}
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-violet-500/10 text-violet-500">{quiz.category || "General"}</span>
+              {quiz.section && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-muted text-muted-foreground">{quiz.section}</span>}
               <span
                 className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
                 style={{ backgroundColor: `${diffColor}18`, color: diffColor }}
@@ -142,10 +127,10 @@ function QuizCard({ quiz, index }: { quiz: Quiz; index: number }) {
                 <ListChecks className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                 {quiz.questions.length} questions
               </span>
-              {quiz.time_limit > 0 && (
+              {duration && (
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                  {quiz.time_limit} min
+                  {duration} min
                 </span>
               )}
             </div>
@@ -156,49 +141,15 @@ function QuizCard({ quiz, index }: { quiz: Quiz; index: number }) {
   )
 }
 
-export function FeaturedSection({ featured: initialFeatured }: FeaturedSectionProps) {
-  const [activeTab, setActiveTab] = useState("popular")
-  const [featured, setFeatured] = useState<FeaturedData>(initialFeatured)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const [allQuizzes, setAllQuizzes] = useState<Quiz[]>([])
-
-  const fetchFresh = useCallback(async (showSpinner = true) => {
-    if (showSpinner) setIsRefreshing(true)
-    try {
-      const quizRes = await fetch("/api/quizzes", { cache: "no-store" })
-      if (quizRes.ok) {
-        const qdata = await quizRes.json()
-        const enabled = Array.isArray(qdata.quizzes)
-          ? qdata.quizzes
-              .map((quiz: Quiz) => ({
-                ...quiz,
-                questions: Array.isArray(quiz.questions) ? quiz.questions : [],
-              }))
-              .filter((quiz: Quiz) => quiz.questions.length > 0)
-          : []
-        setAllQuizzes(enabled)
-        setLastUpdated(new Date())
-      }
-    } catch {
-    } finally {
-      if (showSpinner) setTimeout(() => setIsRefreshing(false), 600)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchFresh(false)
-    timerRef.current = setInterval(() => fetchFresh(true), REFRESH_INTERVAL)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [fetchFresh])
+export function FeaturedSection({ featured, initialQuizzes }: FeaturedSectionProps) {
+  const [activeTab, setActiveTab] = useState("recent")
+  const allQuizzes = initialQuizzes
 
   const isQuizTab = activeTab.startsWith("quiz_")
 
   const currentPdfs: PDF[] = isQuizTab ? [] : (featured[activeTab as keyof FeaturedData] || [])
 
-  const currentQuizzes: Quiz[] = !isQuizTab ? [] : (() => {
+  const currentQuizzes: HomepageQuiz[] = !isQuizTab ? [] : (() => {
     if (activeTab === "quiz_popular") {
       return [...allQuizzes].sort((a, b) => b.questions.length - a.questions.length).slice(0, 4)
     }
@@ -215,6 +166,15 @@ export function FeaturedSection({ featured: initialFeatured }: FeaturedSectionPr
   if (currentPdfs.length === 0 && currentQuizzes.length === 0 && !isQuizTab) return null
 
   const activeTabConfig = ALL_TABS.find(t => t.id === activeTab)!
+  const heading = {
+    popular: "Most Downloaded PDFs",
+    trending: "Most Viewed PDFs",
+    recent: "Recently Updated PDFs",
+    topRated: "Top Rated PDFs",
+    quiz_popular: "Largest Quizzes",
+    quiz_recent: "Recently Added Quizzes",
+    quiz_hard: "Challenging Quizzes",
+  }[activeTab]
 
   return (
     <section className="py-14 sm:py-18 lg:py-22 bg-muted/20 relative overflow-hidden">
@@ -228,30 +188,20 @@ export function FeaturedSection({ featured: initialFeatured }: FeaturedSectionPr
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/8 border border-primary/20 text-primary text-xs font-semibold mb-3">
               <Sparkles className="h-3 w-3" />
               Featured Content
-              {isRefreshing && <RefreshCw className="h-3 w-3 animate-spin ml-0.5" />}
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground tracking-tight">
-              {isQuizTab
-                ? <>Popular <span className="bg-gradient-to-r from-violet-500 to-cyan-500 bg-clip-text text-transparent">Quizzes</span></>
-                : <>Popular <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">PDFs</span></>
-              }
+              {heading}
             </h2>
             <p className="text-muted-foreground text-sm sm:text-base mt-1.5 max-w-sm">
-              {isQuizTab ? "Test your knowledge with top quizzes" : "What students are reading right now"}
+              {isQuizTab ? "Compare real quiz size, recency, and difficulty" : "Ranked from current library activity and update dates"}
             </p>
           </div>
-
-          {lastUpdated && (
-            <p className="text-[10px] text-muted-foreground/40 sm:text-right">
-              Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </p>
-          )}
         </div>
 
         {/* Tab pills — PDFs group */}
         <div className="flex flex-col gap-2 mb-8">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {PDF_TABS.map((tab) => {
+            {PDF_TABS.filter(tab => featured[tab.id as keyof FeaturedData].length > 0).map((tab) => {
               const Icon = tab.icon
               const isActive = activeTab === tab.id
               return (
@@ -296,7 +246,7 @@ export function FeaturedSection({ featured: initialFeatured }: FeaturedSectionPr
         </div>
 
         {/* Cards grid */}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 transition-opacity duration-300 ${isRefreshing ? "opacity-50" : "opacity-100"}`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {isQuizTab
             ? currentQuizzes.length > 0
               ? currentQuizzes.map((quiz, i) => <QuizCard key={quiz.id} quiz={quiz} index={i} />)

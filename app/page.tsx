@@ -17,14 +17,18 @@ import { Chatbot } from "@/components/chatbot"
 import { PDFGrid } from "@/components/pdf-grid"
 import { Footer } from "@/components/footer"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { PDF, Category } from "@/lib/types"
+import type { PDF, Category, HomepageQuiz } from "@/lib/types"
 import { applyPublicPdfVisibility } from "@/lib/pdf-access"
 import { getPublicPdfStats } from "@/lib/public-pdf-stats"
 import { getRecentDownloadCount } from "@/lib/analytics-events"
+import { getQuizList } from "@/lib/quiz-cache"
 import {
   DEFAULT_HOMEPAGE_SETTINGS,
+  DEFAULT_HERO_SETTINGS,
   isSafeHttpUrl,
+  normalizeHeroSettings,
   normalizeHomepageSettings,
+  type HeroSettings,
   type HomepageTextSettings,
 } from "@/lib/homepage-settings"
 
@@ -72,6 +76,16 @@ async function getHomepageSettings(): Promise<HomepageTextSettings> {
   return normalizeHomepageSettings(data?.value)
 }
 
+async function getHeroSettings(): Promise<HeroSettings> {
+  if (!isSupabaseConfigured()) return DEFAULT_HERO_SETTINGS
+  const { data, error } = await readSiteSetting("hero_settings")
+  if (error) {
+    console.error("[homepage] failed to load hero settings:", error.message)
+    return DEFAULT_HERO_SETTINGS
+  }
+  return normalizeHeroSettings(data?.value)
+}
+
 async function getPDFs(): Promise<PDF[]> {
   if (!isSupabaseConfigured()) return []
   const supabase = await createClient()
@@ -79,7 +93,7 @@ async function getPDFs(): Promise<PDF[]> {
   const { data, error } = await applyPublicPdfVisibility(supabase
     .from("pdfs")
     .select(`
-      id, title, description, file_size, category_id, download_count,
+      id, title, description, file_size, page_count, category_id, download_count,
       view_count, average_rating, review_count, created_at, updated_at,
       visibility, allow_download, tags, thumbnail_path,
       category:categories(id, name, slug, color, created_at)
@@ -134,12 +148,66 @@ async function getStats() {
   }
 }
 
-function getFeaturedPDFs(pdfs: PDF[]) {
-  const popular = [...pdfs].sort((a, b) => (b.download_count || 0) - (a.download_count || 0)).slice(0, 4)
-  const trending = [...pdfs].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)).slice(0, 4)
-  const recent = [...pdfs].slice(0, 4)
-  const topRated = [...pdfs].filter(p => p.average_rating).sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0)).slice(0, 4)
-  return { popular, trending, recent, topRated }
+async function getHomepageQuizzes(): Promise<HomepageQuiz[]> {
+  try {
+    const quizzes = (await getQuizList()).filter(
+      quiz => quiz.enabled && quiz.hasContent && quiz.visibility === "public"
+    )
+    return quizzes.map(quiz => ({
+      id: quiz.id,
+      title: quiz.title,
+      description: quiz.description,
+      category: quiz.category,
+      section: quiz.section,
+      difficulty: quiz.difficulty,
+      time_limit: quiz.time_limit,
+      questions: quiz.questions.map(question => ({
+        id: typeof question.id === "string" ? question.id : "",
+      })),
+      enabled: quiz.enabled,
+      created_at: quiz.created_at,
+    }))
+  } catch (error) {
+    console.error("[homepage] failed to load quizzes:", error)
+    return []
+  }
+}
+
+const HOMEPAGE_PDF_SELECT = `
+  id, title, description, file_size, page_count, category_id, download_count,
+  view_count, average_rating, review_count, created_at, updated_at,
+  visibility, allow_download, tags, thumbnail_path,
+  category:categories(id, name, slug, color, created_at)
+`
+
+function mapHomepagePdfs(data: Array<{ id: string } & Record<string, unknown>> | null): PDF[] {
+  return (data || []).map(pdf => ({
+    ...pdf,
+    thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
+    thumbnail_path: undefined,
+  })) as unknown as PDF[]
+}
+
+async function getFeaturedPDFs() {
+  if (!isSupabaseConfigured()) return { popular: [], trending: [], recent: [], topRated: [] }
+  const supabase = await createClient()
+  if (!supabase) return { popular: [], trending: [], recent: [], topRated: [] }
+  const query = () => applyPublicPdfVisibility(supabase.from("pdfs").select(HOMEPAGE_PDF_SELECT))
+  const [popular, trending, recent, topRated] = await Promise.all([
+    query().gt("download_count", 0).order("download_count", { ascending: false }).limit(4),
+    query().gt("view_count", 0).order("view_count", { ascending: false }).limit(4),
+    query().order("updated_at", { ascending: false }).limit(4),
+    query().gt("average_rating", 0).order("average_rating", { ascending: false }).limit(4),
+  ])
+  for (const [label, result] of Object.entries({ popular, trending, recent, topRated })) {
+    if (result.error) console.error(`[homepage] failed to load ${label} PDFs:`, result.error.message)
+  }
+  return {
+    popular: mapHomepagePdfs(popular.data),
+    trending: mapHomepagePdfs(trending.data),
+    recent: mapHomepagePdfs(recent.data),
+    topRated: mapHomepagePdfs(topRated.data),
+  }
 }
 
 function groupPdfsByCategory(pdfs: PDF[]): Record<string, PDF[]> {
@@ -154,19 +222,31 @@ function groupPdfsByCategory(pdfs: PDF[]): Record<string, PDF[]> {
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const configured = isSupabaseConfigured()
-  const [pdfs, categories, generalSettings, homepageSettings, stats] = configured
-    ? await Promise.all([getPDFs(), getCategories(), getGeneralSettings(), getHomepageSettings(), getStats()])
-    : [[], [], {}, DEFAULT_HOMEPAGE_SETTINGS, {
+  const [pdfs, categories, generalSettings, homepageSettings, heroSettings, stats, homepageQuizzes, featured] = configured
+    ? await Promise.all([
+        getPDFs(),
+        getCategories(),
+        getGeneralSettings(),
+        getHomepageSettings(),
+        getHeroSettings(),
+        getStats(),
+        getHomepageQuizzes(),
+        getFeaturedPDFs(),
+      ])
+    : [[], [], {}, DEFAULT_HOMEPAGE_SETTINGS, DEFAULT_HERO_SETTINGS, {
         totalPdfs: 0, totalCategories: 0, totalDownloads: 0, totalViews: 0,
         avgRating: 0, thisWeekUploads: 0, thisWeekDownloads: 0,
-      }]
+      }, [], { popular: [], trending: [], recent: [], topRated: [] }]
 
   const configuredWhatsapp = (generalSettings as Record<string, unknown>).whatsappChannelUrl
   const whatsappUrl = typeof configuredWhatsapp === "string" && isSafeHttpUrl(configuredWhatsapp)
     ? configuredWhatsapp || DEFAULT_WHATSAPP_URL
     : DEFAULT_WHATSAPP_URL
 
-  const featured = getFeaturedPDFs(pdfs)
+  const quizStats = {
+    totalQuizzes: homepageQuizzes.length,
+    totalQuestions: homepageQuizzes.reduce((total, quiz) => total + quiz.questions.length, 0),
+  }
   const pdfsByCategory = groupPdfsByCategory(pdfs)
   const { q: initialSearch = "" } = await searchParams
 
@@ -178,34 +258,42 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <main>
         {/* 1. HERO SECTION */}
-        <HeroSection />
+        <HeroSection
+          settings={heroSettings}
+          totalPdfs={stats.totalPdfs}
+          totalQuizzes={quizStats.totalQuizzes}
+          totalQuestions={quizStats.totalQuestions}
+          recentPdfs={featured.recent.slice(0, 3).map(pdf => ({
+            id: pdf.id,
+            title: pdf.title,
+            updated_at: pdf.updated_at,
+          }))}
+        />
 
-        {/* 2. RECENTLY VIEWED (client-side localStorage) */}
-        <RecentlyViewedSection />
+        {/* Continue from local study history */}
+        <RecentlyViewedSection
+          pdfs={pdfs.map(pdf => ({ id: pdf.id, title: pdf.title }))}
+          quizzes={homepageQuizzes.map(quiz => ({ id: quiz.id, title: quiz.title }))}
+        />
 
-        {/* 3. SUBJECTS SECTION */}
+        {/* Start with navigation, then surface discoveries */}
         <SubjectsSection />
 
-        {/* 4. STATS SECTION */}
-        {configured && pdfs.length > 0 && (
-          <StatsSection stats={stats} />
-        )}
-
-        {/* 3. FEATURED PDFs */}
-        {configured && pdfs.length > 0 && (
-          <FeaturedSection featured={featured} />
-        )}
-
-        {/* 4. CATEGORIES / FOLDERS */}
+        {/* Exam and subject structure */}
         {configured && categories.length > 0 && (
           <CategoriesSection categories={categories} pdfsByCategory={pdfsByCategory} />
         )}
 
-        {/* 5. QUIZ SECTION */}
-        <QuizSection />
+        {/* Practice */}
+        <QuizSection initialQuizzes={homepageQuizzes} />
 
-        {/* 5.5. TEST SERIES SECTION */}
+        {/* Timed preparation */}
         <TestSeriesSection />
+
+        {/* Genuinely sorted, data-backed recent and popular resources */}
+        {configured && pdfs.length > 0 && (
+          <FeaturedSection featured={featured} initialQuizzes={homepageQuizzes} />
+        )}
 
         {/* 6. ALL PDFs GRID */}
         <section id="content" className="py-14 sm:py-18 lg:py-22 bg-background relative overflow-hidden">
@@ -257,10 +345,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </div>
         </section>
 
-        {/* 7. TESTIMONIALS */}
+        {configured && pdfs.length > 0 && <StatsSection stats={stats} />}
+
         <TestimonialsSection />
 
-        {/* 8. BOTTOM CTA */}
         <section className="relative py-20 sm:py-24 lg:py-32 overflow-hidden bg-background">
           {/* Sophisticated layered bg */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_120%,rgba(120,80,200,0.12),transparent)]" />

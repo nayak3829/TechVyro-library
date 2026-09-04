@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { saveQuizHistory } from "@/components/quiz-history-section"
 import { sanitizeHtml } from "@/lib/sanitize"
+import { clearQuizProgress, getQuizProgress, saveQuizProgress } from "@/lib/study-progress"
 
 interface Question {
   qid: string
@@ -30,6 +31,7 @@ interface QuizPlayerProps {
   timeLimit: number
   onComplete?: (result: QuizResult) => void
   userName?: string
+  userId?: string
 }
 
 const LEADERBOARD_KEY = "techvyro-leaderboard" // kept for theme only
@@ -58,7 +60,7 @@ interface QuizResult {
   questionTimes: number[]
 }
 
-export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, userName }: QuizPlayerProps) {
+export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, userName, userId }: QuizPlayerProps) {
   const [started, setStarted] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
@@ -78,6 +80,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
   
   const questionStartRef = useRef<number>(Date.now())
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const progressReadyRef = useRef(false)
 
   // Sync userName prop → auto-fill name if it arrives after mount
   useEffect(() => {
@@ -87,14 +90,79 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
     }
   }, [userName]) // eslint-disable-line
 
-  // Initialize arrays when questions change
+  // Initialize a new attempt or restore this user's unfinished attempt.
   useEffect(() => {
-    if (questions.length > 0) {
+    if (questions.length === 0) return
+    progressReadyRef.current = false
+    const saved = quizId && userId
+      ? getQuizProgress(userId).find(item => item.quizId === quizId && item.totalQuestions === questions.length)
+      : undefined
+
+    if (saved) {
+      const fitBooleans = (values: boolean[]) => [
+        ...values.slice(0, questions.length),
+        ...new Array(Math.max(0, questions.length - values.length)).fill(false),
+      ]
+      const fitTimes = (values: number[]) => [
+        ...values.slice(0, questions.length),
+        ...new Array(Math.max(0, questions.length - values.length)).fill(0),
+      ]
+      const restoredAnswers = Object.fromEntries(
+        Object.entries(saved.answers).filter(([index, answer]) => {
+          const questionIndex = Number(index)
+          return Number.isSafeInteger(questionIndex)
+            && questionIndex >= 0
+            && questionIndex < questions.length
+            && answer >= 1
+            && answer <= questions[questionIndex].options.length
+        })
+      ) as Record<number, number>
+
+      setCurrentIndex(saved.currentIndex)
+      setAnswers(restoredAnswers)
+      setMarked(fitBooleans(saved.marked))
+      setVisited(fitBooleans(saved.visited))
+      setQuestionTimes(fitTimes(saved.questionTimes))
+      setTimeRemaining(Math.min(saved.timeRemaining, timeLimit))
+      setStarted(true)
+      questionStartRef.current = Date.now()
+    } else {
       setMarked(new Array(questions.length).fill(false))
       setVisited(new Array(questions.length).fill(false))
       setQuestionTimes(new Array(questions.length).fill(0))
+      setTimeRemaining(timeLimit)
     }
-  }, [questions.length])
+    progressReadyRef.current = true
+  }, [questions, quizId, timeLimit, userId])
+
+  useEffect(() => {
+    if (!progressReadyRef.current || !quizId || !userId || !started || submitted) return
+    saveQuizProgress(userId, {
+      quizId,
+      title,
+      currentIndex,
+      answers,
+      marked,
+      visited,
+      questionTimes,
+      timeRemaining,
+      totalQuestions: questions.length,
+      updatedAt: new Date().toISOString(),
+    })
+  }, [
+    answers,
+    currentIndex,
+    marked,
+    questionTimes,
+    questions.length,
+    quizId,
+    started,
+    submitted,
+    timeRemaining,
+    title,
+    userId,
+    visited,
+  ])
 
   // Timer
   useEffect(() => {
@@ -303,6 +371,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
   const handleAutoSubmit = useCallback(() => {
     if (submitted) return
     if (timerRef.current) clearInterval(timerRef.current)
+    if (quizId && userId) clearQuizProgress(userId, quizId)
     saveCurrentQuestionTime()
     setSubmitted(true)
     
@@ -376,7 +445,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
         })
         .catch(() => {})
     }
-  }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete, playerName, questions.length, quizId, title])
+  }, [submitted, timeLimit, timeRemaining, answers, questionTimes, calculateResults, onComplete, playerName, questions.length, quizId, title, userId])
 
   const handleSubmit = () => {
     const unanswered = questions.length - Object.keys(answers).length
@@ -389,6 +458,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
 
   const confirmSubmit = () => {
     if (timerRef.current) clearInterval(timerRef.current)
+    if (quizId && userId) clearQuizProgress(userId, quizId)
     saveCurrentQuestionTime()
     setSubmitted(true)
     setShowConfirmSubmit(false)
@@ -471,6 +541,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
   }
 
   const handleRestart = () => {
+    if (quizId && userId) clearQuizProgress(userId, quizId)
     setStarted(false)
     setSubmitted(false)
     setReviewMode(false)
@@ -820,7 +891,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
                 Are you sure you want to leave?
               </p>
               <p className={`text-xs mb-5 ${darkMode ? "text-gray-400" : "text-muted-foreground/80"}`}>
-                Please <strong>submit the quiz first</strong> to save your score on the leaderboard. If you leave now, your progress will be lost.
+                Submit the quiz to save your score on the leaderboard. Your current progress is saved so you can continue later.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button

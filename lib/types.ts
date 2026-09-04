@@ -49,6 +49,19 @@ export interface PDF {
   reviews?: Review[]
 }
 
+export interface HomepageQuiz {
+  id: string
+  title: string
+  description: string
+  category: string
+  section?: string
+  difficulty: string
+  time_limit: number
+  questions: { id: string }[]
+  enabled: boolean
+  created_at: string
+}
+
 export interface Testimonial {
   id: string
   name: string

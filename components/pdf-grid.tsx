@@ -7,7 +7,7 @@ import { Empty } from "@/components/ui/empty"
 import { 
   FileText, ArrowUpDown, Clock, Eye, Download, SortAsc, Heart, 
   ChevronLeft, ChevronRight, FolderOpen, ArrowRight, Grid3X3,
-  LayoutGrid, List, Filter, X, Sparkles
+  LayoutGrid, List, Filter, X, Sparkles, Search
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -77,7 +77,9 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
   const filteredAndSortedPdfs = useMemo(() => {
     let result = pdfs.filter((pdf) => {
       const matchesSearch = pdf.title.toLowerCase().includes(search.toLowerCase()) ||
-        (pdf.description?.toLowerCase().includes(search.toLowerCase()) ?? false)
+        (pdf.description?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+        (pdf.category?.name.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+        (pdf.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase())) ?? false)
       const matchesCategory = !selectedCategory || pdf.category_id === selectedCategory
       const matchesFavorites = !showFavoritesOnly || favorites.includes(pdf.id)
       return matchesSearch && matchesCategory && matchesFavorites
@@ -266,6 +268,17 @@ export function PDFGrid({ pdfs, categories, initialSearch = "", totalPdfs = pdfs
 
       {/* Search and Filters */}
       <section className="space-y-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search title, topic, subject, or tag"
+            aria-label="Search the PDF library"
+            className="h-11 w-full rounded-xl border border-border/70 bg-card pl-10 pr-4 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
+          />
+        </div>
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Mobile Filter Button + Results */}
           <div className="flex sm:hidden items-center gap-2">

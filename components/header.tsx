@@ -358,9 +358,6 @@ export function Header() {
               <button key={idx} onClick={() => handleSuggestionClick(suggestion)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-muted/50 transition-colors">
                 <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <span>{suggestion}</span>
-                {!searchQuery && idx < 3 && (
-                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Trending</span>
-                )}
               </button>
             ))}
           </div>
