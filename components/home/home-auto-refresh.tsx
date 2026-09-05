@@ -37,6 +37,7 @@ export function HomeAutoRefresh() {
     fetcher,
     {
       refreshInterval: REFRESH_INTERVAL,
+      revalidateOnMount: false,
       revalidateOnFocus: false, // Don't refresh on tab focus
       revalidateOnReconnect: true, // Refresh when coming back online
       dedupingInterval: 60000, // Dedupe requests within 1 minute
@@ -94,7 +95,7 @@ export function HomeAutoRefresh() {
 
   if (!show) return null
 
-  const lastRefreshTime = data?.fetchedAt ? new Date(data.fetchedAt) : new Date()
+  const lastRefreshTime = data?.fetchedAt ? new Date(data.fetchedAt) : null
 
   return (
     <button
@@ -114,7 +115,9 @@ export function HomeAutoRefresh() {
       ) : (
         <span className="flex items-center gap-1">
           <Wifi className="h-3 w-3" />
-          Live · {lastRefreshTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {lastRefreshTime
+            ? `Live · ${lastRefreshTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+            : "Ready"}
           {data && <span className="text-emerald-500 ml-0.5">✓</span>}
         </span>
       )}

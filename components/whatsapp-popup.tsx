@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { X, Bell, Users, Zap, Gift } from 'lucide-react';
+import { getPublicGeneralSettings } from '@/lib/general-settings-client';
 
 const DEFAULT_URL = 'https://whatsapp.com/channel/0029Vadk2XHLSmbX3oEVmX37';
 
@@ -15,13 +16,10 @@ export function WhatsAppPopup() {
 
   useEffect(() => {
     setMounted(true);
-    fetch('/api/site-settings?key=general_settings')
-      .then(r => r.json())
-      .then(data => {
-        if (data.value) {
-          if (data.value.whatsappChannelUrl) setWhatsappUrl(data.value.whatsappChannelUrl);
-          setPopupEnabled(data.value.whatsappPopupEnabled !== false);
-        }
+    getPublicGeneralSettings()
+      .then(settings => {
+        if (typeof settings.whatsappChannelUrl === 'string') setWhatsappUrl(settings.whatsappChannelUrl);
+        setPopupEnabled(settings.whatsappPopupEnabled !== false);
       })
       .catch(() => {})
       .finally(() => setSettingsResolved(true));
@@ -46,7 +44,7 @@ export function WhatsAppPopup() {
           setIsVisible(true);
         });
       });
-    }, 2500);
+    }, 30000);
 
     return () => clearTimeout(timer);
   }, [mounted, settingsResolved, popupEnabled]);
@@ -171,7 +169,7 @@ export function WhatsAppPopup() {
             </button>
 
             <p className="text-center text-[10px] text-gray-500 mt-3">
-              10K+ students already joined
+              Free study updates for learners
             </p>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import Link from "next/link"
 import { ArrowLeft, ArrowRight, BookOpen, FileText, FolderOpen, GraduationCap, Layers, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { getPublicContentStructure } from "@/lib/content-structure-client"
 
 interface SectionNode { id: string; name: string; pdfCount?: number; quizCount?: number; enabled: boolean }
 interface CategoryNode { id: string; name: string; color: string; icon: string; sections: SectionNode[]; pdfCount?: number; quizCount?: number; enabled: boolean }
@@ -27,13 +28,10 @@ export function SubjectsSection() {
   const loadSubjects = useCallback(() => {
     setLoading(true)
     setHasError(false)
-    fetch("/api/content-structure")
-      .then(r => {
-        if (!r.ok) throw new Error("Unable to load subjects")
-        return r.json()
-      })
+    getPublicContentStructure()
       .then(d => {
-        const enriched = (d.folders || []).filter((f: FolderNode) => f.pdfCount > 0 || f.quizCount > 0)
+        const data = d as { folders?: FolderNode[] }
+        const enriched = (data.folders || []).filter((f: FolderNode) => f.pdfCount > 0 || f.quizCount > 0)
         setFolders(enriched)
       })
       .catch(() => setHasError(true))

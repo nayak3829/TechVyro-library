@@ -27,13 +27,15 @@ export function InitialSiteLoader() {
       }, remaining)
     }
 
-    const onLoad = () => requestAnimationFrame(() => requestAnimationFrame(finish))
-    if (document.readyState === "complete") onLoad()
-    else window.addEventListener("load", onLoad, { once: true })
+    // Hydration means the interactive shell is ready. Do not wait for every
+    // image, analytics script, or streamed section to fire window.load.
+    const firstFrame = requestAnimationFrame(() => {
+      requestAnimationFrame(finish)
+    })
 
     const failsafe = setTimeout(finish, FAILSAFE_MS)
     return () => {
-      window.removeEventListener("load", onLoad)
+      cancelAnimationFrame(firstFrame)
       clearTimeout(failsafe)
       if (exitTimer) clearTimeout(exitTimer)
       if (hideTimer) clearTimeout(hideTimer)

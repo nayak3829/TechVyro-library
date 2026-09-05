@@ -147,12 +147,16 @@ async function getStats() {
   }
 }
 
-async function getHomepageQuizzes(): Promise<HomepageQuiz[]> {
+async function getHomepageQuizData(): Promise<{
+  quizzes: HomepageQuiz[]
+  totalQuizzes: number
+  totalQuestions: number
+}> {
   try {
     const quizzes = (await getQuizList()).filter(
       quiz => quiz.enabled && quiz.hasContent && quiz.visibility === "public"
     )
-    return quizzes.map(quiz => ({
+    const projected = quizzes.map(quiz => ({
       id: quiz.id,
       title: quiz.title,
       description: quiz.description,
@@ -160,15 +164,27 @@ async function getHomepageQuizzes(): Promise<HomepageQuiz[]> {
       section: quiz.section,
       difficulty: quiz.difficulty,
       time_limit: quiz.time_limit,
-      questions: quiz.questions.map(question => ({
-        id: typeof question.id === "string" ? question.id : "",
-      })),
+      question_count: quiz.questions.length,
       enabled: quiz.enabled,
       created_at: quiz.created_at,
     }))
+    const candidates = [
+      ...projected.slice(0, 4),
+      ...[...projected].sort((a, b) => b.question_count - a.question_count).slice(0, 4),
+      ...[...projected].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 4),
+      ...[...projected].sort((a, b) => {
+        const order: Record<string, number> = { easy: 0, medium: 1, hard: 2 }
+        return (order[a.difficulty.toLowerCase()] ?? 3) - (order[b.difficulty.toLowerCase()] ?? 3)
+      }).slice(0, 4),
+    ]
+    return {
+      quizzes: [...new Map(candidates.map(quiz => [quiz.id, quiz])).values()],
+      totalQuizzes: projected.length,
+      totalQuestions: projected.reduce((total, quiz) => total + quiz.question_count, 0),
+    }
   } catch (error) {
     console.error("[homepage] failed to load quizzes:", error)
-    return []
+    return { quizzes: [], totalQuizzes: 0, totalQuestions: 0 }
   }
 }
 
@@ -219,15 +235,15 @@ function groupPdfsByCategory(pdfs: PDF[]): Record<string, PDF[]> {
   }, {} as Record<string, PDF[]>)
 }
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+async function HomepageDataContent({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const configured = isSupabaseConfigured()
-  const [pdfs, categories, configuration, rawStats, homepageQuizzes, featuredResult] = configured
+  const [pdfs, categories, configuration, rawStats, quizData, featuredResult] = configured
     ? await Promise.all([
         getPDFs(),
         getCategories(),
         getHomepageConfiguration(),
         getStats(),
-        getHomepageQuizzes(),
+        getHomepageQuizData(),
         getFeaturedPDFs(),
       ])
     : [[], [], {
@@ -237,9 +253,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       }, {
         totalPdfs: 0, totalCategories: 0, totalDownloads: 0, totalViews: 0,
         avgRating: 0, thisWeekUploads: 0, thisWeekDownloads: 0,
-      }, [], { popular: [], trending: [], recent: [], topRated: [] }]
+      }, { quizzes: [], totalQuizzes: 0, totalQuestions: 0 }, { popular: [], trending: [], recent: [], topRated: [] }]
 
   const { generalSettings, homepageSettings, heroSettings } = configuration
+  const homepageQuizzes = quizData.quizzes
   const stats = { ...rawStats, totalCategories: categories.length }
   const featured = {
     ...featuredResult,
@@ -254,8 +271,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     : DEFAULT_WHATSAPP_URL
 
   const quizStats = {
-    totalQuizzes: homepageQuizzes.length,
-    totalQuestions: homepageQuizzes.reduce((total, quiz) => total + quiz.questions.length, 0),
+    totalQuizzes: quizData.totalQuizzes,
+    totalQuestions: quizData.totalQuestions,
   }
   const pdfsByCategory = groupPdfsByCategory(pdfs)
   const { q: initialSearch = "" } = await searchParams
@@ -263,9 +280,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const hp = homepageSettings
 
   return (
-    <div className="min-h-[100dvh] bg-background">
-      <Header />
-
+    <>
       <main>
         {/* 1. HERO SECTION */}
         <HeroSection
@@ -408,7 +423,50 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </div>
         </section>
       </main>
+    </>
+  )
+}
 
+function HomepageStreamFallback() {
+  return (
+    <main role="status" aria-label="Loading homepage content" aria-busy="true">
+      <section className="relative min-h-[620px] overflow-hidden bg-background px-4 py-20 sm:py-24">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(49,72,120,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(49,72,120,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
+        <div className="container relative mx-auto grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="space-y-6">
+            <Skeleton className="h-8 w-56 rounded-full" />
+            <div className="space-y-3">
+              <Skeleton className="h-14 w-full max-w-xl rounded-xl sm:h-20" />
+              <Skeleton className="h-14 w-4/5 max-w-lg rounded-xl sm:h-20" />
+            </div>
+            <div className="space-y-3 pt-4">
+              <Skeleton className="h-5 w-full max-w-xl" />
+              <Skeleton className="h-5 w-3/4 max-w-md" />
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Skeleton className="h-12 w-44 rounded-xl" />
+              <Skeleton className="h-12 w-40 rounded-xl" />
+            </div>
+          </div>
+          <Skeleton className="hidden aspect-[1.18/1] w-full rounded-3xl lg:block" />
+        </div>
+      </section>
+      <section className="border-y bg-muted/20 py-14">
+        <div className="container mx-auto flex gap-4 overflow-hidden px-4">
+          {[0, 1, 2, 3].map(item => <Skeleton key={item} className="h-64 min-w-[270px] flex-1 rounded-2xl" />)}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export default function HomePage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  return (
+    <div className="min-h-[100dvh] bg-background">
+      <Header />
+      <Suspense fallback={<HomepageStreamFallback />}>
+        <HomepageDataContent searchParams={searchParams} />
+      </Suspense>
       <Footer />
       <HomeAutoRefresh />
       <Chatbot />

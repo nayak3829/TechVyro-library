@@ -94,6 +94,8 @@ export function PDFCard({ pdf, compact = false, showRank = false, rank }: PDFCar
                     <img
                       src={pdf.thumbnail_url!}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover object-top"
                       onError={() => setThumbnailFailed(true)}
                     />
@@ -172,6 +174,8 @@ export function PDFCard({ pdf, compact = false, showRank = false, rank }: PDFCar
               <img
                 src={pdf.thumbnail_url!}
                 alt={`Preview of ${pdf.title}`}
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-contain object-center p-3 transition-transform duration-500 group-hover:scale-105"
                 onError={() => setThumbnailFailed(true)}
               />

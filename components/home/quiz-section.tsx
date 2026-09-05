@@ -144,7 +144,7 @@ export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[]
                       <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-muted-foreground mb-3 sm:mb-4">
                         <div className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
-                          <span>{quiz.questions.length} Qs</span>
+                          <span>{quiz.question_count} Qs</span>
                         </div>
                         {quizMinutes(quiz.time_limit) && <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />

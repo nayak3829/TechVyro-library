@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Mail, Globe, Heart } from "lucide-react"
+import { getPublicGeneralSettings } from "@/lib/general-settings-client"
 
 const DEFAULTS = {
   instagramUrl: "https://www.instagram.com/techvyro",
@@ -43,10 +44,9 @@ export function Footer() {
   const [s, setS] = useState(DEFAULTS)
 
   useEffect(() => {
-    fetch("/api/site-settings?key=general_settings")
-      .then(r => r.json())
-      .then(data => {
-        if (data.value) setS(prev => ({ ...prev, ...data.value }))
+    getPublicGeneralSettings()
+      .then(settings => {
+        setS(prev => ({ ...prev, ...(settings as Partial<typeof DEFAULTS>) }))
       })
       .catch(() => {})
   }, [])

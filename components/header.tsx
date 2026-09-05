@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
+import { getPublicGeneralSettings } from "@/lib/general-settings-client"
 
 const RECENT_SEARCHES_KEY = "techvyro_recent_searches"
 const MAX_RECENT_SEARCHES = 5
@@ -170,20 +171,23 @@ export function Header() {
   }, [])
 
   useEffect(() => {
-    fetch("/api/categories")
-      .then(r => r.json())
-      .then(data => {
-        const cats: { name: string }[] = data.categories || []
-        setCategories(cats.map(c => c.name))
+    const categoryTimer = window.setTimeout(() => {
+      fetch("/api/categories")
+        .then(r => r.json())
+        .then(data => {
+          const cats: { name: string }[] = data.categories || []
+          setCategories(cats.map(c => c.name))
+        })
+        .catch(() => {})
+    }, 1200)
+
+    getPublicGeneralSettings()
+      .then(settings => {
+        if (typeof settings.whatsappChannelUrl === "string") setWhatsappUrl(settings.whatsappChannelUrl)
       })
       .catch(() => {})
 
-    fetch("/api/site-settings?key=general_settings")
-      .then(r => r.json())
-      .then(data => {
-        if (data.value?.whatsappChannelUrl) setWhatsappUrl(data.value.whatsappChannelUrl)
-      })
-      .catch(() => {})
+    return () => window.clearTimeout(categoryTimer)
   }, [])
 
   useEffect(() => {

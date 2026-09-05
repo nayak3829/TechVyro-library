@@ -61,7 +61,7 @@ export interface HomepageQuiz {
   section?: string
   difficulty: string
   time_limit: number
-  questions: { id: string }[]
+  question_count: number
   enabled: boolean
   created_at: string
 }

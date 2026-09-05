@@ -125,7 +125,7 @@ function QuizCard({ quiz, index }: { quiz: HomepageQuiz; index: number }) {
             <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <ListChecks className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                {quiz.questions.length} questions
+                {quiz.question_count} questions
               </span>
               {duration && (
                 <span className="flex items-center gap-1">
@@ -151,7 +151,7 @@ export function FeaturedSection({ featured, initialQuizzes }: FeaturedSectionPro
 
   const currentQuizzes: HomepageQuiz[] = !isQuizTab ? [] : (() => {
     if (activeTab === "quiz_popular") {
-      return [...allQuizzes].sort((a, b) => b.questions.length - a.questions.length).slice(0, 4)
+      return [...allQuizzes].sort((a, b) => b.question_count - a.question_count).slice(0, 4)
     }
     if (activeTab === "quiz_recent") {
       return [...allQuizzes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 4)

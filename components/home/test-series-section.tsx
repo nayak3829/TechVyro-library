@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { deriveStudyPdfAvailability, type StudyPdfAvailability } from "@/lib/study-pdf-availability"
+import { getPublicContentStructure } from "@/lib/content-structure-client"
 
 interface TestSeries {
   id: string
@@ -77,12 +78,33 @@ const getCategoryIcon = (category: string) => {
 }
 
 export function TestSeriesSection() {
+  const sectionRef = useRef<HTMLElement>(null)
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [testSeries, setTestSeries] = useState<TestSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   const [studyPdfAvailability, setStudyPdfAvailability] = useState<StudyPdfAvailability | null>(null)
+  const [shouldLoad, setShouldLoad] = useState(false)
+
+  useEffect(() => {
+    const section = sectionRef.current
+    if (!section || typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          setShouldLoad(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: "600px 0px" },
+    )
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [])
 
   const fetchTestSeries = useCallback(async () => {
     setLoading(true)
@@ -132,17 +154,20 @@ export function TestSeriesSection() {
   }, [])
 
   useEffect(() => {
+    if (!shouldLoad) return
     fetchTestSeries()
-  }, [fetchTestSeries])
+  }, [fetchTestSeries, shouldLoad])
 
   useEffect(() => {
-    const controller = new AbortController()
-    fetch("/api/content-structure", { signal: controller.signal })
-      .then(response => response.ok ? response.json() : Promise.reject(new Error("Content inventory unavailable")))
-      .then(data => setStudyPdfAvailability(deriveStudyPdfAvailability(data)))
+    if (!shouldLoad) return
+    let active = true
+    getPublicContentStructure()
+      .then(data => {
+        if (active) setStudyPdfAvailability(deriveStudyPdfAvailability(data))
+      })
       .catch(() => {})
-    return () => controller.abort()
-  }, [])
+    return () => { active = false }
+  }, [shouldLoad])
 
   const handleStartSeries = (series: TestSeries) => {
     const params = new URLSearchParams({
@@ -158,7 +183,7 @@ export function TestSeriesSection() {
   }
 
   return (
-    <section className="relative overflow-hidden bg-background py-14 sm:py-18 lg:py-22">
+    <section ref={sectionRef} className="relative overflow-hidden bg-background py-14 sm:py-18 lg:py-22">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-border/70" />
       <div className="container mx-auto px-4">
         {/* Section Header */}
