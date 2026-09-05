@@ -18,15 +18,10 @@ CREATE TABLE IF NOT EXISTS user_credits (
 
 ALTER TABLE user_credits ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-  CREATE POLICY "Users can view own credits" ON user_credits
-    FOR SELECT USING (auth.uid() = user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "Users can update own credits" ON user_credits
-    FOR UPDATE USING (auth.uid() = user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- This legacy table is unused. Keep it unavailable to browser roles.
+DROP POLICY IF EXISTS "Users can view own credits" ON user_credits;
+DROP POLICY IF EXISTS "Users can update own credits" ON user_credits;
+REVOKE ALL PRIVILEGES ON TABLE user_credits FROM anon, authenticated;
 
 CREATE INDEX IF NOT EXISTS idx_user_credits_user_id ON user_credits(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_credits_referral_code ON user_credits(referral_code);

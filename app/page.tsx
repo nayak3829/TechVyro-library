@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import type { Metadata } from "next"
+import dynamic from "next/dynamic"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { Header } from "@/components/header"
@@ -12,16 +13,14 @@ import { TestSeriesSection } from "@/components/home/test-series-section"
 import { TestimonialsSection } from "@/components/home/testimonials-section"
 import { RecentlyViewedSection } from "@/components/home/recently-viewed-section"
 import { SubjectsSection } from "@/components/home/subjects-section"
-import { HomeAutoRefresh } from "@/components/home/home-auto-refresh"
-import { Chatbot } from "@/components/chatbot"
 import { PDFGrid } from "@/components/pdf-grid"
 import { Footer } from "@/components/footer"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { PDF, Category, HomepageQuiz } from "@/lib/types"
-import { applyPublicPdfVisibility } from "@/lib/pdf-access"
 import { getPublicPdfStats } from "@/lib/public-pdf-stats"
+import { getHomepagePdfs } from "@/lib/homepage-pdfs"
 import { getRecentDownloadCount } from "@/lib/analytics-events"
-import { getQuizList } from "@/lib/quiz-cache"
+import { getPublicQuizList } from "@/lib/quiz-cache"
 import {
   DEFAULT_HOMEPAGE_SETTINGS,
   DEFAULT_HERO_SETTINGS,
@@ -37,10 +36,23 @@ export const metadata: Metadata = {
   title: "TechVyro | Free PDFs, Quizzes & Mock Tests",
   description: "Browse free study PDFs, quizzes, and mock tests for competitive exams and academic subjects.",
   alternates: { canonical: "/" },
+  openGraph: {
+    title: "TechVyro | Free PDFs, Quizzes & Mock Tests",
+    description: "Browse free study PDFs, quizzes, and mock tests for competitive exams and academic subjects.",
+    url: "/",
+    type: "website",
+    images: ["/og-image.jpg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TechVyro | Free PDFs, Quizzes & Mock Tests",
+    description: "Browse free study PDFs, quizzes, and mock tests for competitive exams and academic subjects.",
+    images: ["/og-image.jpg"],
+  },
 }
 
 const DEFAULT_WHATSAPP_URL = "https://whatsapp.com/channel/0029Vadk2XHLSmbX3oEVmX37"
-const HOMEPAGE_PDF_LIMIT = 60
+const Chatbot = dynamic(() => import("@/components/chatbot").then(module => module.Chatbot))
 
 async function getHomepageConfiguration(): Promise<{
   generalSettings: Record<string, string>
@@ -85,33 +97,6 @@ async function getHomepageConfiguration(): Promise<{
   }
 }
 
-async function getPDFs(): Promise<PDF[]> {
-  if (!isSupabaseConfigured()) return []
-  const supabase = await createClient()
-  if (!supabase) return []
-  const { data, error } = await applyPublicPdfVisibility(supabase
-    .from("pdfs")
-    .select(`
-      id, title, description, file_size, page_count, category_id, download_count,
-      view_count, average_rating, review_count, created_at, updated_at,
-      visibility, allow_download, tags, thumbnail_path,
-      content_type, content_category, content_subcategory, subject,
-      category:categories(id, name, slug, color, created_at)
-    `)
-    )
-    .order("created_at", { ascending: false })
-    .limit(HOMEPAGE_PDF_LIMIT)
-  if (error) {
-    console.error("[homepage] failed to load PDFs:", error.message)
-    return []
-  }
-  return (data || []).map((pdf: { id: string; thumbnail_path?: string | null } & Record<string, unknown>) => ({
-    ...pdf,
-    thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
-    thumbnail_path: undefined,
-  })) as unknown as PDF[]
-}
-
 async function getCategories(): Promise<Category[]> {
   if (!isSupabaseConfigured()) return []
   const supabase = await createClient()
@@ -153,9 +138,7 @@ async function getHomepageQuizData(): Promise<{
   totalQuestions: number
 }> {
   try {
-    const quizzes = (await getQuizList()).filter(
-      quiz => quiz.enabled && quiz.hasContent && quiz.visibility === "public"
-    )
+    const quizzes = await getPublicQuizList()
     const projected = quizzes.map(quiz => ({
       id: quiz.id,
       title: quiz.title,
@@ -164,7 +147,7 @@ async function getHomepageQuizData(): Promise<{
       section: quiz.section,
       difficulty: quiz.difficulty,
       time_limit: quiz.time_limit,
-      question_count: quiz.questions.length,
+      question_count: quiz.question_count,
       enabled: quiz.enabled,
       created_at: quiz.created_at,
     }))
@@ -188,43 +171,6 @@ async function getHomepageQuizData(): Promise<{
   }
 }
 
-const HOMEPAGE_PDF_SELECT = `
-  id, title, description, file_size, page_count, category_id, download_count,
-  view_count, average_rating, review_count, created_at, updated_at,
-  visibility, allow_download, tags, thumbnail_path,
-  content_type, content_category, content_subcategory, subject,
-  category:categories(id, name, slug, color, created_at)
-`
-
-function mapHomepagePdfs(data: Array<{ id: string } & Record<string, unknown>> | null): PDF[] {
-  return (data || []).map(pdf => ({
-    ...pdf,
-    thumbnail_url: `/api/pdfs/${pdf.id}/thumbnail`,
-    thumbnail_path: undefined,
-  })) as unknown as PDF[]
-}
-
-async function getFeaturedPDFs() {
-  if (!isSupabaseConfigured()) return { popular: [], trending: [], recent: [], topRated: [] }
-  const supabase = await createClient()
-  if (!supabase) return { popular: [], trending: [], recent: [], topRated: [] }
-  const query = () => applyPublicPdfVisibility(supabase.from("pdfs").select(HOMEPAGE_PDF_SELECT))
-  const [popular, trending, topRated] = await Promise.all([
-    query().gt("download_count", 0).order("download_count", { ascending: false }).limit(4),
-    query().gt("view_count", 0).order("view_count", { ascending: false }).limit(4),
-    query().gt("average_rating", 0).order("average_rating", { ascending: false }).limit(4),
-  ])
-  for (const [label, result] of Object.entries({ popular, trending, topRated })) {
-    if (result.error) console.error(`[homepage] failed to load ${label} PDFs:`, result.error.message)
-  }
-  return {
-    popular: mapHomepagePdfs(popular.data),
-    trending: mapHomepagePdfs(trending.data),
-    recent: [],
-    topRated: mapHomepagePdfs(topRated.data),
-  }
-}
-
 function groupPdfsByCategory(pdfs: PDF[]): Record<string, PDF[]> {
   return pdfs.reduce((acc, pdf) => {
     if (pdf.category_id) {
@@ -237,29 +183,29 @@ function groupPdfsByCategory(pdfs: PDF[]): Record<string, PDF[]> {
 
 async function HomepageDataContent({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const configured = isSupabaseConfigured()
-  const [pdfs, categories, configuration, rawStats, quizData, featuredResult] = configured
+  const [pdfData, categories, configuration, rawStats, quizData] = configured
     ? await Promise.all([
-        getPDFs(),
+        getHomepagePdfs(createAdminClient()),
         getCategories(),
         getHomepageConfiguration(),
         getStats(),
         getHomepageQuizData(),
-        getFeaturedPDFs(),
       ])
-    : [[], [], {
+    : [{ pdfs: [], featured: { popular: [], trending: [], recent: [], topRated: [] } }, [], {
         generalSettings: {},
         homepageSettings: DEFAULT_HOMEPAGE_SETTINGS,
         heroSettings: DEFAULT_HERO_SETTINGS,
       }, {
         totalPdfs: 0, totalCategories: 0, totalDownloads: 0, totalViews: 0,
         avgRating: 0, thisWeekUploads: 0, thisWeekDownloads: 0,
-      }, { quizzes: [], totalQuizzes: 0, totalQuestions: 0 }, { popular: [], trending: [], recent: [], topRated: [] }]
+      }, { quizzes: [], totalQuizzes: 0, totalQuestions: 0 }]
 
+  const pdfs = pdfData.pdfs
   const { generalSettings, homepageSettings, heroSettings } = configuration
   const homepageQuizzes = quizData.quizzes
   const stats = { ...rawStats, totalCategories: categories.length }
   const featured = {
-    ...featuredResult,
+    ...pdfData.featured,
     recent: [...pdfs]
       .sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))
       .slice(0, 4),
@@ -296,32 +242,44 @@ async function HomepageDataContent({ searchParams }: { searchParams: Promise<{ q
         />
 
         {/* Continue from local study history */}
-        <RecentlyViewedSection
-          pdfs={pdfs.map(pdf => ({ id: pdf.id, title: pdf.title }))}
-          quizzes={homepageQuizzes.map(quiz => ({ id: quiz.id, title: quiz.title }))}
-        />
+        <div className="home-below-fold">
+          <RecentlyViewedSection
+            pdfs={pdfs.map(pdf => ({ id: pdf.id, title: pdf.title }))}
+            quizzes={homepageQuizzes.map(quiz => ({ id: quiz.id, title: quiz.title }))}
+          />
+        </div>
 
         {/* Start with navigation, then surface discoveries */}
-        <SubjectsSection />
+        <div className="home-below-fold">
+          <SubjectsSection />
+        </div>
 
         {/* Exam and subject structure */}
         {configured && categories.length > 0 && (
-          <CategoriesSection categories={categories} pdfsByCategory={pdfsByCategory} />
+          <div className="home-below-fold">
+            <CategoriesSection categories={categories} pdfsByCategory={pdfsByCategory} />
+          </div>
         )}
 
         {/* Practice */}
-        <QuizSection initialQuizzes={homepageQuizzes} />
+        <div className="home-below-fold">
+          <QuizSection initialQuizzes={homepageQuizzes} />
+        </div>
 
         {/* Timed preparation */}
-        <TestSeriesSection />
+        <div className="home-below-fold">
+          <TestSeriesSection />
+        </div>
 
         {/* Genuinely sorted, data-backed recent and popular resources */}
         {configured && pdfs.length > 0 && (
-          <FeaturedSection featured={featured} initialQuizzes={homepageQuizzes} />
+          <div className="home-below-fold">
+            <FeaturedSection featured={featured} initialQuizzes={homepageQuizzes} />
+          </div>
         )}
 
         {/* 6. ALL PDFs GRID */}
-        <section id="content" className="relative overflow-hidden bg-background py-16 sm:py-20 lg:py-24">
+        <section id="content" className="home-below-fold-large relative overflow-hidden bg-background py-16 sm:py-20 lg:py-24">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(49,72,120,0.07),transparent)]" />
           <div className="container mx-auto px-4 relative">
             <div className="text-center mb-10 sm:mb-14">
@@ -370,11 +328,17 @@ async function HomepageDataContent({ searchParams }: { searchParams: Promise<{ q
           </div>
         </section>
 
-        {configured && pdfs.length > 0 && <StatsSection stats={stats} />}
+        {configured && pdfs.length > 0 && (
+          <div className="home-below-fold">
+            <StatsSection stats={stats} />
+          </div>
+        )}
 
-        <TestimonialsSection />
+        <div className="home-below-fold">
+          <TestimonialsSection />
+        </div>
 
-        <section className="relative overflow-hidden bg-background py-20 sm:py-24 lg:py-32">
+        <section className="home-below-fold relative overflow-hidden bg-background py-20 sm:py-24 lg:py-32">
           {/* Sophisticated layered bg */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_120%,rgba(49,72,120,0.14),transparent)]" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_30%_at_10%_0%,rgba(183,129,48,0.09),transparent)]" />
@@ -468,7 +432,6 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ q?:
         <HomepageDataContent searchParams={searchParams} />
       </Suspense>
       <Footer />
-      <HomeAutoRefresh />
       <Chatbot />
     </div>
   )

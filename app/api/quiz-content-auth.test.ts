@@ -4,6 +4,7 @@ import { NextRequest } from "next/server"
 const state = vi.hoisted(() => ({
   user: null as { id: string } | null,
   admin: false,
+  quizFilters: [] as Array<[string, unknown]>,
 }))
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -30,7 +31,30 @@ vi.mock("@/lib/supabase/server", () => ({
 }))
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({
   from: () => {
-    const query = { select: () => query, eq: () => query, single: async () => ({ data: { id: "quiz-1", title: "Admin quiz", questions: [{ id: "q1", correct: 1, explanation: "Private key" }] }, error: null }) }
+    const query = {
+      select: () => query,
+      eq: (column: string, value: unknown) => {
+        state.quizFilters.push([column, value])
+        return query
+      },
+      in: (column: string, value: unknown) => {
+        state.quizFilters.push([column, value])
+        return query
+      },
+      single: async () => ({
+        data: {
+          id: "quiz-1",
+          title: "Authenticated quiz",
+          description: "",
+          category: "General",
+          time_limit: 600,
+          enabled: true,
+          visibility: "public",
+          questions: [{ id: "q1", question: "Protected question", options: ["A", "B"], correct: 1, explanation: "Private key" }],
+        },
+        error: null,
+      }),
+    }
     return query
   },
 }) }))
@@ -39,12 +63,14 @@ vi.mock("@/lib/notifications", () => ({ publishInAppNotification: vi.fn() }))
 
 import { GET as getQuiz } from "./quizzes/[id]/route"
 import { GET as getQuestions } from "./extract/questions/route"
+import { GET as getTestSeries } from "./extract/tests/route"
 import { GET as getQuizHtml } from "./quiz-html/route"
 
 describe("student quiz content authentication", () => {
   beforeEach(() => {
     state.user = null
     state.admin = false
+    state.quizFilters = []
   })
 
   it("returns 401 for every anonymous content endpoint, including sample tests", async () => {
@@ -73,8 +99,16 @@ describe("student quiz content authentication", () => {
     expect(studentQuiz.quiz.questions[0]).toEqual({ id: "q1", qid: "q1", question: "Protected question", options: ["A", "B"], marks: 1 })
     expect(JSON.stringify(studentQuiz)).not.toContain("correct")
     expect(JSON.stringify(studentQuiz)).not.toContain("explanation")
+    expect(state.quizFilters).toEqual([
+      ["id", "quiz-1"],
+      ["enabled", true],
+      ["visibility", ["public", "unlisted"]],
+    ])
     expect(questions.status).toBe(200)
     expect(questions.headers.get("Cache-Control")).toBe("no-store")
+    const studentQuestions = await questions.json()
+    expect(studentQuestions.questions.every((question: { correct: number; options: string[] }) =>
+      question.correct >= 1 && question.correct <= question.options.length)).toBe(true)
     expect(html.status).toBe(200)
     expect(html.headers.get("Cache-Control")).toBe("no-store")
   })
@@ -95,6 +129,18 @@ describe("student quiz content authentication", () => {
       ),
     )
 
+    expect(response.status).toBe(400)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+
+  it("rejects unapproved test-series API hosts before fetching", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+    const response = await getTestSeries(
+      new Request(
+        "https://example.test/api/extract/tests?slug=live-1&apiBase=https%3A%2F%2Flocalhost",
+      ),
+    )
     expect(response.status).toBe(400)
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()

@@ -1,51 +1,31 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { readBoundedJson, RequestBodyError } from "@/lib/ai-request-security"
 
-// Credits are stored in user_metadata — no extra table needed, works automatically.
-// Structure: { credits: number, is_premium: boolean, referral_code: string, referred_by?: string }
-
-function generateReferralCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
-}
-
-function defaultMeta(existingMeta: Record<string, unknown> = {}) {
-  return {
-    credits: 10,
-    is_premium: false,
-    referral_code: generateReferralCode(),
-    referred_by: null,
-    ...existingMeta,
-  }
+type CreditAccount = {
+  credits: number
+  is_premium: boolean
+  referral_code: string
+  referred_by?: string | null
 }
 
 export async function GET() {
   try {
     const supabase = await createClient()
-    if (!supabase) return NextResponse.json({ credits: defaultMeta() })
+    if (!supabase) return NextResponse.json({ error: "Database not configured" }, { status: 503 })
 
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    let admin
-    try {
-      admin = createAdminClient()
-    } catch {
-      // Service role key not configured — return defaults from user metadata
-      const meta = (user.user_metadata || {}) as Record<string, unknown>
-      return NextResponse.json({ credits: defaultMeta(meta) })
+    const { data, error } = await createAdminClient().rpc("get_user_credit_account", {
+      p_user_id: user.id,
+    })
+    if (error || !data) {
+      console.error("[credits] Failed to read account:", error?.message)
+      return NextResponse.json({ error: "Could not load credits" }, { status: 500 })
     }
-
-    const meta = (user.user_metadata || {}) as Record<string, unknown>
-
-    // Auto-init credits for first-time users
-    if (meta.credits === undefined || meta.referral_code === undefined) {
-      const newMeta = defaultMeta(meta)
-      await admin.auth.admin.updateUserById(user.id, { user_metadata: newMeta })
-      return NextResponse.json({ credits: newMeta })
-    }
-
-    return NextResponse.json({ credits: meta })
+    return NextResponse.json({ credits: data as CreditAccount })
   } catch {
     return NextResponse.json({ error: "Internal error" }, { status: 500 })
   }
@@ -54,55 +34,68 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    if (!supabase) return NextResponse.json({ error: "DB not configured" }, { status: 503 })
+    if (!supabase) return NextResponse.json({ error: "Database not configured" }, { status: 503 })
 
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = await request.json()
-    const action = body.action as string
+    let body: unknown
+    try {
+      body = await readBoundedJson(request, 4 * 1024)
+    } catch (error) {
+      if (error instanceof RequestBodyError) {
+        return NextResponse.json({ error: error.message }, { status: error.status })
+      }
+      throw error
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 })
+    }
+    const payload = body as Record<string, unknown>
+    const action = payload.action
     const admin = createAdminClient()
 
-    const meta = defaultMeta((user.user_metadata || {}) as Record<string, unknown>)
-
     if (action === "use") {
-      if (!meta.is_premium && (meta.credits as number) <= 0) {
-        return NextResponse.json({ error: "No credits left. Refer friends to earn more!", credits: 0 }, { status: 402 })
+      const { data, error } = await admin.rpc("spend_user_credit", { p_user_id: user.id })
+      if (error || !data) {
+        console.error("[credits] Spend failed:", error?.message)
+        return NextResponse.json({ error: "Could not use a credit" }, { status: 500 })
       }
-
-      if (!meta.is_premium) {
-        const updated = { ...meta, credits: (meta.credits as number) - 1 }
-        await admin.auth.admin.updateUserById(user.id, { user_metadata: updated })
-        return NextResponse.json({ success: true, credits: updated })
+      const result = data as CreditAccount & { status: string }
+      if (result.status === "no_credits") {
+        return NextResponse.json(
+          { error: "No credits left. Refer friends to earn more!", credits: 0 },
+          { status: 402 },
+        )
       }
-
-      return NextResponse.json({ success: true, credits: meta })
+      const { status: _status, ...credits } = result
+      return NextResponse.json({ success: true, credits })
     }
 
     if (action === "referral") {
-      const code = (body.code as string)?.trim().toUpperCase()
+      const code = typeof payload.code === "string" ? payload.code.trim().toUpperCase() : ""
       if (!code) return NextResponse.json({ error: "Code required" }, { status: 400 })
-      if (meta.referred_by) return NextResponse.json({ error: "Already used a referral code" }, { status: 400 })
-      if (meta.referral_code === code) return NextResponse.json({ error: "Cannot use your own code" }, { status: 400 })
 
-      // Find the referrer by listing all users and checking their metadata
-      const { data: { users: allUsers }, error: listErr } = await admin.auth.admin.listUsers({ perPage: 1000 })
-      if (listErr) return NextResponse.json({ error: "Could not verify code" }, { status: 500 })
-
-      const referrer = allUsers.find(u => (u.user_metadata?.referral_code as string)?.toUpperCase() === code)
-      if (!referrer) return NextResponse.json({ error: "Invalid referral code" }, { status: 404 })
-
-      // Give referrer +5 credits
-      const referrerMeta = defaultMeta((referrer.user_metadata || {}) as Record<string, unknown>)
-      await admin.auth.admin.updateUserById(referrer.id, {
-        user_metadata: { ...referrerMeta, credits: (referrerMeta.credits as number) + 5 }
+      const { data, error } = await admin.rpc("redeem_user_referral", {
+        p_user_id: user.id,
+        p_code: code,
       })
-
-      // Give current user +5 credits + mark as referred
-      const updated = { ...meta, credits: (meta.credits as number) + 5, referred_by: code }
-      await admin.auth.admin.updateUserById(user.id, { user_metadata: updated })
-
-      return NextResponse.json({ success: true, credits: updated, bonusEarned: 5 })
+      if (error || !data) {
+        console.error("[credits] Referral redemption failed:", error?.message)
+        return NextResponse.json({ error: "Could not redeem referral code" }, { status: 500 })
+      }
+      const result = data as CreditAccount & { status: string; bonusEarned?: number }
+      if (result.status === "invalid_code") {
+        return NextResponse.json({ error: "Invalid referral code" }, { status: 404 })
+      }
+      if (result.status === "own_code") {
+        return NextResponse.json({ error: "Cannot use your own code" }, { status: 400 })
+      }
+      if (result.status === "already_redeemed") {
+        return NextResponse.json({ error: "Already used a referral code" }, { status: 400 })
+      }
+      const { status: _status, bonusEarned, ...credits } = result
+      return NextResponse.json({ success: true, credits, bonusEarned: bonusEarned ?? 5 })
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 })

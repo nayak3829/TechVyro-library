@@ -39,7 +39,7 @@ describe("admin route security", () => {
     expect(body).toEqual({ error: "Unauthorized" })
   })
 
-  it("accepts only a valid shared admin token for the Telegram diagnostic", async () => {
+  it("accepts only a valid cookie admin session for the Telegram diagnostic", async () => {
     process.env.ADMIN_PASSWORD = "test-password"
     const token = createAdminToken("test-password")
 
@@ -50,7 +50,7 @@ describe("admin route security", () => {
     delete process.env.TELEGRAM_TOKEN
     delete process.env.BOT_TOKEN
     const response = await telegramTest(new Request("https://example.test/api/admin/test-telegram", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { cookie: `admin_session=${token}` },
     }))
 
     expect(response.status).not.toBe(401)

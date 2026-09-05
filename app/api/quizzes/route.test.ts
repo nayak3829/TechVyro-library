@@ -34,6 +34,26 @@ vi.mock("@/lib/quiz-cache", () => ({
     shuffle_questions: false,
     shuffle_options: false,
   }],
+  getPublicQuizList: async () => [{
+    id: "quiz-1",
+    title: "Test",
+    description: "",
+    category: "General",
+    section: "General",
+    difficulty: "medium",
+    time_limit: 600,
+    enabled: true,
+    visibility: "public",
+    created_at: "2026-09-03T00:00:00Z",
+    tags: ["exam"],
+    hasContent: true,
+    question_count: 1,
+    structure_location: null,
+    negative_marking: 0,
+    passing_percentage: 0,
+    shuffle_questions: false,
+    shuffle_options: false,
+  }],
   invalidateQuizCache: vi.fn(),
 }))
 
@@ -62,11 +82,15 @@ describe("quiz list visibility", () => {
     expect(body.quizzes[0].tags).toEqual(["exam"])
   })
 
-  it("strips answers and explanations from the public quiz list", async () => {
+  it("returns only metadata and no question or answer-key content publicly", async () => {
     const response = await GET(new Request("https://example.test/api/quizzes"))
     const body = await response.json()
 
     expect(response.headers.get("Cache-Control")).toBe("private, no-store")
-    expect(body.quizzes[0].questions).toEqual([{ id: "question-1" }])
+    const serialized = JSON.stringify(body)
+    expect(body.quizzes[0].question_count).toBe(1)
+    expect(body.quizzes[0]).not.toHaveProperty("questions")
+    expect(serialized).not.toContain("correct")
+    expect(serialized).not.toContain("explanation")
   })
 })

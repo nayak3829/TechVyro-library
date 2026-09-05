@@ -17,8 +17,7 @@ import { toast } from "sonner"
 import { escapeCsvCell } from "@/lib/csv-export"
 
 function adminHeaders() {
-  const token = typeof window !== "undefined" ? sessionStorage.getItem("admin_token") : ""
-  return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
+  return { "Content-Type": "application/json" }
 }
 
 interface HealthStats {

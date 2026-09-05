@@ -107,7 +107,7 @@ export function CategoriesSection({ categories: initialCategories, pdfsByCategor
             Find PDFs organized by subjects for easier navigation
           </p>
           {lastUpdated && (
-            <p className="text-[10px] text-muted-foreground/50 mt-2">
+            <p className="text-[10px] text-muted-foreground mt-2">
               Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </p>
           )}
@@ -131,8 +131,9 @@ export function CategoriesSection({ categories: initialCategories, pdfsByCategor
                 <Card key={folder.id} className="border-border/50 overflow-hidden hover:shadow-lg transition-all">
                   <Collapsible open={isExpanded} onOpenChange={() => toggleFolder(folder.id)}>
                     <CollapsibleTrigger asChild>
-                      <div
-                        className="flex min-w-0 items-center justify-between gap-3 p-4 sm:p-5 cursor-pointer hover:bg-muted/30 transition-colors"
+                      <button
+                        type="button"
+                        className="flex w-full min-w-0 items-center justify-between gap-3 p-4 text-left sm:p-5 cursor-pointer hover:bg-muted/30 transition-colors"
                         style={{ borderLeft: `4px solid ${folder.color}` }}
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
@@ -154,12 +155,12 @@ export function CategoriesSection({ categories: initialCategories, pdfsByCategor
                         </div>
                         <Badge 
                           variant="secondary" 
-                          className="hidden sm:flex"
-                          style={{ backgroundColor: folder.color + '20', color: folder.color }}
+                          style={{ backgroundColor: folder.color + '20', borderColor: folder.color + '60' }}
+                          className="hidden text-foreground sm:flex"
                         >
                           {enabledCategories.length} Categories
                         </Badge>
-                      </div>
+                      </button>
                     </CollapsibleTrigger>
 
                     <CollapsibleContent>
@@ -180,7 +181,7 @@ export function CategoriesSection({ categories: initialCategories, pdfsByCategor
                                 style={{ borderColor: category.color + '40' }}
                               >
                                 <CollapsibleTrigger asChild>
-                                  <div className="flex min-w-0 items-center justify-between gap-2 p-3 sm:p-4 cursor-pointer hover:bg-muted/30 transition-colors">
+                                  <button type="button" className="flex w-full min-w-0 items-center justify-between gap-2 p-3 text-left sm:p-4 cursor-pointer hover:bg-muted/30 transition-colors">
                                     <div className="flex min-w-0 flex-1 items-center gap-3">
                                       <div 
                                         className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center"
@@ -201,7 +202,7 @@ export function CategoriesSection({ categories: initialCategories, pdfsByCategor
                                     <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs">
                                       {enabledSections.reduce((acc, s) => acc + (Number.isFinite(Number(s.pdfCount)) ? Number(s.pdfCount) : 0), 0)} PDFs
                                     </Badge>
-                                  </div>
+                                  </button>
                                 </CollapsibleTrigger>
 
                                 <CollapsibleContent>

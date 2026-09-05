@@ -1,33 +1,15 @@
 import { NextResponse } from "next/server"
 import type { SampleSeries } from "@/lib/sample-tests"
+import {
+  fetchWithTimeout as fetchTrustedQuizApi,
+  readLimitedText,
+  validatePublicHttpsUrl,
+} from "@/lib/quiz-remote-fetch"
 
 // Lazy load sample tests only when needed (saves ~215KB from initial bundle)
 async function getSampleSeries(): Promise<SampleSeries[]> {
   const { SAMPLE_SERIES } = await import("@/lib/sample-tests")
   return SAMPLE_SERIES
-}
-
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 15000) {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal })
-    clearTimeout(id)
-    return res
-  } catch (e) {
-    clearTimeout(id)
-    throw e
-  }
-}
-
-function extractNextData(html: string): Record<string, unknown> | null {
-  try {
-    const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([^<]+)<\/script>/)
-    if (!match) return null
-    return JSON.parse(match[1])
-  } catch {
-    return null
-  }
 }
 
 // Clean subject/folder names to remove platform identifiers
@@ -47,15 +29,15 @@ function cleanSubjectName(name: string): string {
 
 // Clean and normalize test data
 function cleanTestData(tests: unknown[]): unknown[] {
-  return tests.map((t, idx) => {
+  return tests.slice(0, 500).map((t, idx) => {
     const test = t as Record<string, unknown>
     return {
-      id: test.id || test.slug || `test-${idx}`,
-      title: cleanSubjectName(String(test.title || test.name || `Test ${idx + 1}`)),
-      slug: test.slug || String(test.id || idx),
-      duration: test.duration || test.time || 60,
-      total_questions: test.total_questions || test.question_count || test.totalQuestions || 25,
-      total_marks: test.total_marks || test.marks || 100,
+      id: String(test.id ?? test.slug ?? `test-${idx}`).slice(0, 200),
+      title: cleanSubjectName(String(test.title ?? test.name ?? `Test ${idx + 1}`)).slice(0, 300),
+      slug: String(test.slug ?? test.id ?? idx).slice(0, 200),
+      duration: test.duration ?? test.time ?? 60,
+      total_questions: test.total_questions ?? test.question_count ?? test.totalQuestions ?? 25,
+      total_marks: test.total_marks ?? test.marks ?? 100,
       is_free: test.is_free ?? true,
     }
   })
@@ -63,12 +45,12 @@ function cleanTestData(tests: unknown[]): unknown[] {
 
 // Clean subjects data
 function cleanSubjectsData(subjects: unknown[]): unknown[] {
-  return subjects.map((s, idx) => {
+  return subjects.slice(0, 100).map((s, idx) => {
     const subj = s as Record<string, unknown>
     const tests = subj.tests ? cleanTestData(subj.tests as unknown[]) : []
     return {
       id: subj.id || `subject-${idx}`,
-      name: cleanSubjectName(String(subj.name || subj.title || `Subject ${idx + 1}`)),
+      name: cleanSubjectName(String(subj.name ?? subj.title ?? `Subject ${idx + 1}`)).slice(0, 200),
       tests,
     }
   })
@@ -82,6 +64,9 @@ export async function GET(request: Request) {
 
   if (!slug || !apiBase) {
     return NextResponse.json({ error: "slug and apiBase required" }, { status: 400 })
+  }
+  if (slug.length > 200 || /[\u0000-\u001f]/.test(slug)) {
+    return NextResponse.json({ error: "Invalid series identifier" }, { status: 400 })
   }
 
   // Handle sample series (lazy loaded)
@@ -105,65 +90,51 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Sample series not found" }, { status: 404 })
   }
 
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    Accept: "application/json, text/html, */*",
+  let safeApiBase: string
+  try {
+    safeApiBase = (await validatePublicHttpsUrl(apiBase)).toString().replace(/\/$/, "")
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid API URL" },
+      { status: 400 },
+    )
   }
+  const safeSlug = encodeURIComponent(slug)
 
   // Try API endpoints
   const apiEndpoints = [
-    `${apiBase}/api/v1/test-series/${slug}/?format=json`,
-    `${apiBase}/api/v1/test-series/${slug}/`,
-    `${apiBase}/api/v2/test-series/${slug}/?format=json`,
-    `${webBase}/api/v1/test-series/${slug}/?format=json`,
+    `${safeApiBase}/api/v1/test-series/${safeSlug}/?format=json`,
+    `${safeApiBase}/api/v1/test-series/${safeSlug}/`,
+    `${safeApiBase}/api/v2/test-series/${safeSlug}/?format=json`,
   ]
 
-  for (const endpoint of apiEndpoints) {
+  const tryApiEndpoint = async (endpoint: string) => {
     try {
-      const res = await fetchWithTimeout(endpoint, { headers }, 10000)
+      const res = await fetchTrustedQuizApi(endpoint, 10000)
       if (res.ok) {
-        const json = await res.json()
+        const contentType = res.headers.get("content-type")?.toLowerCase() || ""
+        if (!contentType.includes("application/json")) {
+          await res.body?.cancel()
+          return null
+        }
+        const json = JSON.parse(await readLimitedText(res))
         const subjects = cleanSubjectsData(findSubjects(json))
         const tests = cleanTestData(findTests(json))
         if (subjects.length > 0 || tests.length > 0) {
-          return NextResponse.json({ success: true, subjects, tests, source: "api" })
+          return { subjects, tests }
         }
       }
-    } catch {}
+    } catch {
+      // Another endpoint may still provide the series.
+    }
+    return null
   }
 
-  // Fallback: scrape __NEXT_DATA__ when a web URL was provided
-  if (webBase) {
-    const webBaseUrl = webBase
-    try {
-      const url = `${webBaseUrl.replace(/\/$/, "")}/test-series/${slug}/`
-      const res = await fetchWithTimeout(url, { headers }, 15000)
-      if (res.ok) {
-        const html = await res.text()
-        const nextData = extractNextData(html)
-        if (nextData) {
-          const props = (nextData as Record<string, unknown>)?.props
-          const pageProps = (props as Record<string, unknown>)?.pageProps as Record<string, unknown>
-          const rawSubjects: unknown[] = (pageProps?.subjects as unknown[]) || []
-          const testsObj = pageProps?.tests || {}
-
-          const flatTests: unknown[] = []
-          if (typeof testsObj === "object" && testsObj !== null) {
-            for (const arr of Object.values(testsObj)) {
-              if (Array.isArray(arr)) flatTests.push(...arr)
-            }
-          }
-
-          return NextResponse.json({
-            success: true,
-            subjects: cleanSubjectsData(rawSubjects),
-            tests: cleanTestData(flatTests),
-            testSeries: pageProps?.testSeries,
-            source: "scrape",
-          })
-        }
-      }
-    } catch {}
+  const apiResults = await Promise.all(apiEndpoints.slice(0, 2).map(tryApiEndpoint))
+  if (!apiResults.some(Boolean)) apiResults.push(await tryApiEndpoint(apiEndpoints[2]))
+  const apiResult = apiResults.find(result => result !== null)
+  if (apiResult) {
+    return NextResponse.json({ success: true, ...apiResult, source: "api" })
   }
 
   // Fallback: return sample tests for the category detected from slug/URL (lazy loaded)

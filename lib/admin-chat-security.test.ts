@@ -4,6 +4,8 @@ import {
   ADMIN_CHAT_IDLE_TIMEOUT_MS,
   checkAdminChatRateLimit,
   clearAdminChatRateLimitsForTests,
+  createAdminChatSessionCookieValue,
+  getAdminChatSessionId,
   getAdminChatSessionState,
 } from "./admin-chat-security"
 
@@ -11,11 +13,13 @@ describe("admin chat abuse and expiry controls", () => {
   const redisEnvironment = {
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
+    sessionSecret: process.env.SESSION_SECRET,
   }
 
   beforeAll(() => {
     delete process.env.KV_REST_API_URL
     delete process.env.KV_REST_API_TOKEN
+    process.env.SESSION_SECRET = "admin-chat-security-test-secret"
   })
 
   afterAll(() => {
@@ -23,9 +27,23 @@ describe("admin chat abuse and expiry controls", () => {
     else process.env.KV_REST_API_URL = redisEnvironment.url
     if (redisEnvironment.token === undefined) delete process.env.KV_REST_API_TOKEN
     else process.env.KV_REST_API_TOKEN = redisEnvironment.token
+    if (redisEnvironment.sessionSecret === undefined) delete process.env.SESSION_SECRET
+    else process.env.SESSION_SECRET = redisEnvironment.sessionSecret
   })
 
   beforeEach(() => clearAdminChatRateLimitsForTests())
+
+  it("authenticates only the UUID covered by the session signature", () => {
+    const sessionId = "8f44eb32-397c-4ff2-8ba0-c2d8d4a06122"
+    const otherId = "f02ac495-c9b2-4278-8c56-9b59ee98cd7f"
+    const signed = createAdminChatSessionCookieValue(sessionId)
+    expect(getAdminChatSessionId(new Request("https://techvyro.example/api/admin-chat/poll", {
+      headers: { cookie: `admin_chat_session=${signed}` },
+    }))).toBe(sessionId)
+    expect(getAdminChatSessionId(new Request("https://techvyro.example/api/admin-chat/poll", {
+      headers: { cookie: `admin_chat_session=${otherId}.${signed.split(".")[1]}` },
+    }))).toBeNull()
+  })
 
   it("enforces both idle and non-renewable absolute expiry", () => {
     const now = Date.now()

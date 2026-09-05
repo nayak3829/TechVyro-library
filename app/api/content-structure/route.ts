@@ -28,22 +28,18 @@ export async function GET() {
     const folders: FolderNode[] = (setting?.value as FolderNode[]) ?? []
 
     // ── 2. Fetch public enabled quizzes (light) ──────────────────────
-    const { data: quizRows, error: quizError } = await supabase
+    const { data: quizRows, error: quizError } = await adminSupabase
       .from("quizzes")
-      .select("id, structure_location, category, questions, visibility")
+      .select("id,structure_location,category")
       .eq("enabled", true)
       .eq("visibility", "public")
+      .gt("question_count", 0)
     if (quizError) {
       console.error("[content-structure] quizzes query failed:", quizError.message)
       return NextResponse.json({ error: "Failed to fetch content structure" }, { status: 500 })
     }
 
-    const quizzes = (quizRows || []).filter(
-      (q) => Array.isArray(q.questions) && q.questions.some(
-        (question) => question && typeof question === "object" && typeof (question as { question?: unknown }).question === "string" &&
-          Boolean((question as { question: string }).question.trim())
-      )
-    )
+    const quizzes = quizRows || []
 
     // ── 3. Fetch PDFs + their old category names ─────────────────────
     const { data: pdfRows, error: pdfError } = await applyPublicPdfVisibility(supabase

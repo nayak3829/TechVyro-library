@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { getRecentDownloadCount } from "@/lib/analytics-events"
 import { applyPublicPdfVisibility } from "@/lib/pdf-access"
 import { getPublicPdfStats } from "@/lib/public-pdf-stats"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -13,6 +14,7 @@ export async function GET() {
     if (!supabase) {
       return NextResponse.json({ error: "Database not configured" }, { status: 503 })
     }
+    const adminSupabase = createAdminClient()
 
     const publicPdfQuery = (order: "created_at" | "download_count") => applyPublicPdfVisibility(supabase
         .from("pdfs")
@@ -24,7 +26,8 @@ export async function GET() {
       publicPdfQuery("created_at"),
       publicPdfQuery("download_count"),
       supabase.from("categories").select("id", { count: "exact", head: true }),
-      supabase.from("quizzes").select("id", { count: "exact", head: true }),
+      adminSupabase.from("quizzes").select("id", { count: "exact", head: true })
+        .eq("enabled", true).eq("visibility", "public").gt("question_count", 0),
       getRecentDownloadCount(7),
     ])
 

@@ -1,16 +1,6 @@
-"use client"
-
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import { ArrowRight, BookOpen, FileText, ListChecks, Search, Timer, Layers } from "lucide-react"
 import type { HeroSettings } from "@/lib/homepage-settings"
-
-const HEADLINES = [
-  "Welcome to TechVyro Library",
-  "Your exam desk, already organized.",
-  "Free PDFs, quizzes, and mock tests — all in one place.",
-  "Prepare smarter. Score higher.",
-] as const
 
 interface HeroSectionProps {
   settings: HeroSettings
@@ -28,50 +18,19 @@ function relativeDate(value: string) {
 }
 
 export function HeroSection({ settings, totalPdfs, totalQuizzes, totalQuestions, recentPdfs }: HeroSectionProps) {
-  const [headlineIndex, setHeadlineIndex] = useState(0)
-  const [headlineVisible, setHeadlineVisible] = useState(true)
-
-  useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
-    if (reducedMotion.matches) return
-
-    let fadeTimer: ReturnType<typeof setTimeout> | undefined
-    const rotationTimer = window.setInterval(() => {
-      setHeadlineVisible(false)
-      fadeTimer = setTimeout(() => {
-        setHeadlineIndex(current => (current + 1) % HEADLINES.length)
-        setHeadlineVisible(true)
-      }, 400)
-    }, 3200)
-
-    return () => {
-      window.clearInterval(rotationTimer)
-      if (fadeTimer) clearTimeout(fadeTimer)
-    }
-  }, [])
-
   return (
     <section className="relative overflow-hidden border-b border-border/70 bg-background">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_80%_at_90%_0%,rgba(49,72,120,0.15),transparent_62%),radial-gradient(ellipse_45%_70%_at_4%_100%,rgba(183,129,48,0.12),transparent_65%)]" />
       <div className="absolute inset-0 opacity-[0.55] bg-[linear-gradient(rgba(43,61,103,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(43,61,103,0.04)_1px,transparent_1px)] bg-[size:42px_42px]" />
       <div className="container relative mx-auto px-4 py-12 sm:py-16 lg:py-22">
         <div className="grid items-center gap-10 lg:grid-cols-[1.06fr_.94fr] lg:gap-16">
-          <div className="max-w-3xl desk-enter">
+          <div className="max-w-3xl">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-card/85 px-3.5 py-2 text-[11px] font-extrabold uppercase tracking-[0.13em] text-primary shadow-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               {settings.badgeText}
             </div>
             <h1 className="study-display relative max-w-2xl text-5xl font-bold leading-[.97] tracking-[-0.055em] text-foreground sm:text-6xl lg:text-7xl">
-              <span aria-hidden="true" className="invisible block">
-                {HEADLINES[2]}
-              </span>
-              <span
-                className={`absolute inset-0 block transition-opacity duration-[400ms] ${
-                  headlineVisible ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                {HEADLINES[headlineIndex]}
-              </span>
+              Welcome to TechVyro Library
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">{settings.description}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">

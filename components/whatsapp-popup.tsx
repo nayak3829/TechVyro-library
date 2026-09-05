@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { X, Bell, Users, Zap, Gift } from 'lucide-react';
 import { getPublicGeneralSettings } from '@/lib/general-settings-client';
 
 const DEFAULT_URL = 'https://whatsapp.com/channel/0029Vadk2XHLSmbX3oEVmX37';
 
 export function WhatsAppPopup() {
+  const pathname = usePathname();
+  const isAdminRoute = pathname.startsWith('/admin');
   const [isOpen, setIsOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -16,6 +19,7 @@ export function WhatsAppPopup() {
 
   useEffect(() => {
     setMounted(true);
+    if (isAdminRoute) return;
     getPublicGeneralSettings()
       .then(settings => {
         if (typeof settings.whatsappChannelUrl === 'string') setWhatsappUrl(settings.whatsappChannelUrl);
@@ -23,10 +27,10 @@ export function WhatsAppPopup() {
       })
       .catch(() => {})
       .finally(() => setSettingsResolved(true));
-  }, []);
+  }, [isAdminRoute]);
 
   useEffect(() => {
-    if (!mounted || !settingsResolved || !popupEnabled) return;
+    if (!mounted || isAdminRoute || !settingsResolved || !popupEnabled) return;
 
     let alreadyShown: string | null = null;
     try {
@@ -47,7 +51,13 @@ export function WhatsAppPopup() {
     }, 30000);
 
     return () => clearTimeout(timer);
-  }, [mounted, settingsResolved, popupEnabled]);
+  }, [isAdminRoute, mounted, settingsResolved, popupEnabled]);
+
+  useEffect(() => {
+    if (!isAdminRoute) return;
+    setIsOpen(false);
+    setIsVisible(false);
+  }, [isAdminRoute]);
 
   const handleClose = useCallback(() => {
     setIsVisible(false);
@@ -70,7 +80,7 @@ export function WhatsAppPopup() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleClose]);
 
-  if (!mounted || !isOpen || !popupEnabled) return null;
+  if (!mounted || isAdminRoute || !isOpen || !popupEnabled) return null;
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
@@ -119,7 +129,7 @@ export function WhatsAppPopup() {
             </button>
 
             <div className="flex justify-center mb-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] text-xs font-medium">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/30 text-[#087a3e] dark:text-green-300 text-xs font-medium">
                 <Bell className="w-3 h-3" />
                 Official Channel
               </span>
@@ -138,7 +148,7 @@ export function WhatsAppPopup() {
               <span className="text-white">Vyro</span>
             </h2>
 
-            <p className="text-[#25D366] text-center text-sm font-medium mb-3">
+            <p className="text-[#087a3e] dark:text-green-300 text-center text-sm font-medium mb-3">
               WhatsApp Channel
             </p>
 
@@ -154,7 +164,7 @@ export function WhatsAppPopup() {
               ].map((item, i) => (
                 <div key={i} className="flex flex-col items-center gap-1 bg-white/5 rounded-lg p-2 border border-white/10">
                   <div className="h-6 w-6 rounded-full bg-[#25D366]/20 flex items-center justify-center">
-                    <item.icon className="w-3 h-3 text-[#25D366]" />
+                    <item.icon className="w-3 h-3 text-[#087a3e] dark:text-green-300" />
                   </div>
                   <span className="text-[10px] text-gray-400">{item.label}</span>
                 </div>
@@ -163,7 +173,7 @@ export function WhatsAppPopup() {
 
             <button
               onClick={handleJoin}
-              className="w-full py-3 px-4 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-[#25D366]/20 hover:-translate-y-0.5 active:translate-y-0"
+              className="w-full py-3 px-4 bg-gradient-to-r from-[#087a3e] to-[#066b60] text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-[#25D366]/20 hover:-translate-y-0.5 active:translate-y-0"
             >
               Join Channel Now
             </button>

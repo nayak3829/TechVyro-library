@@ -21,3 +21,6 @@
 - [Personal PDF library integrity](personal-pdf-library-integrity.md) — derive ownership on the server, hide non-public PDFs, and record downloads only after successful file generation.
 - [Next build isolation](next-build-isolation.md) — never run a production build beside an active Next dev process in the same `.next` directory.
 - [Homepage payload budget](homepage-payload-budget.md) — send bounded card projections and real counts; defer below-fold API work instead of serializing full datasets.
+- [Sensitive JSON column isolation](sensitive-json-column-isolation.md) — row-level policies cannot hide answer keys nested inside an otherwise readable JSON column.
+- [Cookie capability origin checks](cookie-capability-origin-checks.md) — SameSite cookies do not replace explicit origin checks on privileged or participant-bound endpoints.
+- [Lighthouse metadata verification](lighthouse-metadata-verification.md) — confirm App Router metadata in HTML and the runtime DOM before trusting a Lighthouse 13 absence report.

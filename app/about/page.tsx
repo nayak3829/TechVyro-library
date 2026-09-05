@@ -3,6 +3,7 @@ import { Footer } from "@/components/footer"
 import { BookOpen, Users, Shield, Zap, Mail, Globe, MessageCircle, Star } from "lucide-react"
 import Link from "next/link"
 import { TestimonialCarousel } from "@/components/ui/testimonial-carousel"
+import type { Metadata } from "next"
 
 const TESTIMONIAL_DATA = [
   {
@@ -39,9 +40,23 @@ const TESTIMONIAL_DATA = [
   },
 ]
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "About Us - TechVyro PDF Library",
   description: "Learn about TechVyro — your free educational PDF platform for students.",
+  alternates: { canonical: "/about" },
+  openGraph: {
+    title: "About TechVyro PDF Library",
+    description: "Learn about TechVyro — your free educational PDF platform for students.",
+    url: "/about",
+    type: "website",
+    images: ["/og-image.jpg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About TechVyro PDF Library",
+    description: "Learn about TechVyro — your free educational PDF platform for students.",
+    images: ["/og-image.jpg"],
+  },
 }
 
 export default function AboutPage() {

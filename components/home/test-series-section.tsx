@@ -210,11 +210,10 @@ export function TestSeriesSection() {
               <Link
                 key={cat.id}
                 href={`/test-series?category=${cat.id}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all hover:shadow-sm shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-foreground border transition-all hover:shadow-sm shrink-0"
                 style={{ 
                   backgroundColor: `${cat.color}10`, 
                   borderColor: `${cat.color}30`,
-                  color: cat.color 
                 }}
               >
                 <Icon className="h-3 w-3" />
@@ -271,9 +270,9 @@ export function TestSeriesSection() {
                         <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color }} />
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        <Badge 
-                          className="text-[9px] sm:text-[10px] text-white py-0.5 px-1.5"
-                          style={{ backgroundColor: color }}
+                        <Badge
+                          className="border-border bg-slate-900 px-1.5 py-0.5 text-[9px] text-white dark:bg-slate-100 dark:text-slate-950 sm:text-[10px]"
+                          style={{ borderLeftColor: color, borderLeftWidth: "3px" }}
                         >
                           {series.category?.toUpperCase() || "GENERAL"}
                         </Badge>

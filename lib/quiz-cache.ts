@@ -21,6 +21,10 @@ export interface QuizListItem {
   shuffle_options: boolean
 }
 
+export type PublicQuizListItem = Omit<QuizListItem, "questions"> & {
+  question_count: number
+}
+
 let _cache: { data: QuizListItem[]; at: number } | null = null
 let _pending: Promise<QuizListItem[]> | null = null
 const CACHE_TTL = 60_000
@@ -88,6 +92,43 @@ export async function getQuizList(options: { bypassCache?: boolean } = {}): Prom
 
   if (bypassCache) return _pending
   return _pending
+}
+
+export async function getPublicQuizList(): Promise<PublicQuizListItem[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from("quizzes")
+    .select("id,title,description,category,section,difficulty,time_limit,enabled,visibility,created_at,tags,structure_location,negative_marking,passing_percentage,shuffle_questions,shuffle_options,question_count")
+    .eq("enabled", true)
+    .eq("visibility", "public")
+    .gt("question_count", 0)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[quiz-cache] public metadata query failed:", error)
+    throw new Error("Failed to load quizzes")
+  }
+
+  return (data || []).map(quiz => ({
+    id: quiz.id,
+    title: quiz.title,
+    description: quiz.description,
+    category: quiz.category || "General",
+    section: quiz.section || "General",
+    difficulty: quiz.difficulty || "medium",
+    time_limit: quiz.time_limit,
+    enabled: quiz.enabled,
+    visibility: "public",
+    created_at: quiz.created_at,
+    tags: Array.isArray(quiz.tags) ? quiz.tags.filter((tag: unknown): tag is string => typeof tag === "string") : [],
+    hasContent: quiz.question_count > 0,
+    question_count: Math.max(0, Number(quiz.question_count) || 0),
+    structure_location: quiz.structure_location ?? null,
+    negative_marking: Number(quiz.negative_marking) || 0,
+    passing_percentage: Number(quiz.passing_percentage) || 0,
+    shuffle_questions: quiz.shuffle_questions === true,
+    shuffle_options: quiz.shuffle_options === true,
+  }))
 }
 
 export function invalidateQuizCache() {

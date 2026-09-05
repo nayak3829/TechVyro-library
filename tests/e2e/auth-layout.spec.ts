@@ -72,36 +72,14 @@ test("invalid reset link fits and exposes its recovery action", async ({ page })
   await expectKeyboardReachable(page, primary)
 })
 
-test("auth modal states fit and keep their primary actions accessible", async ({ page }) => {
+test("protected test play redirects to an accessible login page", async ({ page }) => {
   await page.goto(
     "/test-series/play?testId=layout-check&apiBase=remote:test&title=Layout%20Check&duration=60",
   )
-  await page.getByRole("button", { name: /Start Test Now/i }).click()
-
-  const dialog = page.getByRole("dialog")
-  await expect(dialog).toHaveAccessibleName(/Welcome Back/i)
-
-  const states = [
-    { primary: /Login$/i },
-    {
-      switcher: page.getByRole("button", { name: /Sign up free/i }),
-      primary: /Create Account/i,
-    },
-    {
-      switcher: page.getByRole("button", { name: /Login/i }).last(),
-      primary: /Login$/i,
-    },
-    {
-      switcher: page.getByRole("button", { name: /Forgot password/i }),
-      primary: /Send Reset Link/i,
-    },
-  ]
-
-  for (const state of states) {
-    if (state.switcher) await state.switcher.click()
-    const primary = dialog.locator("button[type=submit]")
-    await expect(primary).toHaveAccessibleName(state.primary)
-    await expectNoHorizontalOverflow(page, dialog)
-    await expectKeyboardReachable(page, primary)
-  }
+  await expect(page).toHaveURL(/\/login\?redirect=/)
+  const card = page.locator(".auth-card")
+  const primary = page.getByRole("button", { name: /Login to TechVyro/i })
+  await expect(card).toBeVisible()
+  await expectNoHorizontalOverflow(page, card)
+  await expectKeyboardReachable(page, primary)
 })

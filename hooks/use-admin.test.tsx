@@ -3,12 +3,11 @@ import { renderHook, waitFor } from "@testing-library/react"
 import { useAdmin } from "@/hooks/use-admin"
 
 afterEach(() => {
-  sessionStorage.clear()
   vi.unstubAllGlobals()
 })
 
 describe("useAdmin", () => {
-  it("checks the server session when no JavaScript-visible token exists", async () => {
+  it("checks only the cookie-backed server session", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ valid: true }), {
         headers: { "Content-Type": "application/json" },
@@ -23,7 +22,9 @@ describe("useAdmin", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/admin/verify", expect.objectContaining({
       method: "POST",
       credentials: "include",
-      body: undefined,
     }))
+    const request = fetchMock.mock.calls[0][1]
+    expect(request).not.toHaveProperty("body")
+    expect(request).not.toHaveProperty("headers")
   })
 })

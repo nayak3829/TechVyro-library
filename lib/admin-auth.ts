@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto"
 import { Redis } from "@upstash/redis"
+import { isRequestOriginAllowed } from "@/lib/request-origin"
 
 export const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 export const ADMIN_SESSION_COOKIE = "admin_session"
@@ -180,11 +181,7 @@ export function getClientIp(request: Request): string {
 }
 
 export function extractToken(request: Request): string | null {
-  const authorization = request.headers.get("Authorization")
-  if (authorization?.startsWith("Bearer ")) {
-    const token = authorization.slice("Bearer ".length).trim()
-    if (token) return token
-  }
+  if (!isRequestOriginAllowed(request)) return null
 
   const cookieHeader = request.headers.get("cookie")
   if (!cookieHeader) return null

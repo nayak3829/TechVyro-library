@@ -6,21 +6,32 @@ import {
   escapeTelegramHtml,
   getBoundedText,
   getTelegramSessionCallbackData,
-  isAdminChatSessionId,
 } from "@/lib/admin-chat-validation"
 import {
   checkAdminChatRateLimit,
+  getAdminChatSessionId,
   getAdminChatSessionState,
+  isAdminChatSessionSecurityConfigured,
   rateLimitedResponse,
 } from "@/lib/admin-chat-security"
+import { isRequestOriginAllowed } from "@/lib/request-origin"
 
 export async function POST(req: Request) {
   try {
+    if (!isRequestOriginAllowed(req)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    if (!isAdminChatSessionSecurityConfigured()) {
+      return NextResponse.json({ error: "Admin chat session security is not configured" }, { status: 500 })
+    }
+    const sessionId = getAdminChatSessionId(req)
+    if (!sessionId) {
+      return NextResponse.json({ error: "Invalid or missing chat session" }, { status: 401 })
+    }
     const body = await req.json().catch(() => null)
-    const sessionId = body?.sessionId
     const message = getBoundedText(body?.message, ADMIN_CHAT_MESSAGE_MAX_LENGTH)
-    if (!isAdminChatSessionId(sessionId) || !message) {
-      return NextResponse.json({ error: "A valid sessionId and a message of 2,000 characters or fewer are required" }, { status: 400 })
+    if (!message) {
+      return NextResponse.json({ error: "A message of 2,000 characters or fewer is required" }, { status: 400 })
     }
     if (!isAdminConfigured()) {
       return NextResponse.json({ error: "Not configured" }, { status: 500 })

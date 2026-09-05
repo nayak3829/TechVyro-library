@@ -1,15 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { NextRequest } from "next/server"
 import platformsData from "@/lib/appx-platforms.json"
 
 vi.mock("dns/promises", () => {
   const lookup = vi.fn(async () => [{ address: "203.0.113.10", family: 4 }])
   return { default: { lookup }, lookup }
 })
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({
+    auth: { getUser: async () => ({ data: { user: { id: "student-1" } }, error: null }) },
+  }),
+}))
 
 import {
   fetchWithTimeout,
   isTrustedQuizApiHostname,
 } from "@/lib/quiz-remote-fetch"
+import { GET } from "./route"
 
 describe("quiz HTML remote API restrictions", () => {
   afterEach(() => {
@@ -68,5 +75,33 @@ describe("quiz HTML remote API restrictions", () => {
       expect.any(URL),
       expect.objectContaining({ redirect: "manual" })
     )
+  })
+
+  it("preserves sparse option identity when the answer is an option ID", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        data: [{
+          id: "question-1",
+          question: "Which option is correct?",
+          options: [
+            { id: "option-a", text: "Alpha" },
+            { id: "option-b", text: "" },
+            { id: "option-c", text: "Charlie" },
+          ],
+          answer: "option-c",
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    )
+
+    const query = new URLSearchParams({
+      apiBase: "https://parmaracademyapi.classx.co.in",
+      testId: "test-1",
+    })
+    const response = await GET(new NextRequest(`https://example.test/api/quiz-html?${query}`))
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(html).toContain('"correct_option":"3"')
+    expect(html).toContain('"option_3":"Charlie"')
   })
 })

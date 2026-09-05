@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server"
-import {
-  ADMIN_SESSION_COOKIE,
-  extractToken,
-  verifyAdminToken,
-} from "@/lib/admin-auth"
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth"
+import { isRequestOriginAllowed } from "@/lib/request-origin"
 
 export async function POST(request: Request) {
-  if (!verifyAdminToken(extractToken(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!isRequestOriginAllowed(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
   const response = NextResponse.json({ success: true })

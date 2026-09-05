@@ -43,7 +43,7 @@ interface PDF {
 interface Quiz {
   id: string; title: string; description: string; category: string
   section?: string; tags?: string[]
-  difficulty: string; time_limit: number; questions: { id: string }[]
+  difficulty: string; time_limit: number; question_count: number
   enabled: boolean; created_at: string; url_slug?: string
   structure_location: { folderId: string; categoryId: string; sectionId: string } | null
 }
@@ -615,7 +615,7 @@ export default function SubjectPage() {
                                      <span className="text-[11px] text-muted-foreground">{quiz.section}</span>
                                    )}
                                   <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
-                                    <ListChecks className="h-3 w-3" />{quiz.questions.length} Qs
+                                     <ListChecks className="h-3 w-3" />{quiz.question_count} Qs
                                   </span>
                                   {quiz.time_limit > 0 && (
                                     <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">

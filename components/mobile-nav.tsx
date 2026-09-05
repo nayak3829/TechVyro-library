@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, BookOpen, Zap, User, FileCheck, Upload } from "lucide-react"
@@ -18,7 +18,7 @@ const navItems = [
 export function MobileNav() {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
+  const lastScrollY = useRef(0)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -32,13 +32,16 @@ export function MobileNav() {
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY
-          const diff = currentScrollY - lastScrollY
-          if (diff > 10 && currentScrollY > 80) {
+          const diff = currentScrollY - lastScrollY.current
+          const atBottom = currentScrollY + window.innerHeight >= document.documentElement.scrollHeight - 24
+          if (atBottom || currentScrollY <= 80) {
+            setIsVisible(true)
+          } else if (diff > 10) {
             setIsVisible(false)
           } else if (diff < -5) {
             setIsVisible(true)
           }
-          setLastScrollY(currentScrollY)
+          lastScrollY.current = currentScrollY
           ticking = false
         })
         ticking = true
@@ -46,7 +49,12 @@ export function MobileNav() {
     }
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [lastScrollY, mounted])
+  }, [mounted])
+
+  useEffect(() => {
+    setIsVisible(true)
+    lastScrollY.current = window.scrollY
+  }, [pathname])
 
   const getIsActive = (href: string) => {
     if (href === "/") return pathname === "/"
@@ -57,6 +65,8 @@ export function MobileNav() {
 
   return (
     <nav
+      aria-label="Mobile navigation"
+      onFocusCapture={() => setIsVisible(true)}
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 md:hidden",
         "bg-background/98 backdrop-blur-xl border-t border-border/40",

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
-import { getQuizList } from "@/lib/quiz-cache"
+import { getPublicQuizList } from "@/lib/quiz-cache"
 import { applyPublicPdfVisibility } from "@/lib/pdf-access"
 
 export const revalidate = 0
@@ -52,7 +52,7 @@ export async function GET(
     }))
 
     // 3. Fetch Quizzes
-    const allQuizzes = await getQuizList({ bypassCache: true })
+    const allQuizzes = await getPublicQuizList()
     const quizzes = allQuizzes
       .filter((quiz) => quiz.enabled && quiz.visibility === "public" && quiz.hasContent)
       .map((quiz) => {
@@ -77,13 +77,7 @@ export async function GET(
             }
           }
         }
-        return {
-          ...quiz,
-          structure_location: structureLocation,
-          questions: quiz.questions.map((question) => ({
-            id: typeof question.id === "string" ? question.id : "",
-          })),
-        }
+        return { ...quiz, structure_location: structureLocation }
       })
       .filter((quiz) => quiz.structure_location?.folderId === folderId)
 

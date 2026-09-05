@@ -123,4 +123,17 @@ describe("TestSeriesSection", () => {
     expect(screen.getByText("Mock tests are available now; study PDFs are coming soon.")).toBeVisible()
     expect(screen.getAllByRole("button", { name: /start now/i }).length).toBeGreaterThan(0)
   })
+
+  it("uses theme foreground text instead of low-contrast inline category colors", async () => {
+    render(createElement(TestSeriesSection))
+
+    const categoryLink = await screen.findByRole("link", { name: /SSC/ })
+    expect(categoryLink).toHaveClass("text-foreground")
+    expect(categoryLink.style.color).toBe("")
+
+    await screen.findByText("SSC Series from Alpha")
+    const categoryBadge = screen.getByText("SSC", { selector: "[data-slot='badge']" })
+    expect(categoryBadge).toHaveClass("bg-slate-900", "text-white")
+    expect(categoryBadge.style.backgroundColor).toBe("")
+  })
 })

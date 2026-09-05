@@ -64,8 +64,8 @@ function PdfCard({ pdf, index }: { pdf: PDF; index: number }) {
             </div>
             {pdf.category && (
               <span
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium mb-2.5"
-                style={{ backgroundColor: pdf.category.color + "18", color: pdf.category.color }}
+                className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium text-foreground sm:text-xs mb-2.5"
+                style={{ backgroundColor: pdf.category.color + "18", borderColor: pdf.category.color + "60" }}
               >
                 {pdf.category.name}
               </span>

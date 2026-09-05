@@ -155,6 +155,58 @@ h1, h2, h3 {
 .desk-enter { animation: desk-enter .6s cubic-bezier(.2,.8,.2,1) both; }
 .desk-delay { animation-delay: .12s; }
 
+/* Route loaders stay CSS-only so loading fallbacks do not pull animation runtimes. */
+@keyframes page-loader-dot {
+  0%, 100% { opacity: .5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+@keyframes page-loader-spin { to { transform: rotate(360deg); } }
+@keyframes page-loader-breathe {
+  0%, 100% { opacity: .45; transform: scale(.96); }
+  50% { opacity: .9; transform: scale(1.04); }
+}
+@keyframes page-loader-pulse {
+  0%, 100% { opacity: .5; transform: scale(1); }
+  50% { opacity: 0; transform: scale(1.5); }
+}
+@keyframes page-loader-progress {
+  from { width: 0; }
+}
+@keyframes page-loader-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+.page-loader-dot { animation: page-loader-dot .8s ease-in-out infinite; }
+.page-loader-spin { animation: page-loader-spin 1.25s linear infinite; }
+.page-loader-breathe { animation: page-loader-breathe 1.6s ease-in-out infinite; }
+.page-loader-pulse { animation: page-loader-pulse 1.5s ease-in-out infinite; }
+.page-loader-progress { animation: page-loader-progress .3s ease-out both; }
+.page-loader-shimmer { animation: page-loader-shimmer 1.5s ease-in-out infinite; }
+
+/* Keep below-fold content in the DOM while skipping its initial rendering work. */
+.home-below-fold {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
+}
+.home-below-fold-large {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1600px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loader-dot,
+  .page-loader-spin,
+  .page-loader-breathe,
+  .page-loader-pulse,
+  .page-loader-progress,
+  .page-loader-shimmer {
+    animation: none;
+  }
+  .page-loader-dot { opacity: .8; }
+  .page-loader-breathe,
+  .page-loader-pulse { opacity: .65; }
+}
+
 /* Shared auth surfaces: a quiet editorial extension of the TechVyro library */
 @keyframes auth-enter {
   from { opacity: 0; transform: translateY(14px) scale(.985); }

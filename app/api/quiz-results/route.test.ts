@@ -5,7 +5,6 @@ const state = vi.hoisted(() => ({
   inserted: null as Record<string, unknown> | null,
   user: null as { id: string } | null,
   submittedQuiz: { id: "quiz-public", title: "Public quiz", enabled: true, visibility: "public", questions: [{ qid: "q1", options: ["A", "B"], correct: 1 }], time_limit: 60 } as Record<string, unknown> | null,
-  progressionCalls: [] as Array<[string, string]>,
   existingResult: null as Record<string, unknown> | null,
 }))
 
@@ -42,7 +41,22 @@ function quizQuery() {
 }
 
 vi.mock("@/lib/supabase/admin", () => ({
-  createAdminClient: () => ({ from: (table: string) => table === "quizzes" ? quizQuery() : resultQuery() }),
+  createAdminClient: () => ({
+    from: (table: string) => table === "quizzes" ? quizQuery() : resultQuery(),
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name !== "insert_quiz_result_and_award_progress") return { data: null, error: { message: "unexpected RPC" } }
+      state.inserted = args
+      const duplicate = state.existingResult !== null
+      return {
+        data: {
+          result: state.existingResult || { id: "result-1" },
+          progression: { awarded: !duplicate },
+          duplicate,
+        },
+        error: null,
+      }
+    },
+  }),
 }))
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser: async () => ({ data: { user: state.user }, error: null }) } }),
@@ -55,9 +69,6 @@ vi.mock("@/lib/ai-request-security", () => ({
   RequestBodyError: class RequestBodyError extends Error { status = 400 },
 }))
 vi.mock("@/lib/admin-auth", () => ({ extractToken: () => null, verifyAdminToken: () => false }))
-vi.mock("@/lib/study-progression", () => ({
-  awardQuizProgress: async (userId: string, resultId: string) => { state.progressionCalls.push([userId, resultId]) },
-}))
 
 import { GET, POST } from "./route"
 
@@ -67,7 +78,6 @@ describe("public quiz result access", () => {
     state.inserted = null
     state.user = null
     state.submittedQuiz = { id: "quiz-public", title: "Public quiz", enabled: true, visibility: "public", questions: [{ qid: "q1", options: ["A", "B"], correct: 1 }], time_limit: 60 }
-    state.progressionCalls.length = 0
     state.existingResult = null
   })
 
@@ -102,8 +112,13 @@ describe("public quiz result access", () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get("Cache-Control")).toBe("no-store")
-    expect(state.inserted).toMatchObject({ user_id: "student-verified", correct: 1, wrong: 0, skipped: 0, client_attempt_id: "00000000-0000-4000-8000-000000000001" })
-    expect(state.progressionCalls).toEqual([["student-verified", "result-1"]])
+    expect(state.inserted).toMatchObject({
+      p_user_id: "student-verified",
+      p_correct: 1,
+      p_wrong: 0,
+      p_skipped: 0,
+      p_client_attempt_id: "00000000-0000-4000-8000-000000000001",
+    })
   })
 
   it("rejects forged client score counts instead of trusting them", async () => {
@@ -124,7 +139,6 @@ describe("public quiz result access", () => {
       body: JSON.stringify({ name: "Student", quizId: "quiz-public", answers: { q1: 1 }, clientAttemptId: "00000000-0000-4000-8000-000000000001", totalTime: 10 }),
     }))
     await expect(response.json()).resolves.toMatchObject({ result: { id: "existing-result" }, duplicate: true })
-    expect(state.inserted).toBeNull()
-    expect(state.progressionCalls).toEqual([["student-verified", "existing-result"]])
+    expect(state.inserted).toMatchObject({ p_user_id: "student-verified" })
   })
 })

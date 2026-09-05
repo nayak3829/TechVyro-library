@@ -1,21 +1,30 @@
 import { NextResponse } from "next/server"
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
-import { isAdminChatSessionId, isValidPollCursor } from "@/lib/admin-chat-validation"
+import { isValidPollCursor } from "@/lib/admin-chat-validation"
 import {
   checkAdminChatRateLimit,
+  getAdminChatSessionId,
   getAdminChatSessionState,
+  isAdminChatSessionSecurityConfigured,
   rateLimitedResponse,
 } from "@/lib/admin-chat-security"
+import { isRequestOriginAllowed } from "@/lib/request-origin"
 
 export async function GET(req: Request) {
   try {
+    if (!isRequestOriginAllowed(req, { checkSafeMethods: true })) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    if (!isAdminChatSessionSecurityConfigured()) {
+      return NextResponse.json({ error: "Admin chat session security is not configured" }, { status: 500 })
+    }
+    const sessionId = getAdminChatSessionId(req)
+    if (!sessionId) {
+      return NextResponse.json({ error: "Invalid or missing chat session" }, { status: 401 })
+    }
     const { searchParams } = new URL(req.url)
-    const sessionId = searchParams.get("sessionId")
     const since = searchParams.get("since") // ISO timestamp
 
-    if (!isAdminChatSessionId(sessionId)) {
-      return NextResponse.json({ error: "Invalid sessionId" }, { status: 400 })
-    }
     if (!isValidPollCursor(since)) {
       return NextResponse.json({ error: "Invalid poll cursor" }, { status: 400 })
     }

@@ -112,8 +112,17 @@ export async function POST(request: Request) {
     if (!openAIRes.ok) {
       clearTimeout(upstreamTimeout)
       request.signal.removeEventListener("abort", abortUpstream)
-      const err = await openAIRes.json().catch(() => ({}))
-      return new Response(JSON.stringify({ error: err.error?.message || "AI error" }), { status: 500 })
+      await openAIRes.body?.cancel().catch(() => {})
+      const status = openAIRes.status === 429 ? 429 : 502
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      const retryAfter = openAIRes.headers.get("retry-after")
+      if (status === 429 && retryAfter && /^\d{1,4}$/.test(retryAfter)) {
+        headers["Retry-After"] = retryAfter
+      }
+      return new Response(
+        JSON.stringify({ error: status === 429 ? "AI service is busy. Please try again shortly." : "AI service request failed" }),
+        { status, headers },
+      )
     }
 
     // Stream the response directly to the client

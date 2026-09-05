@@ -11,6 +11,10 @@ export type PublicGeneralSettings = {
 
 let generalSettingsRequest: Promise<PublicGeneralSettings> | null = null
 
+export function invalidatePublicGeneralSettingsCache() {
+  generalSettingsRequest = null
+}
+
 export function getPublicGeneralSettings() {
   if (!generalSettingsRequest) {
     generalSettingsRequest = fetch("/api/site-settings?key=general_settings")

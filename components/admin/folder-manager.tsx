@@ -141,13 +141,8 @@ export function FolderManager() {
   const [moveToFolderId, setMoveToFolderId] = useState<string>("")
   const [moveToCategoryId, setMoveToCategoryId] = useState<string>("")
 
-  function getAdminToken() {
-    if (typeof window !== "undefined") return sessionStorage.getItem("admin_token") || ""
-    return ""
-  }
-
   function adminHeaders() {
-    return { "Content-Type": "application/json", "Authorization": `Bearer ${getAdminToken()}` }
+    return { "Content-Type": "application/json" }
   }
 
   const isFolderTree = (value: unknown): value is ContentFolder[] =>

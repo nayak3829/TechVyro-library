@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { QuizPlayer } from "./quiz-player"
 import { saveQuizProgress } from "@/lib/study-progress"
 
@@ -9,6 +9,11 @@ describe("QuizPlayer progress restoration", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       json: async () => ({ results: [] }),
     }))
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
   })
 
   it("resumes the authenticated user's unfinished question", async () => {

@@ -10,10 +10,21 @@ CREATE TABLE IF NOT EXISTS pdf_favorites (
 -- Enable RLS
 ALTER TABLE pdf_favorites ENABLE ROW LEVEL SECURITY;
 
--- Policy (drop first to avoid duplicate error)
+-- Favorites are accessed through service-role application routes only.
 DROP POLICY IF EXISTS "Allow all on pdf_favorites" ON pdf_favorites;
-CREATE POLICY "Allow all on pdf_favorites" ON pdf_favorites
-  FOR ALL USING (true) WITH CHECK (true);
+DO $$
+DECLARE
+  policy_name TEXT;
+BEGIN
+  FOR policy_name IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'pdf_favorites'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON pdf_favorites', policy_name);
+  END LOOP;
+END
+$$;
+REVOKE ALL PRIVILEGES ON TABLE pdf_favorites FROM anon, authenticated;
 
 -- Add user_id to quiz_results (safe — no-op if column already exists)
 ALTER TABLE quiz_results ADD COLUMN IF NOT EXISTS user_id TEXT DEFAULT NULL;

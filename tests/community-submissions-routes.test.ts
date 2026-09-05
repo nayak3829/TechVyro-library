@@ -67,7 +67,10 @@ describe("community submission route security contracts", () => {
     expect(detail).toContain("duplicateWarning")
     expect(detail).not.toContain(".or(query)")
     expect(detail).toContain('.ilike("title", `%${token}%`)')
-    expect(detail).toContain("enqueuePdfJob(data.approved_pdf_id, \"process\")")
+    expect(detail).not.toContain("enqueuePdfJob")
+    const migration = read("scripts/039_api_data_integrity.sql")
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.moderate_community_submission")
+    expect(migration).toContain("INSERT INTO public.pdf_jobs")
     expect(detail).toContain("Submission did not pass PDF safety checks")
     expect(detail).toContain("unsafe ? 422")
   })
@@ -91,7 +94,7 @@ describe("community submission route security contracts", () => {
     expect(source).toContain("success: true")
     expect(source).toContain("succeeded:")
     expect(source).toContain("failed:")
-    expect(source).toContain("enqueuePdfJob(data.approved_pdf_id, \"process\")")
+    expect(source).not.toContain("enqueuePdfJob")
   })
 
   it("marks all submission JSON responses as non-cacheable", () => {

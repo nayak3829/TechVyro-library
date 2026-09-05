@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
+vi.mock("dns/promises", () => {
+  const lookup = async () => [{ address: "8.8.8.8", family: 4 }]
+  return { default: { lookup }, lookup }
+})
+
 import { GET } from "./route"
 
 describe("extract route normalization", () => {
@@ -8,18 +13,9 @@ describe("extract route normalization", () => {
   })
 
   it("retains live-series source metadata", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      text: async () => (
-        `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
-          props: {
-            pageProps: {
-              testSeries: [{ id: "live-1", title: "Live Test Series" }],
-            },
-          },
-        })}</script>`
-      ),
-    } as Response)
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "live-1", title: "Live Test Series" }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
 
     const response = await GET(new Request("https://local.test/api/extract?bulk=true&category=all"))
     const data = await response.json()
@@ -57,9 +53,8 @@ describe("extract route normalization", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("redirect disallowed"))
 
     await GET(new Request("https://local.test/api/extract?url=https://a4agricos.classx.co.in"))
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/^https:\/\/a4agricos\.classx\.co\.in\//),
-      expect.objectContaining({ redirect: "error" }),
-    )
+    const [url, options] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/^https:\/\/a4agricosapi\.classx\.co\.in\//)
+    expect(options).toMatchObject({ redirect: "manual" })
   })
 })

@@ -33,7 +33,42 @@ test("admin login, deep-link navigation, refresh, and logout work", async ({ pag
   await expect(page.getByRole("tab", { name: /All PDFs/ })).toHaveAttribute("aria-selected", "true")
 
   await page.getByRole("button", { name: "Logout" }).click()
-  await expect(page.getByText("Admin Access", { exact: true })).toBeVisible()
+  await expect(page.getByText("Admin Access", { exact: true })).toBeVisible({ timeout: 30_000 })
+})
+
+test("admin API accepts only its same-origin HttpOnly session cookie", async ({ page, context }) => {
+  await login(page)
+
+  const sessionCookie = (await context.cookies()).find(cookie => cookie.name === "admin_session")
+  expect(sessionCookie).toBeDefined()
+  expect(sessionCookie?.httpOnly).toBe(true)
+  expect(await page.evaluate(() => sessionStorage.getItem("admin_token"))).toBeNull()
+
+  const cookieVerification = await page.request.post("/api/admin/verify")
+  expect(await cookieVerification.json()).toEqual({ valid: true })
+
+  await context.clearCookies()
+  const bearerVerification = await page.request.post("/api/admin/verify", {
+    headers: { Authorization: `Bearer ${sessionCookie!.value}` },
+  })
+  expect(await bearerVerification.json()).toEqual({ valid: false })
+  const bodyVerification = await page.request.post("/api/admin/verify", {
+    data: { token: sessionCookie!.value },
+  })
+  expect(await bodyVerification.json()).toEqual({ valid: false })
+
+  await context.addCookies([sessionCookie!])
+  const crossOriginVerification = await page.request.post("/api/admin/verify", {
+    headers: { Origin: "https://attacker.invalid", "Sec-Fetch-Site": "cross-site" },
+  })
+  expect(await crossOriginVerification.json()).toEqual({ valid: false })
+
+  await context.clearCookies()
+  await context.addCookies([{ ...sessionCookie!, value: "invalid" }])
+  const logoutResponse = await page.request.post("/api/admin/logout")
+  expect(logoutResponse.status()).toBe(200)
+  expect(await logoutResponse.json()).toEqual({ success: true })
+  expect((await context.cookies()).find(cookie => cookie.name === "admin_session")).toBeUndefined()
 })
 
 test("authenticated overview hydrates without runtime errors", async ({ page }) => {
@@ -53,6 +88,19 @@ test("authenticated overview hydrates without runtime errors", async ({ page }) 
     message.includes("Hydration failed") ||
     message.includes("Invalid hook call")
   )).toEqual([])
+})
+
+test("Power Tools loads through the HttpOnly admin session", async ({ page }) => {
+  await login(page)
+  const healthResponse = page.waitForResponse(response =>
+    response.request().method() === "GET" &&
+    new URL(response.url()).pathname === "/api/pdfs/batch-ai",
+  )
+
+  await page.getByRole("button", { name: "Power Tools", exact: true }).click()
+
+  await expect(page.getByRole("heading", { name: "Power Tools" })).toBeVisible()
+  expect((await healthResponse).status()).toBe(200)
 })
 
 test("admin dashboard navigation fits and works on a narrow phone", async ({ page }) => {
@@ -92,7 +140,8 @@ test("admin can cancel PDF analysis without losing the queued file", async ({ pa
 
   const cancelButton = page.getByRole("button", { name: "Cancel processing Cancel Test" })
   await expect(cancelButton).toBeVisible({ timeout: 30_000 })
-  await cancelButton.click()
+  await cancelButton.focus()
+  await page.keyboard.press("Enter")
   await expect(page.getByText("Analysis cancelled — ready to resume")).toBeVisible()
   await expect(page.locator('input[value="Cancel Test"]')).toBeVisible()
 })

@@ -101,13 +101,8 @@ export function InlineStructureEditor({
   
   const [formData, setFormData] = useState({ name: "", icon: "Folder", color: "#3b82f6" })
 
-  function getAdminToken() {
-    if (typeof window !== "undefined") return sessionStorage.getItem("admin_token") || ""
-    return ""
-  }
-
   function adminHeaders() {
-    return { "Content-Type": "application/json", "Authorization": `Bearer ${getAdminToken()}` }
+    return { "Content-Type": "application/json" }
   }
 
   useEffect(() => {

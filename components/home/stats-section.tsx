@@ -157,7 +157,7 @@ export function StatsSection({ stats: initialStats }: StatsSectionProps) {
                   <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block mb-3">{stat.sublabel}</p>
 
                   <div className={`h-px bg-border/30 mb-2 hidden sm:block`} />
-                  <span className={`hidden sm:inline text-[10px] font-medium ${live ? "text-emerald-500" : "text-muted-foreground"}`}>
+                  <span className={`hidden sm:inline text-[10px] font-medium ${live ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}>
                     {trend}
                   </span>
                 </div>
@@ -205,7 +205,7 @@ export function StatsSection({ stats: initialStats }: StatsSectionProps) {
                     <f.icon className={`h-4.5 w-4.5 ${f.color}`} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-sm text-foreground">{f.title}</h4>
+                    <h3 className="font-semibold text-sm text-foreground">{f.title}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">{f.desc}</p>
                   </div>
                 </div>

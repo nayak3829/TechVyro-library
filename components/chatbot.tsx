@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { sanitizeChatbotHtml } from "@/lib/sanitize"
+import { useDialogFocus } from "@/hooks/use-dialog-focus"
 
 interface Message {
   id: string
@@ -492,7 +493,6 @@ function AdminLiveChat({ onBack, prefillName }: { onBack: () => void; prefillNam
   const nameRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const sessionRef = useRef<string | null>(null)
-  const studentNameRef = useRef<string>("")
   const endedRef = useRef(false)
 
   useEffect(() => {
@@ -505,18 +505,16 @@ function AdminLiveChat({ onBack, prefillName }: { onBack: () => void; prefillNam
 
   // Keep refs in sync so beforeunload / unmount can access current values
   useEffect(() => { sessionRef.current = sessionId }, [sessionId])
-  useEffect(() => { studentNameRef.current = studentName }, [studentName])
   useEffect(() => { endedRef.current = ended }, [ended])
 
   // Notify admin when user leaves (tab close / refresh)
   useEffect(() => {
     function handleBeforeUnload() {
       if (sessionRef.current) {
-        navigator.sendBeacon("/api/admin-chat/end", JSON.stringify({
-          sessionId: sessionRef.current,
-          studentName: studentNameRef.current,
-          reason: "tab_closed",
-        }))
+        navigator.sendBeacon(
+          "/api/admin-chat/end",
+          new Blob([JSON.stringify({ reason: "tab_closed" })], { type: "application/json" })
+        )
       }
     }
     window.addEventListener("beforeunload", handleBeforeUnload)
@@ -530,11 +528,7 @@ function AdminLiveChat({ onBack, prefillName }: { onBack: () => void; prefillNam
         fetch("/api/admin-chat/end", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: sessionRef.current,
-            studentName: studentNameRef.current,
-            reason: "left",
-          }),
+          body: JSON.stringify({ reason: "left" }),
           keepalive: true,
         }).catch(() => {})
       }
@@ -551,15 +545,15 @@ function AdminLiveChat({ onBack, prefillName }: { onBack: () => void; prefillNam
       await fetch("/api/admin-chat/end", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, studentName, reason: "ended_by_user" }),
+        body: JSON.stringify({ reason: "ended_by_user" }),
       })
     } catch {}
     onBack()
   }
 
-  const pollMessages = useCallback(async (sid: string, since: string | null) => {
+  const pollMessages = useCallback(async (since: string | null) => {
     try {
-      const url = `/api/admin-chat/poll?sessionId=${sid}${since ? `&since=${encodeURIComponent(since)}` : ""}`
+      const url = `/api/admin-chat/poll${since ? `?since=${encodeURIComponent(since)}` : ""}`
       const res = await fetch(url)
       const data = await res.json()
       if (res.status === 404 || res.status === 410) {
@@ -603,7 +597,7 @@ function AdminLiveChat({ onBack, prefillName }: { onBack: () => void; prefillNam
 
     // Start polling every 3 seconds
     pollRef.current = setInterval(() => {
-      pollMessages(sessionId, lastSince)
+      pollMessages(lastSince)
     }, 3000)
 
     return () => {
@@ -674,7 +668,7 @@ function AdminLiveChat({ onBack, prefillName }: { onBack: () => void; prefillNam
       const res = await fetch("/api/admin-chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message: text, studentName }),
+        body: JSON.stringify({ message: text }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -857,6 +851,17 @@ export function Chatbot() {
   const [unread, setUnread] = useState(0)
   const [mounted, setMounted] = useState(false)
   const { user } = useAuth()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useDialogFocus({
+    active: open,
+    containerRef: panelRef,
+    initialFocusRef: closeButtonRef,
+    onEscape: () => { setOpen(false); setMode("ai") },
+    trap: false,
+    modal: false,
+  })
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -872,7 +877,7 @@ export function Chatbot() {
 
       {/* Chat window */}
       {open && (
-        <div className={cn(
+        <div id="techvyro-chat-panel" ref={panelRef} className={cn(
           "absolute bottom-[72px] right-0",
           "w-[calc(100vw-2rem)] sm:w-[360px] max-w-[360px]",
           "bg-background border border-border/50 rounded-2xl shadow-2xl shadow-violet-500/10",
@@ -881,8 +886,8 @@ export function Chatbot() {
           minimized ? "h-[52px]" : "h-[420px] sm:h-[480px] max-h-[calc(100dvh-160px)]",
         )}
           role="dialog"
-          aria-modal="true"
           aria-labelledby="chatbot-title"
+          tabIndex={-1}
         >
 
           {/* Header */}
@@ -941,6 +946,7 @@ export function Chatbot() {
                 </button>
               )}
               <button
+                ref={closeButtonRef}
                 onClick={() => { setOpen(false); setMode("ai") }}
                 className="p-1.5 rounded-lg hover:bg-white/20 transition-colors text-white/80 hover:text-white"
                 aria-label="Close chat"
@@ -968,6 +974,8 @@ export function Chatbot() {
         )}
 
         <button
+          aria-expanded={open}
+          aria-controls="techvyro-chat-panel"
           onClick={() => { setOpen(o => !o); setUnread(0) }}
           className={cn(
             "relative flex flex-col items-center justify-center gap-0.5",

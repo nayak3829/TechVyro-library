@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS quizzes (
   category TEXT DEFAULT 'General',
   time_limit INTEGER DEFAULT 1200,
   questions JSONB DEFAULT '[]',
+  question_count INTEGER GENERATED ALWAYS AS (
+    CASE WHEN jsonb_typeof(questions) = 'array' THEN jsonb_array_length(questions) ELSE 0 END
+  ) STORED,
   enabled BOOLEAN DEFAULT TRUE,
   tags TEXT[] DEFAULT '{}',
   visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public', 'unlisted', 'private')),
@@ -23,6 +26,9 @@ ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking DECIMAL(6,2) DEFAU
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS passing_percentage DECIMAL(5,2) DEFAULT 0;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle_questions BOOLEAN DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle_options BOOLEAN DEFAULT FALSE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS question_count INTEGER GENERATED ALWAYS AS (
+  CASE WHEN jsonb_typeof(questions) = 'array' THEN jsonb_array_length(questions) ELSE 0 END
+) STORED;
 
 -- Create quiz_results table (leaderboard)
 CREATE TABLE IF NOT EXISTS quiz_results (
@@ -44,10 +50,8 @@ CREATE TABLE IF NOT EXISTS quiz_results (
 ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quiz_results ENABLE ROW LEVEL SECURITY;
 
--- Public read for published quizzes. All mutations go through authenticated
--- server routes using the service role.
-CREATE POLICY "Allow public read on quizzes" ON quizzes
-  FOR SELECT USING (enabled = TRUE AND visibility IN ('public', 'unlisted'));
+-- Quiz rows contain answer keys and are available only through server routes.
+REVOKE ALL PRIVILEGES ON TABLE public.quizzes FROM PUBLIC, anon, authenticated;
 
 CREATE POLICY "Users read own quiz results" ON quiz_results
   FOR SELECT TO authenticated USING ((auth.uid())::text = user_id);

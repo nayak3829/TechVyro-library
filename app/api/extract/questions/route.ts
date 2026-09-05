@@ -3,6 +3,7 @@ import type { SampleQuestion, SampleSeries } from "@/lib/sample-tests"
 import { createClient } from "@/lib/supabase/server"
 import {
   fetchWithTimeout as fetchTrustedQuizApi,
+  readLimitedText,
   validatePublicHttpsUrl,
 } from "@/lib/quiz-remote-fetch"
 
@@ -56,51 +57,58 @@ interface NormalizedQuestion {
 
 function normalizeQuestion(q: AppXQuestion, idx: number): NormalizedQuestion | null {
   try {
-    const questionText = stripHtml(String(q.question || q.title || q.question_title || ""))
+    const questionText = stripHtml(String(q.question || q.title || q.question_title || "")).slice(0, 10_000)
     if (!questionText || questionText.length < 2) return null
 
-    const rawOptions = q.options || []
-    const options = rawOptions.map((o) =>
-      stripHtml(String(o.option || o.text || o.value || ""))
-    ).filter(o => o.length > 0)
+    const rawOptions = (q.options || []).slice(0, 10)
+    const optionEntries = rawOptions
+      .map((option, rawIndex) => ({
+        rawIndex,
+        option,
+        text: stripHtml(String(option.option || option.text || option.value || "")).slice(0, 2_000),
+      }))
+      .filter(({ text }) => text.length > 0)
+    const options = optionEntries.map(({ text }) => text)
 
     if (options.length < 2) return null
 
-    let correctIdx = 0
     const rawAnswer = q.answer ?? q.correct_answer ?? q.correct_option ?? q.correct
+    if (rawAnswer === undefined || rawAnswer === null) return null
 
-    if (typeof rawAnswer === "number") {
-      correctIdx = rawAnswer > options.length ? rawAnswer - 1 : rawAnswer
-    } else if (typeof rawAnswer === "string") {
-      const letter = rawAnswer.toLowerCase().trim()
-      if (["a", "b", "c", "d", "e"].includes(letter)) {
-        correctIdx = letter.charCodeAt(0) - "a".charCodeAt(0)
-      } else {
-        const num = parseInt(letter)
-        if (!isNaN(num)) correctIdx = num > options.length ? num - 1 : num
-      }
+    const answerText = String(rawAnswer).trim()
+    let rawCorrectIndex = rawOptions.findIndex((option) =>
+      (option.optionKey !== undefined && option.optionKey.toLowerCase() === answerText.toLowerCase()) ||
+      (option.id !== undefined && String(option.id) === answerText),
+    )
+    if (rawCorrectIndex < 0 && /^[a-j]$/i.test(answerText)) {
+      rawCorrectIndex = answerText.toLowerCase().charCodeAt(0) - "a".charCodeAt(0)
+    }
+    if (rawCorrectIndex < 0 && /^\d+$/.test(answerText)) {
+      const numericAnswer = Number(answerText)
+      rawCorrectIndex = numericAnswer === 0 ? 0 : numericAnswer - 1
     }
 
-    if (rawOptions.length > 0 && typeof rawAnswer === "string") {
-      const matchIdx = rawOptions.findIndex(
-        (o) => o.optionKey === rawAnswer || String(o.id) === String(rawAnswer)
-      )
-      if (matchIdx >= 0) correctIdx = matchIdx
-    }
-
-    correctIdx = Math.max(0, Math.min(correctIdx, options.length - 1))
+    const correctIdx = optionEntries.findIndex(({ rawIndex }) => rawIndex === rawCorrectIndex)
+    if (correctIdx < 0) return null
 
     return {
       qid: String(q.id || idx + 1),
       question: questionText,
       options,
-      correct: correctIdx,
-      marks: q.marks ?? 1,
-      explanation: stripHtml(String(q.solution || q.explanation || "")),
+      correct: correctIdx + 1,
+      marks: typeof q.marks === "number" && Number.isFinite(q.marks) ? Math.max(0, Math.min(q.marks, 100)) : 1,
+      explanation: stripHtml(String(q.solution || q.explanation || "")).slice(0, 10_000),
     }
   } catch {
     return null
   }
+}
+
+function normalizeSampleQuestions(questions: SampleQuestion[]): SampleQuestion[] {
+  return questions.slice(0, 500).map((question) => ({
+    ...question,
+    correct: question.correct + 1,
+  }))
 }
 
 function findQuestions(data: unknown, depth = 0): unknown[] {
@@ -153,6 +161,9 @@ export async function GET(request: Request) {
   if (!testId || !apiBase) {
     return NextResponse.json({ error: "testId and apiBase required" }, { status: 400 })
   }
+  if (testId.length > 200 || /[\u0000-\u001f]/.test(testId)) {
+    return NextResponse.json({ error: "Invalid test identifier" }, { status: 400 })
+  }
 
   // Short-circuit: sample tests — skip all live API calls (lazy loaded)
   if (apiBase.startsWith("sample:")) {
@@ -161,7 +172,8 @@ export async function GET(request: Request) {
     // First try direct test ID match
     const sampleQ = getSampleQuestions(testId)
     if (sampleQ && sampleQ.length > 0) {
-      return NextResponse.json({ success: true, questions: sampleQ, total: sampleQ.length }, { headers: { "Cache-Control": "no-store" } })
+      const questions = normalizeSampleQuestions(sampleQ)
+      return NextResponse.json({ success: true, questions, total: questions.length }, { headers: { "Cache-Control": "no-store" } })
     }
     
     // Find the test or series to get its category for fallback
@@ -192,7 +204,8 @@ export async function GET(request: Request) {
     }
     
     if (foundQuestions && foundQuestions.length > 0) {
-      return NextResponse.json({ success: true, questions: foundQuestions, total: foundQuestions.length }, { headers: { "Cache-Control": "no-store" } })
+      const questions = normalizeSampleQuestions(foundQuestions)
+      return NextResponse.json({ success: true, questions, total: questions.length }, { headers: { "Cache-Control": "no-store" } })
     }
     
     // Fallback: get sample questions from same category
@@ -202,8 +215,8 @@ export async function GET(request: Request) {
         if (test.questions && test.questions.length > 0) {
           return NextResponse.json({ 
             success: true, 
-            questions: test.questions, 
-            total: test.questions.length,
+            questions: normalizeSampleQuestions(test.questions),
+            total: Math.min(test.questions.length, 500),
             notice: "Showing practice questions from this category."
           }, { headers: { "Cache-Control": "no-store" } })
         }
@@ -216,8 +229,8 @@ export async function GET(request: Request) {
         if (test.questions && test.questions.length > 0) {
           return NextResponse.json({ 
             success: true, 
-            questions: test.questions, 
-            total: test.questions.length,
+            questions: normalizeSampleQuestions(test.questions),
+            total: Math.min(test.questions.length, 500),
             notice: "Showing sample practice questions."
           }, { headers: { "Cache-Control": "no-store" } })
         }
@@ -238,7 +251,6 @@ export async function GET(request: Request) {
   }
 
   const safeTestId = encodeURIComponent(testId)
-  const errors: string[] = []
 
   const endpoints = [
     `${safeApiBase}/api/v1/test/${safeTestId}/questions/?format=json`,
@@ -253,26 +265,31 @@ export async function GET(request: Request) {
   const tryQuestionEndpoint = async (endpoint: string): Promise<NormalizedQuestion[] | null> => {
     try {
       const res = await fetchTrustedQuizApi(endpoint, 3000)
-      if (!res.ok) { errors.push(`${endpoint}: HTTP ${res.status}`); return null }
-      const text = await res.text()
+      if (!res.ok) return null
+      const contentType = res.headers.get("content-type")?.toLowerCase() || ""
+      if (!contentType.includes("application/json")) {
+        await res.body?.cancel()
+        return null
+      }
+      const text = await readLimitedText(res)
       let json: unknown
       try { json = JSON.parse(text) } catch { return null }
-      const rawQuestions = findQuestions(json)
+      const rawQuestions = findQuestions(json).slice(0, 500)
       if (rawQuestions.length > 0) {
         const questions = rawQuestions.map((q, i) => normalizeQuestion(q as AppXQuestion, i)).filter(Boolean) as NormalizedQuestion[]
         return questions.length > 0 ? questions : null
       }
       return null
-    } catch (e) {
-      errors.push(`${endpoint}: ${e instanceof Error ? e.message : "timeout"}`)
+    } catch {
       return null
     }
   }
 
-  const questionResults = await Promise.allSettled(endpoints.map(tryQuestionEndpoint))
-  for (const result of questionResults) {
-    if (result.status === "fulfilled" && result.value) {
-        return NextResponse.json({ success: true, questions: result.value, total: result.value.length }, { headers: { "Cache-Control": "no-store" } })
+  for (let index = 0; index < endpoints.length; index += 2) {
+    const questionResults = await Promise.all(endpoints.slice(index, index + 2).map(tryQuestionEndpoint))
+    const questions = questionResults.find((result) => result !== null)
+    if (questions) {
+      return NextResponse.json({ success: true, questions, total: questions.length }, { headers: { "Cache-Control": "no-store" } })
     }
   }
 
@@ -281,14 +298,16 @@ export async function GET(request: Request) {
   
   const sampleQuestions = getSampleQuestions(testId)
   if (sampleQuestions && sampleQuestions.length > 0) {
-    return NextResponse.json({ success: true, questions: sampleQuestions, total: sampleQuestions.length }, { headers: { "Cache-Control": "no-store" } })
+    const questions = normalizeSampleQuestions(sampleQuestions)
+    return NextResponse.json({ success: true, questions, total: questions.length }, { headers: { "Cache-Control": "no-store" } })
   }
 
   // Also try matching by slug — find a test in sample series
   for (const series of getAllSampleSeries()) {
     const matchedTest = series.tests.find(t => t.id === testId || t.id.includes(testId) || testId.includes(t.id))
     if (matchedTest) {
-      return NextResponse.json({ success: true, questions: matchedTest.questions, total: matchedTest.questions.length }, { headers: { "Cache-Control": "no-store" } })
+      const questions = normalizeSampleQuestions(matchedTest.questions)
+      return NextResponse.json({ success: true, questions, total: questions.length }, { headers: { "Cache-Control": "no-store" } })
     }
   }
 
@@ -300,14 +319,13 @@ export async function GET(request: Request) {
     const fallbackTest = fallbackSeries.tests[0]
     return NextResponse.json({
       success: true,
-      questions: fallbackTest.questions,
-      total: fallbackTest.questions.length,
+      questions: normalizeSampleQuestions(fallbackTest.questions),
+      total: Math.min(fallbackTest.questions.length, 500),
       notice: "Showing sample practice questions.",
     }, { headers: { "Cache-Control": "no-store" } })
   }
 
   return NextResponse.json({
     error: "Could not load questions for this test.",
-    debug: errors.slice(0, 4),
   }, { status: 404 })
 }

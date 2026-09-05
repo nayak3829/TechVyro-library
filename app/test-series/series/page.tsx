@@ -115,9 +115,11 @@ function SeriesContent() {
   const fetchData = async () => {
     setLoading(true)
     setError("")
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 25_000)
     try {
       const params = new URLSearchParams({ slug, apiBase, webBase })
-      const res = await fetch(`/api/extract/tests?${params}`)
+      const res = await fetch(`/api/extract/tests?${params}`, { signal: controller.signal })
       const data = await res.json()
       if (!res.ok || !data.success) { setError(data.error || "Could not load test series"); return }
       const subs = data.subjects || []
@@ -125,8 +127,11 @@ function SeriesContent() {
       setTests(data.tests || [])
       if (subs.length > 0) setExpanded({ [String(subs[0].id || 0)]: true })
     } catch {
-      setError("Network error. Please try again.")
+      setError(controller.signal.aborted
+        ? "This provider is taking too long to respond. Please try again."
+        : "Network error. Please try again.")
     } finally {
+      window.clearTimeout(timeout)
       setLoading(false)
     }
   }

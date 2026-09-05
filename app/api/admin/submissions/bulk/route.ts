@@ -3,7 +3,6 @@ import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { UUID } from "@/lib/community-submissions"
 import { publishInAppNotification } from "@/lib/notifications"
-import { enqueuePdfJob } from "@/lib/pdf-jobs"
 
 const NO_STORE = { headers: { "Cache-Control": "no-store" } }
 export async function POST(request: Request) {
@@ -29,7 +28,6 @@ export async function POST(request: Request) {
     }
     results.push({ id, success: true, approvedPdfId: data?.approved_pdf_id ?? null })
     if (body.action === "approve" && data?.approved_pdf_id) {
-      await enqueuePdfJob(data.approved_pdf_id, "process").catch(() => {})
       try {
         await publishInAppNotification({
           kind: "pdf", entityId: data.approved_pdf_id, title: `New PDF: ${data.title}`,

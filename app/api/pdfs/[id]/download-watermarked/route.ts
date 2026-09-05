@@ -5,7 +5,6 @@ import { applyPublicPdfVisibility, canDownloadPDF, canViewPDF, getPDFRequestIden
 import { isValidAnalyticsEventKey } from "@/lib/analytics-events"
 import { getWatermarkSettings } from "@/lib/watermark-settings"
 import { validPdfStorageLocation } from "@/lib/pdf-storage"
-import { recordUserPdfActivity } from "@/lib/user-pdf-library"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -75,7 +74,13 @@ export async function GET(request: Request, { params }: RouteProps) {
     const originalPdfBytes = await fileData.arrayBuffer()
 
     let responseBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(originalPdfBytes)
-    if (watermark.enabled && originalPdfBytes.byteLength <= MAX_INLINE_WATERMARK_BYTES) {
+    if (watermark.enabled) {
+      if (originalPdfBytes.byteLength > MAX_INLINE_WATERMARK_BYTES) {
+        return NextResponse.json(
+          { error: "PDF is too large to watermark safely" },
+          { status: 422 },
+        )
+      }
       try {
         const pdfDoc = await PDFDocument.load(originalPdfBytes, {
           ignoreEncryption: true,
@@ -107,18 +112,23 @@ export async function GET(request: Request, { params }: RouteProps) {
         pdfDoc.setProducer(watermark.siteName)
         responseBytes = await pdfDoc.save()
       } catch (watermarkError) {
-        console.warn("[pdf/download-watermarked] Watermark failed; serving verified original:", watermarkError)
+        console.error("[pdf/download-watermarked] Watermark processing failed:", watermarkError)
+        return NextResponse.json(
+          { error: "Unable to watermark PDF" },
+          { status: 422 },
+        )
       }
     }
 
-    const { error: countError } = await supabase.rpc("increment_download_count", {
-      pdf_id: id,
-      event_key: eventKey,
+    const { error: accountingError } = await supabase.rpc("record_pdf_download", {
+      p_pdf_id: id,
+      p_event_key: eventKey,
+      p_user_id: identity.userId,
     })
-    if (countError) {
-      console.error("[pdf/download-watermarked] Atomic counter failed:", countError)
+    if (accountingError) {
+      console.error("[pdf/download-watermarked] Download accounting failed:", accountingError.message)
+      return NextResponse.json({ error: "Failed to record download" }, { status: 500 })
     }
-    await recordUserPdfActivity(identity.userId, id, "download")
 
     // Create filename
     const safeFilename = pdf.title.replace(/[^a-zA-Z0-9\s]/g, "").trim().replace(/\s+/g, "_") || "TechVyro_PDF"

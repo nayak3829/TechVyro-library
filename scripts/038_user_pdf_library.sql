@@ -33,6 +33,10 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+
   IF p_event NOT IN ('view', 'download') THEN
     RAISE EXCEPTION 'invalid PDF activity event' USING ERRCODE = '22023';
   END IF;

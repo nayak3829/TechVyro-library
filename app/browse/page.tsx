@@ -16,7 +16,7 @@ import {
 import {
   Search, X, FileText, BookOpen, Clock, Play, Flame,
   Lock, Sparkles, Brain, GraduationCap, LayoutGrid,
-  ChevronRight, SlidersHorizontal
+  ChevronRight, SlidersHorizontal, AlertCircle
 } from "lucide-react"
 import { toast } from "sonner"
 import { matchesContentHierarchy, PdfContentFilter, type ContentHierarchyFilterValue } from "@/components/pdf-content-filter"
@@ -45,7 +45,7 @@ interface Quiz {
   category: string
   difficulty: string
   time_limit: number
-  questions: { id: string }[]
+  question_count: number
   enabled: boolean
   created_at: string
   structure_location: { folderId: string; categoryId: string; sectionId: string } | null
@@ -78,6 +78,8 @@ export default function BrowsePage() {
   const [pdfs, setPdfs] = useState<PDF[]>([])
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState<Tab>("all")
   const [filter, setFilter] = useState<ContentStructureFilter>({
@@ -110,7 +112,10 @@ export default function BrowsePage() {
   }, [])
 
   const fetchAll = useCallback(async (initial = false) => {
-    if (initial) setLoading(true)
+    if (initial) {
+      setLoading(true)
+      setLoadError(null)
+    }
     refreshControllerRef.current?.abort()
     const controller = new AbortController()
     refreshControllerRef.current = controller
@@ -120,13 +125,16 @@ export default function BrowsePage() {
         fetch("/api/quizzes", { signal: controller.signal }),
         fetch("/api/content-structure", { cache: "no-store", signal: controller.signal }),
       ])
+      if (!pdfRes.ok || !quizRes.ok || !structRes.ok) {
+        throw new Error("One or more catalogue services are unavailable")
+      }
       const [pdfData, quizData, structData] = await Promise.all([
         pdfRes.json(),
         quizRes.json(),
         structRes.json(),
       ])
       setPdfs(pdfData.pdfs || [])
-      setQuizzes((quizData.quizzes || []).filter((q: Quiz) => q.enabled && q.questions.length > 0))
+      setQuizzes((quizData.quizzes || []).filter((q: Quiz) => q.enabled && q.question_count > 0))
 
       // Build name maps from structure
       const nm: Record<string, string> = {}
@@ -141,7 +149,7 @@ export default function BrowsePage() {
       setCatToFolder(fm)
     } catch {
       if (!controller.signal.aborted) {
-        // Keep the existing empty-state behavior for failed background refreshes.
+        if (initial) setLoadError("We couldn’t load the catalogue. Please try again.")
       }
     } finally {
       if (initial && !controller.signal.aborted) setLoading(false)
@@ -243,7 +251,7 @@ export default function BrowsePage() {
   const showPdfs = activeTab !== "quizzes"
   const showQuizzes = activeTab !== "pdfs"
 
-  function handleDownload(e: React.MouseEvent, pdf: PDF) {
+  async function handleDownload(e: React.MouseEvent, pdf: PDF) {
     if (!pdf.allow_download) {
       e.preventDefault()
       toast.info("Download not available for this PDF")
@@ -252,7 +260,31 @@ export default function BrowsePage() {
     if (!user) {
       e.preventDefault()
       toast.info("Login to download this PDF")
-      router.push("/login")
+      router.push("/login?redirect=/browse")
+      return
+    }
+    setDownloadingId(pdf.id)
+    try {
+      const response = await fetch(`/api/pdfs/${pdf.id}/download-watermarked`, {
+        headers: { "Idempotency-Key": `download:${pdf.id}:${crypto.randomUUID()}` },
+      })
+      if (!response.ok) throw new Error("Download request failed")
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      const disposition = response.headers.get("Content-Disposition")
+      const filenameMatch = disposition?.match(/filename="(.+)"/)
+      link.download = filenameMatch?.[1] || `${pdf.title}_TechVyro.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast.success("Download started")
+    } catch {
+      toast.error("Could not download this PDF. Please try again.")
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -399,7 +431,7 @@ export default function BrowsePage() {
                   suppressHydrationWarning
                 />
                 {search && (
-                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <button aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     <X className="h-4 w-4" />
                   </button>
                 )}
@@ -413,6 +445,12 @@ export default function BrowsePage() {
               )}
             </div>
 
+            <div
+              role="tabpanel"
+              id="browse-tabpanel"
+              aria-labelledby={`browse-tab-${activeTab}`}
+              tabIndex={0}
+            >
             {loading ? (
               <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                 {[...Array(6)].map((_, i) => (
@@ -421,6 +459,18 @@ export default function BrowsePage() {
               </div>
             ) : (
               <>
+                {loadError && (
+                  <div role="alert" className="flex flex-col items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/5 px-6 py-16 text-center">
+                    <AlertCircle className="mb-4 h-12 w-12 text-destructive/70" />
+                    <h2 className="text-lg font-bold">Catalogue unavailable</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">{loadError}</p>
+                    <Button className="mt-5" variant="outline" onClick={() => void fetchAll(true)}>
+                      Try Again
+                    </Button>
+                  </div>
+                )}
+                {!loadError && (
+                  <>
                 {/* Results summary */}
                 <p className="text-xs text-muted-foreground mb-4">
                   {showPdfs && showQuizzes
@@ -464,7 +514,7 @@ export default function BrowsePage() {
                                 </div>
                               )}
                               <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0" role="tabpanel" id="browse-tabpanel" aria-labelledby={`browse-tab-${activeTab}`} tabIndex={0}>
+                                <div className="flex-1 min-w-0">
                                   {isNew && (
                                     <div className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 rounded-full px-2 py-0.5 mb-1">
                                       <Sparkles className="h-2.5 w-2.5" /> NEW
@@ -506,10 +556,12 @@ export default function BrowsePage() {
                                 {pdf.allow_download && (
                                   <button
                                     onClick={(e) => handleDownload(e, pdf)}
+                                    disabled={downloadingId === pdf.id}
+                                    aria-label={user ? `Download ${pdf.title}` : `Login to download ${pdf.title}`}
                                     className="px-3 py-2 rounded-xl text-xs font-semibold border border-border/60 hover:bg-muted/50 transition-all"
                                     title={user ? "Download" : "Login to Download"}
                                   >
-                                    {user ? "↓" : <Lock className="h-3 w-3" />}
+                                    {user ? (downloadingId === pdf.id ? "…" : "↓") : <Lock className="h-3 w-3" />}
                                   </button>
                                 )}
                               </div>
@@ -550,7 +602,7 @@ export default function BrowsePage() {
                               )}
                               <div className="flex items-center gap-2 mt-auto mb-3 flex-wrap">
                                 <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted/60 text-[11px] font-medium">
-                                  <FileText className="h-3 w-3 text-primary" /> {quiz.questions.length} Q
+                                  <FileText className="h-3 w-3 text-primary" /> {quiz.question_count} Q
                                 </div>
                                 <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted/60 text-[11px] font-medium">
                                   <Clock className="h-3 w-3 text-accent" /> {Math.floor(quiz.time_limit / 60)} min
@@ -587,8 +639,11 @@ export default function BrowsePage() {
                     </Button>
                   </div>
                 )}
+                  </>
+                )}
               </>
             )}
+            </div>
           </div>
         </div>
       </main>

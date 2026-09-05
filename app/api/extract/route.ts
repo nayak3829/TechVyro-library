@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getAllSampleSeries, getSampleSeriesForCategory, mapUrlToCategory } from "@/lib/sample-tests"
 import platforms from "@/lib/appx-platforms.json"
+import {
+  fetchWithTimeout as fetchTrustedQuizApi,
+  readLimitedText,
+} from "@/lib/quiz-remote-fetch"
 
 interface Platform {
   name: string
@@ -51,40 +55,6 @@ function findAllowedPlatform(input: string): { apiUrl: string; webUrl: string } 
     }
   })
   return platform ? { apiUrl: platform.api.replace(/\/$/, ""), webUrl: deriveWebUrl(platform.api).replace(/\/$/, "") } : null
-}
-
-// Redirects must never be followed here: an allowlisted public APX host could
-// otherwise turn this into an SSRF primitive by redirecting to an internal URL.
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 10000) {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
-  try {
-    const res = await fetch(url, { ...options, redirect: "error", signal: controller.signal })
-    clearTimeout(id)
-    return res
-  } catch (e) {
-    clearTimeout(id)
-    throw e
-  }
-}
-
-const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  Accept: "application/json, text/html, */*",
-  "Accept-Language": "en-IN,en;q=0.9,hi;q=0.8",
-  "Cache-Control": "no-cache",
-  "Origin": "https://web.classx.co.in",
-  "Referer": "https://web.classx.co.in/",
-}
-
-function extractNextData(html: string): Record<string, unknown> | null {
-  try {
-    const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([^<]+)<\/script>/)
-    if (!match) return null
-    return JSON.parse(match[1])
-  } catch {
-    return null
-  }
 }
 
 function findTestSeries(data: unknown, depth = 0): unknown[] {
@@ -155,16 +125,16 @@ function detectCategoryFromTitle(title: string): string {
 }
 
 function cleanSeriesData(series: unknown[]): unknown[] {
-  return series.map((item, idx) => {
+  return series.slice(0, 500).map((item, idx) => {
     const s = item as Record<string, unknown>
     return {
-      id: s.id || s.slug || `series-${idx}`,
-      title: cleanTitle(String(s.title || s.name || `Mock Test ${idx + 1}`)),
-      slug: s.slug || String(s.id || idx),
+      id: String(s.id ?? s.slug ?? `series-${idx}`).slice(0, 200),
+      title: cleanTitle(String(s.title ?? s.name ?? `Mock Test ${idx + 1}`)).slice(0, 300),
+      slug: String(s.slug ?? s.id ?? idx).slice(0, 200),
       description: cleanDescription(String(s.description || s.subtitle || "")),
-      total_tests: s.total_tests || s.test_count || s.totalTests || s.testsCount || 10,
-      total_questions: s.total_questions || s.totalQuestions || 0,
-      duration: s.duration || s.time || 60,
+      total_tests: s.total_tests ?? s.test_count ?? s.totalTests ?? s.testsCount ?? 10,
+      total_questions: s.total_questions ?? s.totalQuestions ?? 0,
+      duration: s.duration ?? s.time ?? 60,
       is_free: s.is_free ?? true,
       subjects: s.subjects || [],
       category: s.category || detectCategoryFromTitle(String(s.title || s.name || "")),
@@ -177,7 +147,11 @@ function cleanSeriesData(series: unknown[]): unknown[] {
 }
 
 // Try to fetch test series from a specific platform API
-async function tryFetchFromPlatform(apiUrl: string): Promise<unknown[] | null> {
+async function tryFetchFromPlatform(
+  apiUrl: string,
+  timeout = 3_500,
+  endpointLimit = 3,
+): Promise<unknown[] | null> {
   const endpoints = [
     `/api/v1/test-series/?format=json`,
     `/api/v2/test-series/?format=json`,
@@ -188,11 +162,16 @@ async function tryFetchFromPlatform(apiUrl: string): Promise<unknown[] | null> {
     `/api/v2/courses/`,
   ]
 
-  for (const endpoint of endpoints) {
+  for (const endpoint of endpoints.slice(0, endpointLimit)) {
     try {
-      const res = await fetchWithTimeout(`${apiUrl}${endpoint}`, { headers: HEADERS }, 8000)
+      const res = await fetchTrustedQuizApi(`${apiUrl}${endpoint}`, timeout)
       if (res.ok) {
-        const text = await res.text()
+        const contentType = res.headers.get("content-type")?.toLowerCase() || ""
+        if (!contentType.includes("application/json")) {
+          await res.body?.cancel()
+          continue
+        }
+        const text = await readLimitedText(res)
         try {
           const json = JSON.parse(text)
           const series = findTestSeries(json)
@@ -205,30 +184,6 @@ async function tryFetchFromPlatform(apiUrl: string): Promise<unknown[] | null> {
       }
     } catch {
       // Timeout or network error, try next
-    }
-  }
-  return null
-}
-
-// Try to scrape from web URL
-async function tryScrapeFromWeb(webUrl: string): Promise<unknown[] | null> {
-  const paths = ["/test-series", "/test-series/", "/courses", "/courses/", "/"]
-  
-  for (const path of paths) {
-    try {
-      const res = await fetchWithTimeout(`${webUrl}${path}`, { headers: HEADERS }, 8000)
-      if (res.ok) {
-        const html = await res.text()
-        const nextData = extractNextData(html)
-        if (nextData) {
-          const series = findTestSeries(nextData)
-          if (series.length > 0) {
-            return series
-          }
-        }
-      }
-    } catch {
-      // Continue to next path
     }
   }
   return null
@@ -279,71 +234,26 @@ export async function GET(request: Request) {
     // Keep homepage discovery bounded and deterministic for a given day.
     // A rotating window preserves coverage without launching hundreds of
     // outbound requests on a cold process.
-    const platformLimit = Math.min(24, PLATFORM_LIST.length)
+    const platformLimit = Math.min(4, PLATFORM_LIST.length)
     const dailyOffset = Math.floor(Date.now() / 86_400_000) % PLATFORM_LIST.length
     const platformsToTry = Array.from(
       { length: platformLimit },
       (_, index) => PLATFORM_LIST[(dailyOffset + index) % PLATFORM_LIST.length],
     )
 
-    // Fetch from platforms in parallel - try both API and web scraping
+    // Fetch a bounded rotating set of approved API hosts.
     const fetchPromises = platformsToTry.map(async (platform) => {
       const webUrl = deriveWebUrl(platform.api)
-      
-      // Try multiple methods to get data
       try {
-        // Method 1: Try web scraping first (most reliable for APX platforms)
-        const webPaths = ["/test-series/", "/test-series"]
-        for (const path of webPaths) {
-          try {
-            const res = await fetchWithTimeout(`${webUrl}${path}`, { headers: HEADERS }, 2500)
-            if (res.ok) {
-              const html = await res.text()
-              const nextData = extractNextData(html)
-              if (nextData) {
-                const series = findTestSeries(nextData)
-                if (series.length > 0) {
-                  // Return all series (up to 10 per platform)
-                  return series.slice(0, 10).map(s => ({
-                    ...(s as object),
-                    _sourceApi: platform.api,
-                    _sourceWeb: webUrl,
-                    _platformName: platform.name,
-                    isSample: false,
-                  }))
-                }
-              }
-            }
-          } catch {
-            // Try next path
-          }
-        }
-        
-        // Method 2: Try API endpoints as fallback
-        const apiEndpoints = [
-          "/api/v1/test-series/?format=json",
-          "/api/v2/test-series/?format=json",
-          "/api/v1/courses/?format=json",
-        ]
-        for (const endpoint of apiEndpoints) {
-          try {
-            const res = await fetchWithTimeout(`${platform.api}${endpoint}`, { headers: HEADERS }, 2500)
-            if (res.ok) {
-              const json = await res.json()
-              const series = findTestSeries(json)
-              if (series.length > 0) {
-                return series.slice(0, 10).map(s => ({
-                  ...(s as object),
-                  _sourceApi: platform.api,
-                  _sourceWeb: webUrl,
-                  _platformName: platform.name,
-                  isSample: false,
-                }))
-              }
-            }
-          } catch {
-            // Try next endpoint
-          }
+        const series = await tryFetchFromPlatform(platform.api, 2_500, 2)
+        if (series?.length) {
+          return series.slice(0, 10).map(s => ({
+            ...(s as object),
+            _sourceApi: platform.api,
+            _sourceWeb: webUrl,
+            _platformName: platform.name,
+            isSample: false,
+          }))
         }
       } catch {
         // Failed to fetch
@@ -438,18 +348,10 @@ export async function GET(request: Request) {
   }
   const { apiUrl, webUrl } = platform
 
-  console.log(`[v0] Extract API: apiUrl=${apiUrl} webUrl=${webUrl}`)
-
-  // Try API first, then web scraping
-  let series = await tryFetchFromPlatform(apiUrl)
-  
-  if (!series || series.length === 0) {
-    series = await tryScrapeFromWeb(webUrl)
-  }
+  const series = await tryFetchFromPlatform(apiUrl)
 
   if (series && series.length > 0) {
     const cleanedSeries = cleanSeriesData(series)
-    console.log(`[v0] Found ${cleanedSeries.length} series`)
     return NextResponse.json({
       success: true,
       testSeries: cleanedSeries,
@@ -458,8 +360,6 @@ export async function GET(request: Request) {
       webBase: webUrl,
     })
   }
-
-  console.log(`[v0] No series found, using sample tests`)
 
   // Fallback to sample tests
   const cat = mapUrlToCategory(webUrl)

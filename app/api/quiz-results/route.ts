@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendTelegramMessage } from "@/lib/telegram"
 import { checkRateLimit, clientAddress, readBoundedJson, RequestBodyError } from "@/lib/ai-request-security"
-import { awardQuizProgress } from "@/lib/study-progression"
 
 const LEADERBOARD_FIELDS = "id,name,score,percentage,correct,wrong,skipped,total_time,quiz_id,quiz_title,created_at"
 // Leaderboard needs the performance breakdown; never include user_id or other
@@ -163,18 +162,6 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient()
-    const { data: existing, error: existingError } = await admin
-      .from("quiz_results")
-      .select(LEADERBOARD_FIELDS)
-      .eq("user_id", user.id)
-      .eq("client_attempt_id", clientAttemptId)
-      .maybeSingle()
-    if (existingError) return NextResponse.json({ error: "Failed to check quiz attempt" }, { status: 500 })
-    if (existing) {
-      let progression = null
-      try { progression = await awardQuizProgress(user.id, existing.id) } catch {}
-      return NextResponse.json({ result: existing, progression, duplicate: true }, { headers: { "Cache-Control": "no-store" } })
-    }
     const { data: quiz, error: quizError } = await admin
       .from("quizzes")
       .select("id,title,enabled,questions,time_limit")
@@ -201,66 +188,48 @@ export async function POST(request: Request) {
     const percentage = Math.round((correct / total) * 100)
     const score = correct - (wrong * 0.25)
 
-    const { data, error } = await admin
-      .from("quiz_results")
-      .insert({
-        id: crypto.randomUUID(),
-        name,
-        score,
-        percentage,
-        correct,
-        wrong,
-        skipped,
-        total_time: totalTime,
-        quiz_id: quiz.id,
-        quiz_title: quiz.title,
-        user_id: user.id,
-        client_attempt_id: clientAttemptId,
-      })
-      .select(LEADERBOARD_FIELDS)
-      .single()
-
-    if (error) {
-      // A concurrent retry may win after the initial existence check.
-      if (error.code === "23505") {
-        const { data: raced } = await admin.from("quiz_results").select(LEADERBOARD_FIELDS).eq("user_id", user.id).eq("client_attempt_id", clientAttemptId).maybeSingle()
-        if (raced) {
-          let progression = null
-          try { progression = await awardQuizProgress(user.id, raced.id) } catch {}
-          return NextResponse.json({ result: raced, progression, duplicate: true }, { headers: { "Cache-Control": "no-store" } })
-        }
-      }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    const { data: submission, error } = await admin.rpc("insert_quiz_result_and_award_progress", {
+      p_result_id: crypto.randomUUID(),
+      p_user_id: user.id,
+      p_client_attempt_id: clientAttemptId,
+      p_name: name,
+      p_score: score,
+      p_percentage: percentage,
+      p_correct: correct,
+      p_wrong: wrong,
+      p_skipped: skipped,
+      p_total_time: totalTime,
+      p_quiz_id: quiz.id,
+      p_quiz_title: quiz.title,
+    })
+    if (error || !submission || typeof submission !== "object") {
+      console.error("[quiz-results] Atomic result/progression write failed:", error?.message)
+      return NextResponse.json({ error: "Failed to save quiz result" }, { status: 500 })
     }
-    // The RPC reads the persisted, server-computed result and uses its ID as
-    // an idempotency key. No client supplied XP or streak data is accepted.
-    let progression = null
-    try {
-      progression = await awardQuizProgress(user.id, data.id)
-    } catch (progressionError) {
-      // The result is already committed. Do not encourage a retry that would
-      // create a duplicate attempt; progression can be reconciled separately.
-      console.error("[quiz-results] Progression award failed:", progressionError)
+    const saved = submission as {
+      result: Record<string, unknown>
+      progression: unknown
+      duplicate: boolean
     }
 
     // Send Telegram notification (fire and forget)
-    const medal = percentage >= 90 ? "🥇" : percentage >= 75 ? "🥈" : percentage >= 50 ? "🥉" : "📝"
+    if (!saved.duplicate) {
+      const medal = percentage >= 90 ? "🥇" : percentage >= 75 ? "🥈" : percentage >= 50 ? "🥉" : "📝"
+      const message = [
+        `${medal} <b>New Quiz Result!</b>`,
+        "",
+        `👤 <b>Student:</b> ${escapeTelegramHtml(name)}`,
+        `📝 <b>Quiz:</b> ${escapeTelegramHtml(quiz.title)}`,
+        `✅ <b>Score:</b> ${percentage}% (${correct}/${total} correct)`,
+        wrong > 0 ? `❌ <b>Wrong:</b> ${wrong}` : "",
+        totalTime > 0 ? `⏱️ <b>Time:</b> ${formatTime(totalTime)}` : "",
+        "",
+        "#TechVyro #Quiz #Leaderboard",
+      ].filter(line => line !== "").join("\n")
+      sendTelegramMessage(message).catch(() => {})
+    }
 
-    const message = [
-      `${medal} <b>New Quiz Result!</b>`,
-      "",
-      `👤 <b>Student:</b> ${escapeTelegramHtml(name)}`,
-      `📝 <b>Quiz:</b> ${escapeTelegramHtml(quiz.title)}`,
-      `✅ <b>Score:</b> ${percentage}% (${correct}/${total} correct)`,
-      wrong > 0 ? `❌ <b>Wrong:</b> ${wrong}` : "",
-      totalTime > 0 ? `⏱️ <b>Time:</b> ${formatTime(totalTime)}` : "",
-      "",
-      "#TechVyro #Quiz #Leaderboard",
-    ].filter(line => line !== "").join("\n")
-
-    sendTelegramMessage(message).catch(() => {})
-
-    return NextResponse.json({ result: data, progression }, { headers: { "Cache-Control": "no-store" } })
+    return NextResponse.json(saved, { headers: { "Cache-Control": "no-store" } })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

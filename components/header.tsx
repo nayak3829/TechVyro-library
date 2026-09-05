@@ -161,6 +161,8 @@ export function Header() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
   const browseRef = useRef<HTMLDivElement>(null)
+  const browseButtonRef = useRef<HTMLButtonElement>(null)
+  const browseFocusOnOpenRef = useRef(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -201,6 +203,14 @@ export function Header() {
   }, [searchOpen])
 
   useEffect(() => {
+    if (!browseOpen || !browseFocusOnOpenRef.current) return
+    browseFocusOnOpenRef.current = false
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>("#header-browse-panel a[href], #header-browse-panel button:not([disabled])")?.focus()
+    })
+  }, [browseOpen])
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
@@ -211,7 +221,10 @@ export function Header() {
         setSearchOpen(false)
         setSearchQuery("")
         setShowSuggestions(false)
-        setBrowseOpen(false)
+        setBrowseOpen(current => {
+          if (current) requestAnimationFrame(() => browseButtonRef.current?.focus())
+          return false
+        })
       }
     }
     window.addEventListener("keydown", handleKeyDown)
@@ -385,7 +398,7 @@ export function Header() {
     } supports-[backdrop-filter]:bg-background/80`}>
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
-      <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between gap-4 px-4">
+      <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between gap-4 overflow-visible px-4">
 
         {/* Logo */}
         <a href="/" className="flex items-center gap-2.5 group shrink-0">
@@ -401,7 +414,7 @@ export function Header() {
           </div>
           <div className="flex flex-col">
             <span className="text-lg sm:text-xl font-bold leading-tight tracking-tight">
-              <span className="text-[#ef4444]">Tech</span>
+              <span className="text-red-700 dark:text-red-400">Tech</span>
               <span className="text-foreground">Vyro</span>
             </span>
             <span className="text-[9px] sm:text-[10px] text-muted-foreground -mt-0.5 hidden sm:block font-medium">Study Platform</span>
@@ -409,7 +422,7 @@ export function Header() {
         </a>
 
         {/* Desktop Search */}
-        <div className="hidden md:flex flex-1 max-w-xl mx-4" ref={suggestionsRef}>
+        <div className="hidden min-w-0 md:flex flex-1 max-w-xl mx-4" ref={suggestionsRef}>
           <div className="relative w-full">
             <form onSubmit={handleSearch} className="relative w-full group">
               <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-primary/20 to-accent/20 opacity-0 group-focus-within:opacity-100 blur-sm transition-opacity duration-300" />
@@ -442,7 +455,7 @@ export function Header() {
         </div>
 
         {/* Desktop Nav */}
-        <nav className="flex items-center gap-1 sm:gap-1.5">
+        <nav className="flex shrink-0 items-center gap-1 sm:gap-1.5">
 
           {/* Mobile search icon */}
           <Button
@@ -458,16 +471,31 @@ export function Header() {
           </Button>
 
           {/* Home */}
-          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
+          <Button variant="ghost" size="sm" asChild className="hidden px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
             <a href="/"><Home className="h-4 w-4" />Home</a>
           </Button>
 
           {/* Browse Dropdown */}
-          <div className="relative hidden lg:block" ref={browseRef}>
+          <div className="relative hidden xl:flex" ref={browseRef}>
             <button
-              onClick={() => setBrowseOpen(!browseOpen)}
+              ref={browseButtonRef}
+              onClick={() => {
+                browseFocusOnOpenRef.current = false
+                setBrowseOpen(!browseOpen)
+              }}
               aria-expanded={browseOpen}
-              aria-haspopup="menu"
+              aria-controls="header-browse-panel"
+              onKeyDown={(event) => {
+                if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  browseFocusOnOpenRef.current = true
+                  setBrowseOpen(true)
+                } else if (event.key === "Escape") {
+                  event.preventDefault()
+                  setBrowseOpen(false)
+                  browseButtonRef.current?.focus()
+                }
+              }}
               className={`flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium transition-all duration-200 hover:bg-primary/10 hover:text-primary ${browseOpen ? "bg-primary/10 text-primary" : "text-foreground/80"}`}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -476,7 +504,39 @@ export function Header() {
             </button>
 
             {browseOpen && (
-              <div className="absolute top-full left-0 mt-2 w-[480px] bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+              <div
+                id="header-browse-panel"
+                role="region"
+                aria-label="Browse study materials"
+                className="absolute top-full left-0 mt-2 w-[480px] bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50"
+                onBlur={(event) => {
+                  const nextTarget = event.relatedTarget
+                  if (!(nextTarget instanceof Node) || !browseRef.current?.contains(nextTarget)) {
+                    setBrowseOpen(false)
+                  }
+                }}
+                onKeyDown={(event) => {
+                  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"))
+                  const index = items.indexOf(document.activeElement as HTMLElement)
+                  if (event.key === "Escape") {
+                    event.preventDefault()
+                    setBrowseOpen(false)
+                    browseButtonRef.current?.focus()
+                  } else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+                    event.preventDefault()
+                    items[(index + 1 + items.length) % items.length]?.focus()
+                  } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+                    event.preventDefault()
+                    items[(index - 1 + items.length) % items.length]?.focus()
+                  } else if (event.key === "Home") {
+                    event.preventDefault()
+                    items[0]?.focus()
+                  } else if (event.key === "End") {
+                    event.preventDefault()
+                    items[items.length - 1]?.focus()
+                  }
+                }}
+              >
                 <div className="p-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Access</p>
                   <div className="grid grid-cols-2 gap-2 mb-4">
@@ -556,22 +616,22 @@ export function Header() {
 
           {/* Contribute - direct link */}
           {user && (
-            <Button variant="ghost" size="sm" asChild className="hidden xl:flex px-3 gap-1.5 hover:bg-blue-500/10 hover:text-blue-600 text-sm font-medium">
+            <Button variant="ghost" size="sm" asChild className="hidden 2xl:flex px-3 gap-1.5 hover:bg-blue-500/10 hover:text-blue-600 text-sm font-medium">
               <Link href="/library"><BookOpen className="h-4 w-4" />My Library</Link>
             </Button>
           )}
 
-          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
+          <Button variant="ghost" size="sm" asChild className="hidden xl:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
             <Link href="/submit"><Upload className="h-4 w-4" />Contribute</Link>
           </Button>
 
           {/* Quiz Portal - direct link */}
-          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-amber-500/10 hover:text-amber-600 text-sm font-medium">
+          <Button variant="ghost" size="sm" asChild className="hidden xl:flex px-3 gap-1.5 hover:bg-amber-500/10 hover:text-amber-600 text-sm font-medium">
             <a href="/quiz"><Trophy className="h-4 w-4" />Quiz Portal</a>
           </Button>
 
           {/* Mock Tests - direct link */}
-          <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-violet-500/10 hover:text-violet-600 text-sm font-medium">
+          <Button variant="ghost" size="sm" asChild className="hidden xl:flex px-3 gap-1.5 hover:bg-violet-500/10 hover:text-violet-600 text-sm font-medium">
             <a href="/test-series"><Zap className="h-4 w-4" />Mock Tests</a>
           </Button>
 

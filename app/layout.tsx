@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from 'next'
+import dynamic from 'next/dynamic'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
-import { WhatsAppPopup } from "@/components/whatsapp-popup"
-import { InitialSiteLoader } from "@/components/initial-site-loader"
 import { MobileNav } from "@/components/mobile-nav"
+import { canonicalUrl, getCanonicalOrigin } from "@/lib/site-url"
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const WhatsAppPopup = dynamic(() => import("@/components/whatsapp-popup").then(module => module.WhatsAppPopup))
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -23,7 +24,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.techvyro.in'),
+  metadataBase: new URL(getCanonicalOrigin()),
   title: 'TechVyro - Free PDF Library | NDA Notes, Study Materials & Educational PDFs',
   description: 'Download free NDA PDFs, study notes, previous year papers and educational materials for CBSE, engineering, medical and competitive exams.',
   keywords: [
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
     'B.Tech Notes', 'NEET PDF', 'JEE PDF', 'SSC PDF', 'UPSC PDF',
     'Free Books PDF', 'College Notes', 'School Notes PDF'
   ],
-  authors: [{ name: 'TechVyro', url: 'https://www.techvyro.in/' }],
+  authors: [{ name: 'TechVyro', url: canonicalUrl('/') }],
   creator: 'TechVyro',
   publisher: 'TechVyro',
   robots: {
@@ -50,7 +51,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'TechVyro - Free PDF Library | Download Study Materials & Notes',
     description: 'Download free NDA PDFs, study notes and educational materials for academic and competitive exams.',
-    url: 'https://www.techvyro.in/',
+    url: canonicalUrl('/'),
     siteName: 'TechVyro PDF Library',
     type: 'website',
     locale: 'en_IN',
@@ -71,7 +72,7 @@ export const metadata: Metadata = {
     images: ['/og-image.jpg'],
   },
   alternates: {
-    canonical: 'https://www.techvyro.in/',
+    canonical: canonicalUrl('/'),
   },
   category: 'Education',
   icons: {
@@ -101,18 +102,39 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const origin = getCanonicalOrigin()
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "TechVyro",
+      url: origin,
+      logo: canonicalUrl("/apple-icon.png"),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "TechVyro",
+      url: origin,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${origin}/?q={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ]
+  const serializedStructuredData = JSON.stringify(structuredData).replace(/</g, "\\u003c")
+
   return (
     <html lang="en-IN" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
-        <meta name="google-adsense-account" content="ca-pub-6111784142192967" />
         <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6111784142192967"
-          crossOrigin="anonymous"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializedStructuredData }}
         />
+        <meta name="google-adsense-account" content="ca-pub-6111784142192967" />
       </head>
       <body className="font-sans antialiased">
-        <InitialSiteLoader />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -126,7 +148,7 @@ export default function RootLayout({
           <Toaster richColors position="top-right" />
           <WhatsAppPopup />
         </ThemeProvider>
-        <Analytics />
+        {process.env.VERCEL ? <Analytics /> : null}
       </body>
     </html>
   )

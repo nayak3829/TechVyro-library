@@ -3,6 +3,7 @@ import fs from "fs"
 import path from "path"
 import {
   fetchWithTimeout,
+  readLimitedText,
   validatePublicHttpsUrl,
 } from "@/lib/quiz-remote-fetch"
 import { createClient } from "@/lib/supabase/server"
@@ -19,12 +20,11 @@ function escapeHtml(value: string): string {
 
 async function readBoundedJson(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type")?.toLowerCase() || ""
-  if (contentType && !contentType.includes("json")) throw new Error("Quiz API did not return JSON")
-  const declaredSize = Number(response.headers.get("content-length") || 0)
-  if (declaredSize > MAX_REMOTE_JSON_BYTES) throw new Error("Quiz response is too large")
-  const text = await response.text()
-  if (Buffer.byteLength(text, "utf8") > MAX_REMOTE_JSON_BYTES) throw new Error("Quiz response is too large")
-  return JSON.parse(text)
+  if (!contentType.includes("json")) {
+    await response.body?.cancel()
+    throw new Error("Quiz API did not return JSON")
+  }
+  return JSON.parse(await readLimitedText(response, MAX_REMOTE_JSON_BYTES))
 }
 
 function stripHtml(html: string): string {
@@ -49,7 +49,7 @@ interface RawQuestion {
   option_3?: string
   option_4?: string
   option_5?: string
-  options?: Array<{ option?: string; text?: string; optionKey?: string }>
+  options?: Array<{ option?: string; text?: string; optionKey?: string; id?: string | number }>
   answer?: string | number
   correct_option?: string | number
   correct?: string | number
@@ -61,36 +61,42 @@ interface RawQuestion {
   explanation?: string
 }
 
-function convertToTemplateFormat(q: RawQuestion, idx: number): Record<string, unknown> {
-  const questionText = stripHtml(String(q.question || q.title || q.question_title || `Question ${idx + 1}`))
+function convertToTemplateFormat(q: RawQuestion, idx: number): Record<string, unknown> | null {
+  const questionText = stripHtml(String(q.question || q.title || q.question_title || `Question ${idx + 1}`)).slice(0, 10_000)
   
   let opt1 = "", opt2 = "", opt3 = "", opt4 = ""
   
   if (q.option_1 && q.option_2) {
-    opt1 = stripHtml(q.option_1)
-    opt2 = stripHtml(q.option_2)
-    opt3 = stripHtml(q.option_3 || "")
-    opt4 = stripHtml(q.option_4 || "")
+    opt1 = stripHtml(q.option_1).slice(0, 2_000)
+    opt2 = stripHtml(q.option_2).slice(0, 2_000)
+    opt3 = stripHtml(q.option_3 || "").slice(0, 2_000)
+    opt4 = stripHtml(q.option_4 || "").slice(0, 2_000)
   } else if (Array.isArray(q.options) && q.options.length >= 2) {
-    const opts = q.options.map(o => stripHtml(String(o.option || o.text || "")))
+    const opts = q.options.slice(0, 4).map(o => stripHtml(String(o.option || o.text || "")).slice(0, 2_000))
     opt1 = opts[0] || ""
     opt2 = opts[1] || ""
     opt3 = opts[2] || ""
     opt4 = opts[3] || ""
   }
 
-  let correctOption = "1"
   const raw = q.answer ?? q.correct_answer ?? q.correct_option ?? q.correct
-  if (typeof raw === "number") {
-    correctOption = String(raw > 4 ? raw - 4 : raw)
-  } else if (typeof raw === "string") {
-    const letter = raw.toLowerCase().trim()
-    if (["a", "b", "c", "d"].includes(letter)) {
-      correctOption = String(letter.charCodeAt(0) - "a".charCodeAt(0) + 1)
-    } else {
-      correctOption = raw || "1"
-    }
+  if (raw === undefined || raw === null) return null
+  const answerText = String(raw).trim()
+  let rawCorrectIndex = Array.isArray(q.options)
+    ? q.options.findIndex((option) =>
+      (option.optionKey !== undefined && option.optionKey.toLowerCase() === answerText.toLowerCase())
+      || (option.id !== undefined && String(option.id).toLowerCase() === answerText.toLowerCase()))
+    : -1
+  if (rawCorrectIndex < 0 && /^[a-d]$/i.test(answerText)) {
+    rawCorrectIndex = answerText.toLowerCase().charCodeAt(0) - "a".charCodeAt(0)
   }
+  if (rawCorrectIndex < 0 && /^\d+$/.test(answerText)) {
+    const numericAnswer = Number(answerText)
+    rawCorrectIndex = numericAnswer === 0 ? 0 : numericAnswer - 1
+  }
+  const renderedOptions = [opt1, opt2, opt3, opt4]
+  if (rawCorrectIndex < 0 || rawCorrectIndex >= renderedOptions.length || !renderedOptions[rawCorrectIndex]) return null
+  const correctOption = String(rawCorrectIndex + 1)
 
   return {
     id: q.id || idx + 1,
@@ -102,7 +108,7 @@ function convertToTemplateFormat(q: RawQuestion, idx: number): Record<string, un
     correct_option: correctOption,
     positive_marks: q.positive_marks ?? q.marks ?? 1,
     negative_marks: q.negative_marks ?? 0.25,
-    solution: stripHtml(String(q.solution || q.explanation || "")),
+    solution: stripHtml(String(q.solution || q.explanation || "")).slice(0, 10_000),
   }
 }
 
@@ -174,6 +180,9 @@ export async function GET(request: NextRequest) {
   const title = searchParams.get("title") || "Mock Test"
   const seriesTitle = searchParams.get("seriesTitle") || "Practice Test Series"
   const duration = parseInt(searchParams.get("duration") || "60")
+  if (testId.length > 200 || /[\u0000-\u001f]/.test(testId)) {
+    return NextResponse.json({ error: "Invalid test identifier" }, { status: 400 })
+  }
 
   let questions: Record<string, unknown>[] = []
   let source = "sample"
@@ -196,20 +205,31 @@ export async function GET(request: NextRequest) {
       `${safeApiBase}/api/v2/test/${encodeURIComponent(testId)}/questions/?format=json`,
     ]
 
-    for (const endpoint of endpoints) {
+    const tryEndpoint = async (endpoint: string): Promise<Record<string, unknown>[] | null> => {
       try {
-        const res = await fetchWithTimeout(endpoint)
+        const res = await fetchWithTimeout(endpoint, 4_000)
         if (res.ok) {
-            const json = await readBoundedJson(res)
+          const json = await readBoundedJson(res)
           const raw = findRawQuestions(json)
           if (raw.length > 0) {
-            questions = raw.slice(0, MAX_QUESTIONS).map((q, i) => convertToTemplateFormat(q, i))
-            source = "live"
-            break
+            const converted = raw.slice(0, MAX_QUESTIONS)
+              .map((q, i) => convertToTemplateFormat(q, i))
+              .filter((question): question is Record<string, unknown> => question !== null)
+            return converted.length > 0 ? converted : null
           }
         }
       } catch {
-        continue
+        return null
+      }
+      return null
+    }
+    for (let index = 0; index < endpoints.length; index += 2) {
+      const candidates = await Promise.all(endpoints.slice(index, index + 2).map(tryEndpoint))
+      const liveQuestions = candidates.find((candidate) => candidate !== null)
+      if (liveQuestions) {
+        questions = liveQuestions
+        source = "live"
+        break
       }
     }
   }

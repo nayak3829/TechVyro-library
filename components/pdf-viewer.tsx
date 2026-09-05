@@ -270,8 +270,8 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
               </div>
               {pdf.category && (
                 <Badge
-                  className="absolute top-3 left-3 text-xs px-2.5 py-1 font-bold shadow-md border-0"
-                  style={{ backgroundColor: categoryColor, color: "#fff" }}
+                  className="absolute top-3 left-3 border-border bg-slate-900 px-2.5 py-1 text-xs font-bold text-white shadow-md dark:bg-slate-100 dark:text-slate-950"
+                  style={{ borderLeftColor: categoryColor, borderLeftWidth: "3px" }}
                 >
                   {pdf.category.name}
                 </Badge>
@@ -279,7 +279,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
 
               {/* Reading time badge */}
               {readingTime > 0 && (
-                <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 text-[10px] font-medium text-foreground">
+                <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 text-xs font-medium text-foreground">
                   <Clock className="h-2.5 w-2.5 text-primary" />
                   {formatReadingTime(readingTime)}
                 </div>
@@ -316,7 +316,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
                       <span style={{ color: s.color }}>{s.icon}</span>
                     </div>
                     <p className="text-base font-extrabold text-foreground">{s.value}</p>
-                    <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -371,6 +371,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
                   onClick={toggleBookmark}
                   className={`hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors ${isBookmarked ? "border-amber-500/60 bg-amber-500/10 text-amber-500" : ""}`}
                   title={isBookmarked ? "Remove bookmark" : "Save bookmark"}
+                  aria-label={isBookmarked ? "Remove PDF bookmark" : "Save PDF bookmark"}
                 >
                   {isBookmarked ? <BookmarkCheck className="h-4 w-4 text-amber-500" /> : <Bookmark className="h-4 w-4" />}
                 </Button>
@@ -379,6 +380,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
                   size="icon"
                   onClick={handleShare}
                   className="hover:border-primary/50 hover:bg-primary/5"
+                  aria-label={copied ? "PDF link copied" : "Copy PDF link"}
                 >
                   {copied ? <Check className="h-4 w-4 text-green-500" /> : <Share2 className="h-4 w-4" />}
                 </Button>
@@ -386,7 +388,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
 
               {/* Social share */}
               <div className="pt-3 border-t border-border/50">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Share PDF</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Share PDF</p>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -428,7 +430,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
                 <div className="hidden sm:block h-4 w-px bg-border/50" />
                 <div className="hidden sm:block">
                   <p className="text-xs font-semibold text-foreground">Document Preview</p>
-                  <p className="text-[10px] text-muted-foreground">Scroll to read · Fullscreen for best experience</p>
+                   <p className="text-xs text-muted-foreground">Scroll to read · Fullscreen for best experience</p>
                 </div>
               </div>
               <Button
@@ -436,6 +438,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
                 size="sm"
                 onClick={toggleFullscreen}
                 aria-pressed={isFullscreen}
+                 aria-label={isFullscreen ? "Exit PDF fullscreen view" : "Enter PDF fullscreen view"}
                 className="gap-2 text-xs hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
@@ -443,11 +446,30 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
               </Button>
             </div>
 
+            <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border/50 bg-muted/20 text-xs">
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline underline-offset-2"
+              >
+                Open PDF in a new tab
+              </a>
+              {pdf.allow_download !== false && (
+                <>
+                  <span aria-hidden="true" className="text-muted-foreground">·</span>
+                  <button type="button" onClick={handleDownload} disabled={downloading || authLoading} className="font-medium text-primary underline underline-offset-2 disabled:opacity-50">
+                    {downloading ? "Downloading PDF…" : user || isAdmin ? "Download accessible PDF copy" : "Log in to download PDF"}
+                  </button>
+                </>
+              )}
+            </div>
+
             <div className="aspect-[3/4] lg:aspect-[4/5] w-full bg-muted/10">
               <iframe
                 src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                 className="w-full h-full border-0"
-                title={pdf.title}
+                title={`PDF preview: ${pdf.title}`}
               />
             </div>
             </CardContent>
@@ -465,7 +487,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
               </div>
               <div>
                 <h2 className="text-base font-bold text-foreground">Related PDFs</h2>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   More documents from {pdf.category?.name}
                 </p>
               </div>
@@ -496,7 +518,7 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
                     style={{ color: relPdf.category?.color || categoryColor }}
                   />
                   {relPdf.download_count > 0 && (
-                    <span className="absolute bottom-1 right-1 flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                    <span className="absolute bottom-1 right-1 flex items-center gap-0.5 text-xs text-muted-foreground">
                       <Download className="h-2.5 w-2.5" />{relPdf.download_count}
                     </span>
                   )}

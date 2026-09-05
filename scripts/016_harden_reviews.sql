@@ -13,13 +13,15 @@ DROP POLICY IF EXISTS "Allow public insert on reviews" ON reviews;
 DROP POLICY IF EXISTS "Authenticated users insert own reviews" ON reviews;
 
 CREATE POLICY "Visible PDF reviews are publicly readable"
-  ON reviews FOR SELECT
+  ON reviews FOR SELECT TO anon, authenticated
   USING (
     EXISTS (
       SELECT 1
       FROM pdfs
       WHERE pdfs.id = reviews.pdf_id
-        AND pdfs.visibility IN ('public', 'unlisted')
+        AND pdfs.visibility = 'public'
+        AND pdfs.publish_status = 'published'
+        AND pdfs.malware_status = 'clean'
         AND (pdfs.scheduled_at IS NULL OR pdfs.scheduled_at <= NOW())
     )
   );
@@ -33,7 +35,9 @@ CREATE POLICY "Authenticated users insert own reviews"
       SELECT 1
       FROM pdfs
       WHERE pdfs.id = reviews.pdf_id
-        AND pdfs.visibility IN ('public', 'unlisted')
+        AND pdfs.visibility = 'public'
+        AND pdfs.publish_status = 'published'
+        AND pdfs.malware_status = 'clean'
         AND (pdfs.scheduled_at IS NULL OR pdfs.scheduled_at <= NOW())
     )
   );

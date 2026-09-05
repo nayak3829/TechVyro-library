@@ -16,22 +16,17 @@ function result<T>(data: T) {
 vi.mock("@/lib/supabase/admin", () => ({
   isAdminConfigured: () => true,
   createAdminClient: () => ({
-    from: (table: string) => ({
-      select: () => {
-        if (table === "pdfs") {
-          return {
-            range: () => result([{
-              id: "pdf-1", title: "Guide", category_id: "cat-1", view_count: 10,
-              download_count: 5, review_count: 2, file_size: 1024, average_rating: 4.5,
-            }]),
-          }
-        }
-        if (table === "categories") return result([{ id: "cat-1", name: "Guides", color: "#000000" }])
-        return result([])
-      },
-    }),
-    rpc: (_name: string, args: { p_days: number }) => {
-      state.requestedTrendDays = args.p_days
+    rpc: (name: string, args?: { p_days: number }) => {
+      if (name === "get_admin_analytics_summary") {
+        return result({
+          stats: { totalViews: 10, totalDownloads: 5, totalReviews: 2, totalPdfs: 1, avgRating: 4.5 },
+          performance: { highRated: 1 },
+          topPdfs: [{ id: "pdf-1", title: "Guide" }],
+          topDownloads: [{ id: "pdf-1", title: "Guide" }],
+          categories: [{ id: "cat-1", count: 1, views: 10, downloads: 5 }],
+        })
+      }
+      state.requestedTrendDays = args?.p_days || 0
       return result([{ event_date: "2026-09-03", views: 3, downloads: 1 }])
     },
   }),

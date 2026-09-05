@@ -4,11 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import platformsData from "@/lib/appx-platforms.json"
 import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
 import { publishInAppNotification } from "@/lib/notifications"
-
-const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
+import {
+  fetchWithTimeout as fetchTrustedQuizApi,
+  readLimitedText as readLimitedQuizText,
+} from "@/lib/quiz-remote-fetch"
+import { readBoundedJson, RequestBodyError } from "@/lib/ai-request-security"
 
 interface Platform {
   name: string
@@ -16,39 +16,29 @@ interface Platform {
 }
 
 const PLATFORM_LIST: Platform[] = platformsData as Platform[]
-const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_SYNC_PLATFORMS = 20
 const MAX_SERIES_PER_PLATFORM = 100
-
-async function readLimitedText(response: Response): Promise<string> {
-  const declaredLength = Number(response.headers.get("content-length") || 0)
-  if (declaredLength > MAX_HTML_BYTES) throw new Error("Platform response is too large")
-  if (!response.body) return ""
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  while (true) {
-    const { value, done } = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > MAX_HTML_BYTES) {
-      await reader.cancel()
-      throw new Error("Platform response is too large")
-    }
-    chunks.push(value)
-  }
-  const result = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    result.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return new TextDecoder().decode(result)
-}
 
 function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.round(parsed))) : fallback
+}
+
+function normalizedCategoryValue(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const normalized = value.trim().slice(0, 80)
+  return normalized && /^[\p{L}\p{N}\s/_-]+$/u.test(normalized) ? normalized : null
+}
+
+function normalizedThumbnailUrl(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return ""
+  try {
+    const url = new URL(value)
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return ""
+    return url.toString().slice(0, 2_000)
+  } catch {
+    return ""
+  }
 }
 
 // Derive web URL from API URL
@@ -59,31 +49,6 @@ function deriveWebUrl(apiUrl: string): string {
     return `https://${host}`
   } catch {
     return apiUrl.replace(/api\./, "").replace(/api$/, "")
-  }
-}
-
-// Fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit, timeout = 8000): Promise<Response> {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal })
-    clearTimeout(id)
-    return response
-  } catch (error) {
-    clearTimeout(id)
-    throw error
-  }
-}
-
-// Extract __NEXT_DATA__ from HTML
-function extractNextData(html: string): Record<string, unknown> | null {
-  const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/i)
-  if (!match) return null
-  try {
-    return JSON.parse(match[1])
-  } catch {
-    return null
   }
 }
 
@@ -124,19 +89,23 @@ async function fetchFromPlatform(platform: Platform): Promise<{
 }> {
   const webUrl = deriveWebUrl(platform.api)
   
-  // Try web scraping first
-  const paths = ["/test-series/", "/test-series", "/courses/", "/"]
-  for (const path of paths) {
+  const endpoints = [
+    "/api/v1/test-series/?format=json",
+    "/api/v2/test-series/?format=json",
+    "/api/v1/courses/?format=json",
+  ]
+  for (const endpoint of endpoints) {
     try {
-      const res = await fetchWithTimeout(`${webUrl}${path}`, { headers: HEADERS }, 6000)
+      const res = await fetchTrustedQuizApi(`${platform.api.replace(/\/$/, "")}${endpoint}`, 4_000)
       if (res.ok) {
-        const html = await readLimitedText(res)
-        const nextData = extractNextData(html)
-        if (nextData) {
-          const series = findTestSeries(nextData)
-          if (series.length > 0) {
-            return { series, webUrl }
-          }
+        const contentType = res.headers.get("content-type")?.toLowerCase() || ""
+        if (!contentType.includes("application/json")) {
+          await res.body?.cancel()
+          continue
+        }
+        const series = findTestSeries(JSON.parse(await readLimitedQuizText(res)))
+        if (series.length > 0) {
+          return { series: series.slice(0, MAX_SERIES_PER_PLATFORM), webUrl }
         }
       }
     } catch {
@@ -153,7 +122,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body: unknown = await request.json().catch(() => null)
+    let body: unknown
+    try {
+      body = await readBoundedJson(request, 4 * 1024)
+    } catch (error) {
+      if (error instanceof RequestBodyError) {
+        return NextResponse.json({ success: false, error: error.message }, { status: error.status })
+      }
+      throw error
+    }
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ success: false, error: "Request body must be a JSON object" }, { status: 400 })
     }
@@ -165,7 +142,7 @@ export async function POST(request: NextRequest) {
     if (!Number.isInteger(normalizedLimit) || normalizedLimit < 1 || normalizedLimit > MAX_SYNC_PLATFORMS) {
       return NextResponse.json({ success: false, error: `Limit must be between 1 and ${MAX_SYNC_PLATFORMS}` }, { status: 400 })
     }
-    const normalizedCategory = typeof category === "string" && category.trim() ? category.trim() : "general"
+    const normalizedCategory = normalizedCategoryValue(category)
     const supabase = createAdminClient()
     
     // Select random platforms to sync
@@ -184,6 +161,8 @@ export async function POST(request: NextRequest) {
         const { series, webUrl } = await fetchFromPlatform(platform)
         
         if (series.length === 0) continue
+        const firstSeriesCategory = normalizedCategoryValue((series[0] as Record<string, unknown>).category)
+        const platformCategory = normalizedCategory ?? firstSeriesCategory ?? "general"
         
         // Upsert platform
         const { data: platformData, error: platformError } = await supabase
@@ -192,7 +171,7 @@ export async function POST(request: NextRequest) {
             name: platform.name,
             api_url: platform.api,
             web_url: webUrl,
-            category: normalizedCategory,
+            category: platformCategory,
             is_active: true,
             last_synced_at: new Date().toISOString(),
           }, { onConflict: "api_url" })
@@ -215,12 +194,12 @@ export async function POST(request: NextRequest) {
             slug: String(s.slug || s.id || `series-${Date.now()}`).slice(0, 200),
             title: String(s.title || s.name || "Untitled").slice(0, 300),
             description: String(s.description || s.subtitle || "").slice(0, 5000),
-            category: normalizedCategory || String(s.category || "general").slice(0, 80),
+            category: normalizedCategory ?? normalizedCategoryValue(s.category) ?? platformCategory,
             total_tests: boundedNumber(s.total_tests || s.testsCount, 10, 0, 10000),
             total_questions: boundedNumber(s.total_questions || s.questionsCount, 0, 0, 100000),
             duration: boundedNumber(s.duration, 60, 1, 10000),
             is_free: Boolean(s.is_free ?? s.isFree ?? true),
-            thumbnail_url: String(s.thumbnail || s.image || "").slice(0, 2000),
+            thumbnail_url: normalizedThumbnailUrl(s.thumbnail || s.image),
             metadata: { sourceId: s.id ?? null, sourceSlug: s.slug ?? null },
           }
           
@@ -241,12 +220,13 @@ export async function POST(request: NextRequest) {
     
     if (results.series > 0) {
       const dateKey = new Date().toISOString().slice(0, 10)
+      const notificationCategory = normalizedCategory ?? "all"
       try {
         await publishInAppNotification({
           kind: "test",
-          entityId: `catalog-${normalizedCategory.replace(/[^A-Za-z0-9_-]/g, "-")}-${dateKey}`,
+          entityId: `catalog-${notificationCategory.replace(/[^A-Za-z0-9_-]/g, "-")}-${dateKey}`,
           title: "Mock test catalogue updated",
-          body: `${results.series} test series ${results.series === 1 ? "was" : "were"} refreshed in ${normalizedCategory}.`,
+          body: `${results.series} test series ${results.series === 1 ? "was" : "were"} refreshed${normalizedCategory ? ` in ${normalizedCategory}` : ""}.`,
           href: "/test-series",
           payload: { category: normalizedCategory, series: results.series },
         })

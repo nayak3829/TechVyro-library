@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { randomUUID } from "crypto"
+import { readBoundedJson, RequestBodyError } from "@/lib/ai-request-security"
 
 const DEVICE_COOKIE = "tv_device_id"
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365 // 1 year
@@ -53,7 +54,10 @@ export async function GET() {
       error = result.error
     }
 
-    if (error) return NextResponse.json({ favorites: [] })
+    if (error) {
+      console.error("[favorites] Failed to load favorites:", error.message)
+      return NextResponse.json({ error: "Failed to load favorites" }, { status: 500 })
+    }
 
     const response = NextResponse.json({ favorites: (data || []).map((r: { pdf_id: string }) => r.pdf_id) })
     response.cookies.set(DEVICE_COOKIE, deviceId, {
@@ -64,14 +68,27 @@ export async function GET() {
     })
     return response
   } catch {
-    return NextResponse.json({ favorites: [] })
+    return NextResponse.json({ error: "Failed to load favorites" }, { status: 500 })
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { pdfId } = await request.json()
-    if (!pdfId) return NextResponse.json({ error: "pdfId required" }, { status: 400 })
+    let body: unknown
+    try {
+      body = await readBoundedJson(request, 4 * 1024)
+    } catch (error) {
+      if (error instanceof RequestBodyError) {
+        return NextResponse.json({ error: error.message }, { status: error.status })
+      }
+      throw error
+    }
+    const pdfId = body && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>).pdfId
+      : null
+    if (typeof pdfId !== "string" || !/^[0-9a-f-]{36}$/i.test(pdfId)) {
+      return NextResponse.json({ error: "Valid pdfId required" }, { status: 400 })
+    }
 
     const [{ deviceId }, userId] = await Promise.all([
       getOrCreateDeviceId(),
@@ -79,38 +96,14 @@ export async function POST(request: Request) {
     ])
     const supabase = createAdminClient()
 
-    // Check if already favorited
-    let existing
-    if (userId) {
-      const result = await supabase
-        .from("pdf_favorites")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("pdf_id", pdfId)
-        .maybeSingle()
-      existing = result.data
-    } else {
-      const result = await supabase
-        .from("pdf_favorites")
-        .select("id")
-        .eq("device_id", deviceId)
-        .eq("pdf_id", pdfId)
-        .maybeSingle()
-      existing = result.data
-    }
-
-    let action: "added" | "removed"
-
-    if (existing) {
-      await supabase.from("pdf_favorites").delete().eq("id", existing.id)
-      action = "removed"
-    } else {
-      await supabase.from("pdf_favorites").insert({
-        device_id: deviceId,
-        pdf_id: pdfId,
-        user_id: userId || null,
-      })
-      action = "added"
+    const { data: action, error } = await supabase.rpc("toggle_pdf_favorite", {
+      p_user_id: userId,
+      p_device_id: deviceId,
+      p_pdf_id: pdfId,
+    })
+    if (error || (action !== "added" && action !== "removed")) {
+      console.error("[favorites] Toggle failed:", error?.message)
+      return NextResponse.json({ error: "Failed to update favorite" }, { status: 500 })
     }
 
     const response = NextResponse.json({ action })

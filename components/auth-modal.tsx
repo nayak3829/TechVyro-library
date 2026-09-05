@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GoogleIcon } from "@/components/google-icon"
 import { toast } from "sonner"
+import { useDialogFocus } from "@/hooks/use-dialog-focus"
 
 interface AuthModalProps {
   onClose: () => void
@@ -27,6 +28,7 @@ export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
   const [loading, setLoading] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   const supabaseRef = useRef<SupabaseClient | null>(null)
   if (!supabaseRef.current) {
@@ -34,19 +36,20 @@ export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
   }
   const supabase = supabaseRef.current
 
+  useDialogFocus({
+    active: true,
+    containerRef: dialogRef,
+    initialFocusRef: closeButtonRef,
+    onEscape: () => { if (!loading) onClose() },
+  })
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
-    closeButtonRef.current?.focus()
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !loading) onClose()
-    }
-    window.addEventListener("keydown", onKeyDown)
     return () => {
       document.body.style.overflow = previousOverflow
-      window.removeEventListener("keydown", onKeyDown)
     }
-  }, [loading, onClose])
+  }, [])
 
   // Get the redirect URL - stays on current page after login
   const getRedirectURL = (destination?: string) => {
@@ -203,9 +206,9 @@ export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-5">
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => { if (!loading) onClose() }} />
 
-      <div role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" className="auth-card relative max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-border/60 bg-card/95">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" aria-describedby="auth-modal-description" tabIndex={-1} className="auth-card relative max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-border/60 bg-card/95">
         <div className="h-1 w-full bg-gradient-to-r from-primary to-accent" />
 
         <div className="p-6">
@@ -214,7 +217,7 @@ export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
               <h2 id="auth-modal-title" className="text-xl font-bold text-foreground">
                 {mode === "login" ? "Welcome Back" : mode === "signup" ? "Create Account" : "Reset Password"}
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p id="auth-modal-description" className="text-xs text-muted-foreground mt-0.5">
                 {mode === "login"
                   ? "Sign in to your account"
                   : mode === "signup"

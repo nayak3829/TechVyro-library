@@ -14,6 +14,7 @@ import Link from "next/link"
 import { saveQuizHistory } from "@/components/quiz-history-section"
 import { sanitizeHtml } from "@/lib/sanitize"
 import { clearQuizProgress, getQuizProgress, saveQuizProgress } from "@/lib/study-progress"
+import { useDialogFocus } from "@/hooks/use-dialog-focus"
 
 interface Question {
   qid: string
@@ -85,8 +86,25 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
   const questionStartRef = useRef<number>(Date.now())
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const progressReadyRef = useRef(false)
+  const submitDialogRef = useRef<HTMLDivElement>(null)
+  const submitCancelRef = useRef<HTMLButtonElement>(null)
+  const exitDialogRef = useRef<HTMLDivElement>(null)
+  const exitContinueRef = useRef<HTMLButtonElement>(null)
   // Kept for this mounted player so a transport retry identifies the same attempt.
   const clientAttemptIdRef = useRef<string>(crypto.randomUUID())
+
+  useDialogFocus({
+    active: showConfirmSubmit,
+    containerRef: submitDialogRef,
+    initialFocusRef: submitCancelRef,
+    onEscape: () => setShowConfirmSubmit(false),
+  })
+  useDialogFocus({
+    active: showExitWarning,
+    containerRef: exitDialogRef,
+    initialFocusRef: exitContinueRef,
+    onEscape: () => setShowExitWarning(false),
+  })
 
   // Sync userName prop → auto-fill name if it arrives after mount
   useEffect(() => {
@@ -855,16 +873,25 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
       {/* Confirm Submit Modal */}
       {showConfirmSubmit && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <Card className={`max-w-md w-full p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+          <Card
+            ref={submitDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quiz-submit-title"
+            aria-describedby="quiz-submit-description"
+            tabIndex={-1}
+            className={`max-w-md w-full p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}
+          >
             <div className="text-center">
               <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
-              <h3 className="text-lg font-bold mb-2">Confirm Submission</h3>
-              <p className="text-muted-foreground mb-4">
+              <h3 id="quiz-submit-title" className="text-lg font-bold mb-2">Confirm Submission</h3>
+              <p id="quiz-submit-description" className="text-muted-foreground mb-4">
                 You have {questions.length - Object.keys(answers).length} unanswered questions.
                 Are you sure you want to submit?
               </p>
               <div className="flex gap-3">
                 <Button 
+                  ref={submitCancelRef}
                   variant="outline" 
                   className="flex-1"
                   onClick={() => setShowConfirmSubmit(false)}
@@ -886,16 +913,24 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
       {/* Exit Warning Modal — shown when user tries to go back mid-quiz */}
       {showExitWarning && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <Card className={`max-w-md w-full p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}>
+          <Card
+            ref={exitDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quiz-exit-title"
+            aria-describedby="quiz-exit-description"
+            tabIndex={-1}
+            className={`max-w-md w-full p-6 ${darkMode ? "bg-gray-800 border-gray-700" : ""}`}
+          >
             <div className="text-center">
               <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center">
                 <AlertTriangle className="h-8 w-8 text-red-500" />
               </div>
-              <h3 className="text-lg font-bold mb-1">Quiz In Progress!</h3>
+              <h3 id="quiz-exit-title" className="text-lg font-bold mb-1">Quiz In Progress!</h3>
               <p className={`text-sm mb-1 ${darkMode ? "text-gray-300" : "text-muted-foreground"}`}>
                 Are you sure you want to leave?
               </p>
-              <p className={`text-xs mb-5 ${darkMode ? "text-gray-400" : "text-muted-foreground/80"}`}>
+              <p id="quiz-exit-description" className={`text-xs mb-5 ${darkMode ? "text-gray-400" : "text-muted-foreground/80"}`}>
                 Submit the quiz to save your score on the leaderboard. Your current progress is saved so you can continue later.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
@@ -910,6 +945,7 @@ export function QuizPlayer({ title, quizId, questions, timeLimit, onComplete, us
                   Submit & Leave
                 </Button>
                 <Button
+                  ref={exitContinueRef}
                   variant="outline"
                   className="flex-1"
                   onClick={() => setShowExitWarning(false)}

@@ -13,7 +13,7 @@ async function visiblePdf(request: Request, id: string) {
   const admin = createAdminClient()
   const identity = await getPDFRequestIdentity(request)
   let query = admin.from("pdfs")
-    .select("id, visibility, scheduled_at, publish_status").eq("id", id)
+    .select("id, visibility, scheduled_at, publish_status, malware_status").eq("id", id)
   if (!identity.isAdmin) query = applyPublicPdfVisibility(query)
   const { data } = await query.maybeSingle()
   if (!data) return null

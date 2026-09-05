@@ -202,12 +202,19 @@ export default function AdminPage() {
   }
 
   async function handleLogout() {
-    try {
-      await fetch("/api/admin/logout", { method: "POST" })
-    } finally {
-      sessionStorage.removeItem("admin_token")
-      window.location.reload()
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await fetch("/api/admin/logout", { method: "POST" })
+        if (response.ok) {
+          window.location.assign("/admin")
+          return
+        }
+      } catch {
+        // Retry once for an interrupted request so the HttpOnly cookie is cleared.
+      }
+      if (attempt === 0) await new Promise(resolve => window.setTimeout(resolve, 1500))
     }
+    toast.error("Could not log out. Please check your connection and try again.")
   }
 
   function navigate(tab: string, pdfSub?: "import" | "library") {

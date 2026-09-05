@@ -1,17 +1,40 @@
 import { NextResponse } from "next/server"
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { sendTelegramMessage } from "@/lib/telegram"
-import { escapeTelegramHtml, isAdminChatSessionId } from "@/lib/admin-chat-validation"
+import { escapeTelegramHtml } from "@/lib/admin-chat-validation"
+import {
+  ADMIN_CHAT_SESSION_COOKIE,
+  ADMIN_CHAT_SESSION_COOKIE_OPTIONS,
+  getAdminChatSessionId,
+  isAdminChatSessionSecurityConfigured,
+} from "@/lib/admin-chat-security"
+import { isRequestOriginAllowed } from "@/lib/request-origin"
+
+function clearSessionCookie(response: NextResponse) {
+  response.cookies.set(ADMIN_CHAT_SESSION_COOKIE, "", {
+    ...ADMIN_CHAT_SESSION_COOKIE_OPTIONS,
+    maxAge: 0,
+  })
+  return response
+}
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => null)
-    const sessionId = body?.sessionId
-    const reason = body?.reason
-    if (!isAdminChatSessionId(sessionId)) {
-      return NextResponse.json({ error: "Invalid sessionId" }, { status: 400 })
+    if (!isRequestOriginAllowed(req)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
-    if (!isAdminConfigured()) return NextResponse.json({ ok: true })
+    if (!isAdminChatSessionSecurityConfigured()) {
+      return NextResponse.json({ error: "Admin chat session security is not configured" }, { status: 500 })
+    }
+    const sessionId = getAdminChatSessionId(req)
+    if (!sessionId) {
+      return clearSessionCookie(
+        NextResponse.json({ error: "Invalid or missing chat session" }, { status: 401 })
+      )
+    }
+    const body = await req.json().catch(() => null)
+    const reason = body?.reason
+    if (!isAdminConfigured()) return clearSessionCookie(NextResponse.json({ ok: true }))
 
     const supabase = createAdminClient()
     const { data: session, error: sessionError } = await supabase
@@ -22,7 +45,9 @@ export async function POST(req: Request) {
 
     if (sessionError) throw sessionError
     if (!session) {
-      return NextResponse.json({ error: "Unknown session" }, { status: 404 })
+      return clearSessionCookie(
+        NextResponse.json({ error: "Unknown session" }, { status: 404 })
+      )
     }
 
     const { count, error: countError } = await supabase
@@ -66,7 +91,7 @@ export async function POST(req: Request) {
 
     await sendTelegramMessage(text)
 
-    return NextResponse.json({ ok: true })
+    return clearSessionCookie(NextResponse.json({ ok: true }))
   } catch (err) {
     console.error("admin-chat/end:", err)
     return NextResponse.json({ error: "Failed to end session" }, { status: 500 })

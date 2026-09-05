@@ -8,12 +8,26 @@ import {
 } from "@/lib/admin-chat-validation"
 import {
   ADMIN_CHAT_ABSOLUTE_LIFETIME_MS,
+  ADMIN_CHAT_SESSION_COOKIE,
+  ADMIN_CHAT_SESSION_COOKIE_OPTIONS,
   checkAdminChatRateLimit,
+  createAdminChatSessionCookieValue,
+  isAdminChatSessionSecurityConfigured,
   rateLimitedResponse,
 } from "@/lib/admin-chat-security"
+import { isRequestOriginAllowed } from "@/lib/request-origin"
 
 export async function POST(req: Request) {
   try {
+    if (!isRequestOriginAllowed(req)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    if (!isAdminChatSessionSecurityConfigured()) {
+      return NextResponse.json(
+        { error: "Admin chat session security is not configured" },
+        { status: 500 }
+      )
+    }
     const rateLimit = await checkAdminChatRateLimit("start", req)
     if (!rateLimit.allowed) return rateLimitedResponse(rateLimit.retryAfterSeconds)
 
@@ -69,7 +83,13 @@ export async function POST(req: Request) {
       },
     })
 
-    return NextResponse.json({ sessionId })
+    const response = NextResponse.json({ sessionId })
+    response.cookies.set(
+      ADMIN_CHAT_SESSION_COOKIE,
+      createAdminChatSessionCookieValue(sessionId),
+      ADMIN_CHAT_SESSION_COOKIE_OPTIONS
+    )
+    return response
   } catch (err) {
     console.error("admin-chat/start:", err)
     return NextResponse.json({ error: "Failed" }, { status: 500 })

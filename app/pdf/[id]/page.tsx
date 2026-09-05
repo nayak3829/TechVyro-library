@@ -70,7 +70,10 @@ export async function generateMetadata({ params }: PageProps) {
   const pdf = await getPDF(id)
   
   if (!pdf) {
-    return { title: "PDF Not Found" }
+    return {
+      title: "PDF Not Found",
+      robots: { index: false, follow: false },
+    }
   }
 
   // getPDF is constrained at query time to public, published, and due records;

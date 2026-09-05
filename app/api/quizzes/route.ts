@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getQuizList, invalidateQuizCache } from "@/lib/quiz-cache"
+import { getPublicQuizList, getQuizList, invalidateQuizCache } from "@/lib/quiz-cache"
 import { validateQuizPayload } from "@/lib/quiz-validation"
 import { isValidStructureLocation } from "@/lib/content-structure-validation"
 import { publishInAppNotification } from "@/lib/notifications"
@@ -20,15 +20,9 @@ export async function GET(request: Request) {
   try {
     const isAdmin = verifyAdminToken(extractToken(request))
     // Admin reads must observe changes made by another process immediately.
-    const list = await getQuizList({ bypassCache: true })
     const quizzes = isAdmin
-      ? list
-      : list
-        .filter((quiz) => quiz.enabled && quiz.hasContent && quiz.visibility === "public")
-        .map(quiz => ({
-          ...quiz,
-          questions: quiz.questions.map(question => ({ id: typeof question.id === "string" ? question.id : "" })),
-        }))
+      ? await getQuizList({ bypassCache: true })
+      : await getPublicQuizList()
     const response = NextResponse.json({ quizzes })
     response.headers.set("Cache-Control", "private, no-store")
     return response

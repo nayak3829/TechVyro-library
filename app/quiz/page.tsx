@@ -30,7 +30,7 @@ interface Quiz {
   section: string
   difficulty: string
   time_limit: number
-  questions: { id: string }[]
+  question_count: number
   hasContent: boolean
   enabled: boolean
   created_at: string
@@ -109,7 +109,7 @@ export default function QuizzesPage() {
       const res = await fetch("/api/quizzes")
       const data = await res.json()
       const all: Quiz[] = data.quizzes || []
-      setQuizzes(all.filter(q => q.enabled && q.questions.length > 0))
+      setQuizzes(all.filter(q => q.enabled && q.question_count > 0))
     } catch {}
     if (showLoading) setLoading(false)
   }, [])
@@ -156,8 +156,8 @@ export default function QuizzesPage() {
     return [...result].sort((a, b) => {
       if (sortBy === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      if (sortBy === "most-questions") return b.questions.length - a.questions.length
-      if (sortBy === "least-questions") return a.questions.length - b.questions.length
+      if (sortBy === "most-questions") return b.question_count - a.question_count
+      if (sortBy === "least-questions") return a.question_count - b.question_count
       if (sortBy === "longest") return b.time_limit - a.time_limit
       if (sortBy === "shortest") return a.time_limit - b.time_limit
       return 0
@@ -166,7 +166,7 @@ export default function QuizzesPage() {
 
   const visible = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
-  const totalQuestions = quizzes.reduce((sum, q) => sum + q.questions.length, 0)
+  const totalQuestions = quizzes.reduce((sum, q) => sum + q.question_count, 0)
   const hasStructureFilter = !!structureFilter.folderId
   const hasAnyFilter = hasStructureFilter || selectedCategory !== "All" || search.trim() !== ""
   const activeSortLabel = sortOptions.find(s => s.value === sortBy)?.label || "Sort"
@@ -627,7 +627,7 @@ function QuizCard({ quiz, cfg, diff, isNew, isLoggedIn, animIndex, onStart }: Qu
 
         {/* Meta chips */}
         <div className="flex items-center gap-2 flex-wrap mt-auto">
-          <MetaChip icon={<FileText className="h-3 w-3 text-primary" />} label={`${quiz.questions.length} Q`} />
+          <MetaChip icon={<FileText className="h-3 w-3 text-primary" />} label={`${quiz.question_count} Q`} />
           <MetaChip icon={<Clock className="h-3 w-3 text-accent" />} label={`${Math.floor(quiz.time_limit / 60)} min`} />
           <span
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold"

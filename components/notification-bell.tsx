@@ -21,6 +21,7 @@ export function NotificationBell() {
   const [unread, setUnread] = useState(0)
   const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!user || loading) return
@@ -45,6 +46,18 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", close)
   }, [])
 
+  useEffect(() => {
+    if (!open) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      setOpen(false)
+      buttonRef.current?.focus()
+    }
+    window.addEventListener("keydown", closeOnEscape)
+    return () => window.removeEventListener("keydown", closeOnEscape)
+  }, [open])
+
   async function markRead(id: string) {
     setBusy(true)
     try {
@@ -59,14 +72,14 @@ export function NotificationBell() {
   if (!user || loading) return null
   return (
     <div className="relative" ref={ref}>
-      <Button variant="ghost" size="icon" aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`} aria-expanded={open} onClick={() => setOpen((value) => !value)} className="relative h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary">
+      <Button ref={buttonRef} variant="ghost" size="icon" aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`} aria-expanded={open} aria-haspopup="dialog" aria-controls="notification-popover" onClick={() => setOpen((value) => !value)} className="relative h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary">
         <Bell className="h-4 w-4" />
         {unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-foreground ring-2 ring-background">{unread > 9 ? "9+" : unread}</span>}
       </Button>
       {open && (
-        <div className="absolute right-0 top-11 z-[60] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl shadow-foreground/10 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div id="notification-popover" role="dialog" aria-labelledby="notification-popover-title" className="absolute right-0 top-11 z-[60] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl shadow-foreground/10 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-            <div><p className="text-sm font-bold">Your inbox</p><p className="text-[11px] text-muted-foreground">{unread ? `${unread} waiting for you` : "You are all caught up"}</p></div>
+            <div><p id="notification-popover-title" className="text-sm font-bold">Your inbox</p><p className="text-[11px] text-muted-foreground">{unread ? `${unread} waiting for you` : "You are all caught up"}</p></div>
             <Link href="/notifications" onClick={() => setOpen(false)} className="text-xs font-semibold text-primary hover:underline">View all</Link>
           </div>
           {items.length === 0 ? (

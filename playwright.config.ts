@@ -7,8 +7,10 @@ const layoutViewports = [
   { name: "desktop", width: 1440, height: 900 },
 ]
 const productionServer = process.env.PLAYWRIGHT_PRODUCTION === "1"
+const localBaseUrl = "http://localhost:5000"
 
 export default defineConfig({
+  timeout: 90_000,
   testDir: ".",
   testMatch: ["e2e/**/*.spec.ts", "tests/e2e/**/*.spec.ts"],
   fullyParallel: true,
@@ -17,7 +19,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "line",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5000",
+    // Chromium persists Secure cookies on localhost in production-mode tests.
+    // Keep browser and APIRequestContext on this one canonical hostname.
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || localBaseUrl,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
@@ -25,7 +29,7 @@ export default defineConfig({
     ? undefined
     : {
         command: productionServer ? "pnpm run start" : "pnpm run dev",
-        url: "http://127.0.0.1:5000",
+        url: localBaseUrl,
         reuseExistingServer: !productionServer,
         timeout: 120_000,
       },

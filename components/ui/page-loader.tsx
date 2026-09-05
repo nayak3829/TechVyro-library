@@ -1,6 +1,3 @@
-"use client"
-
-import { motion, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 interface PageLoaderProps {
@@ -11,22 +8,14 @@ interface PageLoaderProps {
 
 // Animated dots loader
 export function DotsLoader({ className }: { className?: string }) {
-  const reduceMotion = useReducedMotion()
   return (
     <div className={cn("flex items-center justify-center gap-1", className)}>
       {[0, 1, 2].map((i) => (
-        <motion.div
+        <span
           key={i}
-          className="w-2 h-2 rounded-full bg-primary"
-          animate={reduceMotion ? { opacity: 0.8 } : {
-            scale: [1, 1.2, 1],
-            opacity: [0.5, 1, 0.5],
-          }}
-          transition={{
-            duration: 0.8,
-            repeat: Infinity,
-            delay: i * 0.15,
-          }}
+          aria-hidden="true"
+          className="page-loader-dot h-2 w-2 rounded-full bg-primary"
+          style={{ animationDelay: `${i * 150}ms` }}
         />
       ))}
     </div>
@@ -54,21 +43,9 @@ export function SpinnerLoader({ className, size = "md" }: { className?: string; 
 
 // Pulse loader
 export function PulseLoader({ className }: { className?: string }) {
-  const reduceMotion = useReducedMotion()
   return (
     <div className={cn("relative", className)}>
-      <motion.div
-        className="w-12 h-12 rounded-full bg-primary/20"
-        animate={reduceMotion ? { opacity: 0.65 } : {
-          scale: [1, 1.5, 1],
-          opacity: [0.5, 0, 0.5],
-        }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
+      <div aria-hidden="true" className="page-loader-pulse h-12 w-12 rounded-full bg-primary/20" />
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="w-6 h-6 rounded-full bg-primary" />
       </div>
@@ -78,21 +55,16 @@ export function PulseLoader({ className }: { className?: string }) {
 
 // TechVyro branded loader
 export function TechVyroLoader({ className, text = "Loading..." }: PageLoaderProps) {
-  const reduceMotion = useReducedMotion()
   return (
     <div className={cn("flex flex-col items-center justify-center gap-4", className)} aria-busy="true">
       <div className="relative grid h-24 w-24 place-items-center">
-        <motion.div
+        <div
           aria-hidden="true"
-          className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary border-r-primary/40 motion-reduce:animate-none"
-          animate={reduceMotion ? undefined : { rotate: 360 }}
-          transition={{ duration: 1.25, repeat: Infinity, ease: "linear" }}
+          className="page-loader-spin absolute inset-0 rounded-full border-2 border-transparent border-r-primary/40 border-t-primary"
         />
-        <motion.div
+        <div
           aria-hidden="true"
-          className="absolute inset-2 rounded-full border border-primary/20"
-          animate={reduceMotion ? { opacity: 0.7 } : { scale: [0.96, 1.04, 0.96], opacity: [0.45, 0.9, 0.45] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          className="page-loader-breathe absolute inset-2 rounded-full border border-primary/20"
         />
         <img
           src="/techvyro-logo.jpg"
@@ -158,11 +130,9 @@ export function ProgressLoader({ progress = 0, className }: { progress?: number;
   return (
     <div className={cn("w-full max-w-xs", className)}>
       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-        <motion.div
-          className="h-full bg-gradient-to-r from-primary to-accent"
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+        <div
+          className="page-loader-progress h-full bg-gradient-to-r from-primary to-accent"
+          style={{ width: `${progress}%` }}
         />
       </div>
       <p className="text-xs text-muted-foreground text-center mt-2">{Math.round(progress)}%</p>
@@ -179,15 +149,7 @@ export function ShimmerLoader({ className }: { className?: string }) {
         className
       )}
     >
-      <motion.div
-        className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-        animate={{ translateX: ["0%", "200%"] }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
+      <div aria-hidden="true" className="page-loader-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
     </div>
   )
 }

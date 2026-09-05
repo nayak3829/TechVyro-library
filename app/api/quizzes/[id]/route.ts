@@ -8,6 +8,8 @@ import { isValidStructureLocation } from "@/lib/content-structure-validation"
 import { publishInAppNotification } from "@/lib/notifications"
 import { becamePublicQuiz } from "@/lib/quiz-publication"
 
+const QUIZ_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/
+
 function studentQuizProjection(quiz: Record<string, unknown>) {
   const questions = Array.isArray(quiz.questions) ? quiz.questions.map((value) => {
     const question = value && typeof value === "object" ? value as Record<string, unknown> : {}
@@ -40,6 +42,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   try {
     const isAdmin = verifyAdminToken(extractToken(request))
+    // The service-role lookup below is intentionally limited to a validated,
+    // explicit path ID. Public list queries continue to expose public rows only.
+    if (!isAdmin && !QUIZ_ID.test(id)) {
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
+    }
     // Question payloads are never public. Keep the established admin path for
     // content management, but require a verified Supabase session for students.
     const studentClient = isAdmin ? null : await createClient()
@@ -47,8 +54,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const { data: { user }, error: authError } = await studentClient?.auth.getUser() ?? { data: { user: null }, error: null }
       if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    const supabase = isAdmin ? createAdminClient() : studentClient
-    if (!supabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // An explicit enabled unlisted link cannot be read through client RLS. Use
+    // service role only after authentication and path validation, then constrain
+    // the lookup to the two student-visible states.
+    const supabase = createAdminClient()
 
     let query = supabase
       .from("quizzes")
@@ -56,7 +65,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       // is further projected below to remove answer keys and explanations.
       .select(isAdmin ? "*" : "id,title,description,category,time_limit,enabled,questions")
       .eq("id", id)
-    if (!isAdmin) query = query.eq("enabled", true).eq("visibility", "public")
+    if (!isAdmin) query = query.eq("enabled", true).in("visibility", ["public", "unlisted"])
     const { data, error } = await query.single()
 
     if (error || !data) return NextResponse.json({ error: "Quiz not found" }, { status: 404 })

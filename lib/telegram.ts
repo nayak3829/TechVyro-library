@@ -118,12 +118,21 @@ export async function answerCallbackQuery(
   token: string,
   callbackQueryId: string,
   text?: string
-): Promise<void> {
+): Promise<boolean> {
   try {
-    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    const response = await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ callback_query_id: callbackQueryId, text, show_alert: false }),
+      signal: AbortSignal.timeout(10_000),
     })
-  } catch {}
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {})
+      console.error(`[telegram] answerCallbackQuery failed with HTTP ${response.status}`)
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
 }

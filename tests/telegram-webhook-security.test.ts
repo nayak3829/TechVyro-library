@@ -45,7 +45,7 @@ describe("Telegram webhook deployment security", () => {
     const adminToken = createAdminToken(process.env.ADMIN_PASSWORD!)
     const response = await setupWebhook(new Request("https://techvyro.example/api/telegram/setup", {
       method: "POST",
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: { cookie: `admin_session=${adminToken}` },
     }))
 
     expect(response.status).toBe(200)
@@ -76,7 +76,7 @@ describe("Telegram webhook deployment security", () => {
     const adminToken = createAdminToken(process.env.ADMIN_PASSWORD!)
     const response = await setupWebhook(new Request("https://techvyro.example/api/telegram/setup", {
       method: "POST",
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: { cookie: `admin_session=${adminToken}` },
     }))
 
     expect(response.status).toBe(500)
@@ -99,7 +99,7 @@ describe("Telegram webhook deployment security", () => {
     const adminToken = createAdminToken(process.env.ADMIN_PASSWORD!)
     const response = await setupWebhook(new Request("https://techvyro.example/api/telegram/setup", {
       method: "POST",
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: { cookie: `admin_session=${adminToken}` },
     }))
 
     expect(response.status).toBe(500)
@@ -117,7 +117,7 @@ describe("Telegram webhook deployment security", () => {
 
     const adminToken = createAdminToken(process.env.ADMIN_PASSWORD!)
     const response = await getWebhookStatus(new Request("https://techvyro.example/api/telegram/setup", {
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: { cookie: `admin_session=${adminToken}` },
     }))
 
     expect(response.status).toBe(502)

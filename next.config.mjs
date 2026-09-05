@@ -2,6 +2,8 @@
 const isDevelopment = process.env.NODE_ENV !== "production"
 
 const nextConfig = {
+  // Keep ad-hoc production verification isolated from a running dev server.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Package only the files required by the production server. Replit's
   // Autoscale image should not need the full build-time dependency tree.
   output: "standalone",

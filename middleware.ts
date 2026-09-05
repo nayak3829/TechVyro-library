@@ -1,15 +1,26 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { loginHref } from "@/lib/auth-redirect"
+import { isPrivateIndexRoute } from "@/lib/seo-routes"
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
+  const pathname = request.nextUrl.pathname
+  const isQuizPlayRoute = /^\/quiz\/[^/]+(?:\/play)?\/?$/.test(pathname) &&
+    pathname !== "/quiz/leaderboard" &&
+    pathname !== "/quiz/leaderboard/"
+  const isPrivateRoute = isPrivateIndexRoute(pathname)
+
+  const applyRobotsHeader = <T extends NextResponse>(response: T): T => {
+    if (isPrivateRoute) response.headers.set("X-Robots-Tag", "noindex, nofollow")
+    return response
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return supabaseResponse
+    return applyRobotsHeader(supabaseResponse)
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -51,8 +62,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const pathname = request.nextUrl.pathname
-  const isQuizPlayRoute = /^\/quiz\/[^/]+$/.test(pathname) && pathname !== "/quiz/leaderboard"
   const isProtectedRoute =
     pathname.startsWith("/profile") ||
     isQuizPlayRoute ||
@@ -67,10 +76,10 @@ export async function middleware(request: NextRequest) {
     supabaseResponse.cookies.getAll().forEach((cookie) => {
       redirectResponse.cookies.set(cookie)
     })
-    return redirectResponse
+    return applyRobotsHeader(redirectResponse)
   }
 
-  return supabaseResponse
+  return applyRobotsHeader(supabaseResponse)
 }
 
 export const config = {

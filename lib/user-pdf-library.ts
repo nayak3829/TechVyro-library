@@ -11,5 +11,5 @@ export async function recordUserPdfActivity(userId: string | null | undefined, p
     p_pdf_id: pdfId,
     p_event: event,
   })
-  if (error) console.error(`[library] Failed to record ${event}:`, error.message)
+  if (error) throw new Error(`Failed to record ${event}: ${error.message}`)
 }

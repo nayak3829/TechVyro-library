@@ -1,5 +1,3 @@
-"use client"
-
 import { TechVyroLoader } from "@/components/ui/page-loader"
 
 export default function Loading() {

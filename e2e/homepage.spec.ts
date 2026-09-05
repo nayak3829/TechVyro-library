@@ -11,7 +11,7 @@ test("homepage primary actions and chatbot remain usable", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: /Welcome to TechVyro/i })).toBeVisible()
 
-  await page.getByRole("link", { name: "Browse Library", exact: true }).click()
+  await page.getByRole("main").getByRole("link", { name: "Browse PDFs", exact: true }).click()
   await expect(page).toHaveURL(/#content$/)
 
   await page.getByRole("button", { name: "Open TechVyro AI Assistant" }).click()
@@ -85,7 +85,12 @@ test("homepage section links open Browse with the selected section filter", asyn
             description: "Should be visible",
             category: "Science",
             section: "Physics",
-            questions: [{ id: "question-1" }],
+            difficulty: "medium",
+            time_limit: 600,
+            question_count: 1,
+            hasContent: true,
+            created_at: "2026-01-01T00:00:00.000Z",
+            tags: [],
             enabled: true,
             visibility: "public",
             structure_location: { folderId: "folder-1", categoryId: "category-1", sectionId: "section-1" },
@@ -96,7 +101,12 @@ test("homepage section links open Browse with the selected section filter", asyn
             description: "Should be filtered out",
             category: "Science",
             section: "Chemistry",
-            questions: [{ id: "question-2" }],
+            difficulty: "medium",
+            time_limit: 600,
+            question_count: 1,
+            hasContent: true,
+            created_at: "2026-01-01T00:00:00.000Z",
+            tags: [],
             enabled: true,
             visibility: "public",
             structure_location: { folderId: "folder-1", categoryId: "category-1", sectionId: "section-2" },
@@ -114,4 +124,21 @@ test("homepage section links open Browse with the selected section filter", asyn
   await expect(page.getByText("Other Section Notes")).toHaveCount(0)
   await expect(page.getByText("Selected Section Quiz")).toBeVisible()
   await expect(page.getByText("Other Section Quiz")).toHaveCount(0)
+})
+
+test("Browse distinguishes service failure from an empty catalogue", async ({ page }) => {
+  for (const endpoint of ["**/api/pdfs", "**/api/quizzes", "**/api/content-structure"]) {
+    await page.route(endpoint, route => route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Temporarily unavailable" }),
+    }))
+  }
+
+  await page.goto("/browse")
+
+  await expect(page.getByRole("heading", { name: "Catalogue unavailable" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Try Again" })).toBeVisible()
+  await expect(page.getByText("No content found")).toHaveCount(0)
+  await expect(page.locator("#browse-tabpanel[role='tabpanel']")).toHaveCount(1)
 })

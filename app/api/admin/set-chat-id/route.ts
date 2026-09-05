@@ -25,21 +25,12 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createAdminClient()
-    const { data: existing, error: readError } = await supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "general_settings")
-      .single()
-    if (readError && readError.code !== "PGRST116") {
-      return NextResponse.json({ error: "Unable to update chat ID" }, { status: 500 })
-    }
-
-    const merged = { ...(existing?.value as object || {}), telegramChatId: chatId }
-    const { error: updateError } = await supabase
-      .from("site_settings")
-      .upsert({ key: "general_settings", value: merged, updated_at: new Date().toISOString() }, { onConflict: "key" })
-
+    const { error: updateError } = await supabase.rpc("patch_site_setting_json", {
+      p_key: "general_settings",
+      p_patch: { telegramChatId: chatId },
+    })
     if (updateError) {
+      console.error("[admin/set-chat-id] Atomic settings update failed:", updateError.message)
       return NextResponse.json({ error: "Unable to update chat ID" }, { status: 500 })
     }
   } catch {

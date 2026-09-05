@@ -22,6 +22,11 @@ export async function POST(request: Request) {
   const { data: pdf } = await query.maybeSingle()
   if (!pdf) return NextResponse.json({ error: "PDF not found" }, { status: 404 })
 
-  await recordUserPdfActivity(user.id, pdfId, event)
+  try {
+    await recordUserPdfActivity(user.id, pdfId, event)
+  } catch (error) {
+    console.error("[library/activity] Failed to record activity:", error)
+    return NextResponse.json({ error: "Failed to record activity" }, { status: 500 })
+  }
   return NextResponse.json({ success: true })
 }

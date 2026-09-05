@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -220,18 +222,18 @@ export default function ProfilePage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <><Header /><div className="min-h-[70vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
           <p className="text-muted-foreground text-sm">Loading your profile…</p>
         </div>
-      </div>
+      </div><Footer /></>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <><Header /><div className="min-h-[70vh] flex items-center justify-center p-4">
         <div className="text-center max-w-sm">
           <div className="h-14 w-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
             <X className="h-7 w-7 text-destructive" />
@@ -242,7 +244,7 @@ export default function ProfilePage() {
             <RefreshCw className="h-4 w-4" />Try Again
           </Button>
         </div>
-      </div>
+      </div><Footer /></>
     )
   }
 
@@ -296,7 +298,7 @@ export default function ProfilePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
+    <><Header /><div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
         {/* Back nav */}
@@ -470,11 +472,24 @@ export default function ProfilePage() {
         {/* Tabs */}
         <div className="rounded-3xl border border-border/60 bg-card/80 backdrop-blur-sm overflow-hidden shadow-lg shadow-black/5">
           {/* Tab bar */}
-          <div className="flex border-b border-border/50 overflow-x-auto no-scrollbar">
-            {tabs.map((t) => (
+          <div className="flex border-b border-border/50 overflow-x-auto no-scrollbar" role="tablist" aria-label="Profile sections">
+            {tabs.map((t, index) => (
               <button
                 key={t.id}
+                id={`profile-tab-${t.id}`}
+                role="tab"
+                aria-selected={tab === t.id}
+                aria-controls="profile-tabpanel"
+                tabIndex={tab === t.id ? 0 : -1}
                 onClick={() => setTab(t.id)}
+                onKeyDown={(event) => {
+                  const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0
+                  if (!delta) return
+                  event.preventDefault()
+                  const next = tabs[(index + delta + tabs.length) % tabs.length]
+                  setTab(next.id)
+                  document.getElementById(`profile-tab-${next.id}`)?.focus()
+                }}
                 className={`flex items-center gap-2 px-5 py-3.5 text-sm font-semibold whitespace-nowrap transition-all border-b-2 ${
                   tab === t.id
                     ? "border-primary text-primary"
@@ -493,7 +508,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Tab content */}
-          <div className="p-5">
+          <div className="p-5" role="tabpanel" id="profile-tabpanel" aria-labelledby={`profile-tab-${tab}`} tabIndex={0}>
 
             {/* QUIZ HISTORY */}
             {tab === "history" && (
@@ -786,6 +801,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </div>
+    </div><Footer /></>
   )
 }

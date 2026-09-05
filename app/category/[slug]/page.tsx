@@ -9,6 +9,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { PDF, Category } from "@/lib/types"
 import { applyPublicPdfVisibility } from "@/lib/pdf-access"
+import type { Metadata } from "next"
 
 export const revalidate = 30
 
@@ -65,13 +66,22 @@ async function getAllCategories(): Promise<Category[]> {
   return data || []
 }
 
-export async function generateMetadata({ params }: PageProps) {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const category = await getCategoryBySlug(slug)
-  if (!category) return { title: "Category Not Found | TechVyro" }
+  if (!category) return {
+    title: "Category Not Found | TechVyro",
+    robots: { index: false, follow: false },
+  }
+  const title = `${category.name} | TechVyro PDF Library`
+  const description = `Browse public study PDFs in the ${category.name} category on TechVyro.`
+  const canonical = `/category/${encodeURIComponent(category.slug)}`
   return {
-    title: `${category.name} | TechVyro PDF Library`,
-    description: `Browse all PDFs in the ${category.name} category on TechVyro`,
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { title, description, url: canonical, type: "website", images: ["/og-image.jpg"] },
+    twitter: { card: "summary_large_image", title, description, images: ["/og-image.jpg"] },
   }
 }
 

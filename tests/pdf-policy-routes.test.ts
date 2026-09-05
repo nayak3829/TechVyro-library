@@ -17,13 +17,14 @@ const state = vi.hoisted(() => ({
   storageDownloads: 0,
   rpcCalls: [] as Array<{ name: string; args: unknown }>,
   rpcError: null as null | { message: string },
+  watermarkEnabled: false,
 }))
 
 function listingQuery() {
   let rows = [
-    { id: "public", title: "Public", visibility: "public", publish_status: "published" },
-    { id: "unlisted", title: "Unlisted", visibility: "unlisted", publish_status: "published" },
-    { id: "private", title: "Private", visibility: "private", publish_status: "published" },
+    { id: "public", title: "Public", visibility: "public", publish_status: "published", malware_status: "clean" },
+    { id: "unlisted", title: "Unlisted", visibility: "unlisted", publish_status: "published", malware_status: "clean" },
+    { id: "private", title: "Private", visibility: "private", publish_status: "published", malware_status: "clean" },
   ]
   const query = {
     select: () => query,
@@ -35,8 +36,9 @@ function listingQuery() {
     or: () => query,
     order: () => query,
     range: () => query,
-    then(resolve: (result: { data: typeof rows; error: null }) => unknown) {
-      return Promise.resolve(resolve({ data: rows, error: null }))
+    then(resolve: (result: { data: Array<Omit<(typeof rows)[number], "malware_status">>; error: null }) => unknown) {
+      const projectedRows = rows.map(({ malware_status: _malwareStatus, ...row }) => row)
+      return Promise.resolve(resolve({ data: projectedRows, error: null }))
     },
   }
   return query
@@ -103,7 +105,15 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
-    from: () => state.admin ? adminPDFQuery() : metadataQuery(),
+    from: (table: string) => table === "site_settings"
+      ? {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: { value: {} }, error: null }),
+          }),
+        }),
+      }
+      : state.admin ? adminPDFQuery() : metadataQuery(),
     rpc: async (name: string, args: unknown) => {
       state.rpcCalls.push({ name, args })
       return { data: state.rpcError ? null : 11, error: state.rpcError }
@@ -116,6 +126,15 @@ vi.mock("@/lib/supabase/admin", () => ({
         },
       }),
     },
+  }),
+}))
+vi.mock("@/lib/watermark-settings", () => ({
+  getWatermarkSettings: () => ({
+    enabled: state.watermarkEnabled,
+    text: "TechVyro",
+    opacity: 0.2,
+    position: "diagonal",
+    siteName: "TechVyro",
   }),
 }))
 
@@ -145,6 +164,7 @@ describe("PDF route privacy policy", () => {
     state.storageDownloads = 0
     state.rpcCalls = []
     state.rpcError = null
+    state.watermarkEnabled = false
   })
 
   it("returns only explicitly public PDFs from the public listing", async () => {
@@ -159,6 +179,7 @@ describe("PDF route privacy policy", () => {
     })
     expect(state.listingFilters).toContainEqual(["visibility", "public"])
     expect(state.listingFilters).toContainEqual(["publish_status", "published"])
+    expect(state.listingFilters).toContainEqual(["malware_status", "clean"])
   })
 
   it("returns every visibility level to an authenticated admin listing", async () => {
@@ -225,6 +246,23 @@ describe("PDF route privacy policy", () => {
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toEqual({ error: "Downloads are disabled for this PDF" })
     expect(state.storageDownloads).toBe(0)
+  })
+
+  it("fails closed without accounting when required watermarking fails", async () => {
+    state.authenticated = true
+    state.watermarkEnabled = true
+
+    const response = await downloadPDF(
+      new Request("https://example.test/api/pdfs/pdf-1/download-watermarked", {
+        headers: { "Idempotency-Key": "download:pdf-1:event-1" },
+      }),
+      params,
+    )
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toEqual({ error: "Unable to watermark PDF" })
+    expect(state.storageDownloads).toBe(1)
+    expect(state.rpcCalls).toEqual([])
   })
 
   it("tracks a view atomically and returns the persisted count", async () => {

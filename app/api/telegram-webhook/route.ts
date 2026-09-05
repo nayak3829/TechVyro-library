@@ -16,6 +16,7 @@ import {
   ADMIN_CHAT_ABSOLUTE_LIFETIME_MS,
   getAdminChatSessionState,
 } from "@/lib/admin-chat-security"
+import { readBoundedJson, RequestBodyError } from "@/lib/ai-request-security"
 
 const HELP_TEXT =
   `🤖 <b>TechVyro Admin Bot — Commands</b>\n` +
@@ -49,7 +50,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json()
+    const rawBody = await readBoundedJson(req, 256 * 1024)
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+      return NextResponse.json({ error: "Invalid Telegram update" }, { status: 400 })
+    }
+    const body = rawBody as { callback_query?: any; message?: any }
     const token = process.env.TELEGRAM_BOT_TOKEN!
     if (!token || !isAdminConfigured()) return NextResponse.json({ ok: true })
 
@@ -67,8 +72,11 @@ export async function POST(req: Request) {
     const callbackQuery = body?.callback_query
     if (callbackQuery) {
       const fromChatId = String(callbackQuery.message?.chat?.id || callbackQuery.from?.id || "")
-      const data: string = callbackQuery.data || ""
-      const cbId: string = callbackQuery.id
+      const data = typeof callbackQuery.data === "string" ? callbackQuery.data : ""
+      const cbId = typeof callbackQuery.id === "string" ? callbackQuery.id : ""
+      if (!cbId || cbId.length > 200 || data.length > 128) {
+        return NextResponse.json({ ok: true })
+      }
 
       if (!adminChatId || fromChatId !== adminChatId) {
         await answerCallbackQuery(token, cbId, "⛔ Access denied")
@@ -86,6 +94,7 @@ export async function POST(req: Request) {
           .gte("last_message_at", cutoff)
           .gte("created_at", createdCutoff)
           .order("last_message_at", { ascending: false })
+          .limit(50)
 
         if (!sessions?.length) {
           await sendTelegramToChat(token, fromChatId,
@@ -164,12 +173,13 @@ export async function POST(req: Request) {
 
     // ── REGULAR MESSAGES ──────────────────────────────────────
     const message = body?.message
-    if (!message?.text) return NextResponse.json({ ok: true })
+    if (typeof message?.text !== "string") return NextResponse.json({ ok: true })
 
     const fromChatId = String(message.chat?.id || "")
     if (!adminChatId || fromChatId !== adminChatId) return NextResponse.json({ ok: true })
 
-    const text: string = message.text.trim()
+    const text = getBoundedText(message.text, ADMIN_CHAT_MESSAGE_MAX_LENGTH)
+    if (!text) return NextResponse.json({ ok: true })
 
     // ── /start ───────────────────────────────────────────────
     if (text === "/start") {
@@ -388,6 +398,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
     console.error("telegram-webhook:", err)
     return NextResponse.json({ ok: true })
   }

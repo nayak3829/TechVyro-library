@@ -1,6 +1,7 @@
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { verifyAdminToken, extractToken } from "@/lib/admin-auth"
+import { readBoundedJson, RequestBodyError } from "@/lib/ai-request-security"
 
 export async function POST(request: Request) {
   try {
@@ -12,15 +13,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Database not configured" }, { status: 503 })
     }
 
-    const body = await request.json()
-    const { filename, contentType } = body
-    const assetKind = body.assetKind === "thumbnail" ? "thumbnail" : "pdf"
+    let body: unknown
+    try {
+      body = await readBoundedJson(request, 4 * 1024)
+    } catch (error) {
+      if (error instanceof RequestBodyError) {
+        return NextResponse.json({ error: error.message }, { status: error.status })
+      }
+      throw error
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 })
+    }
+    const { filename, contentType, assetKind } = body as Record<string, unknown>
+    if (assetKind !== "pdf" && assetKind !== "thumbnail") {
+      return NextResponse.json({ error: "assetKind must be pdf or thumbnail" }, { status: 400 })
+    }
 
     if (typeof filename !== "string" || typeof contentType !== "string") {
       return NextResponse.json({ error: "filename and contentType are required" }, { status: 400 })
     }
 
     const normalizedFilename = filename.trim()
+    if (!normalizedFilename || normalizedFilename.length > 255 || contentType.length > 100) {
+      return NextResponse.json({ error: "Filename or content type is invalid" }, { status: 400 })
+    }
     const extension = normalizedFilename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
     const allowedContentTypes: Record<string, string[]> = assetKind === "thumbnail"
       ? { jpg: ["image/jpeg"], jpeg: ["image/jpeg"], webp: ["image/webp"] }

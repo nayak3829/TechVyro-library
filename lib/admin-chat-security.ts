@@ -1,8 +1,12 @@
-import { createHash } from "node:crypto"
+import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 import { Redis } from "@upstash/redis"
+import { isAdminChatSessionId } from "@/lib/admin-chat-validation"
 
 export const ADMIN_CHAT_IDLE_TIMEOUT_MS = 30 * 60 * 1000
 export const ADMIN_CHAT_ABSOLUTE_LIFETIME_MS = 3 * 60 * 60 * 1000
+export const ADMIN_CHAT_SESSION_COOKIE = "admin_chat_session"
+export const ADMIN_CHAT_SESSION_COOKIE_PATH = "/api/admin-chat"
+const ADMIN_CHAT_SESSION_SECRET_MIN_LENGTH = 16
 
 type SessionTimes = {
   created_at?: string | null
@@ -29,6 +33,73 @@ const LIMITS = {
 
 function digest(value: string) {
   return createHash("sha256").update(value).digest("hex").slice(0, 32)
+}
+
+export function isAdminChatSessionSecurityConfigured() {
+  return Boolean(
+    process.env.SESSION_SECRET
+    && process.env.SESSION_SECRET.length >= ADMIN_CHAT_SESSION_SECRET_MIN_LENGTH
+  )
+}
+
+function sessionSecret() {
+  if (!isAdminChatSessionSecurityConfigured()) {
+    throw new Error("Admin chat session security is not configured")
+  }
+  return process.env.SESSION_SECRET!
+}
+
+function sessionSignature(sessionId: string) {
+  return createHmac("sha256", sessionSecret())
+    .update(`admin-chat-session:${sessionId}`)
+    .digest("base64url")
+}
+
+export function createAdminChatSessionCookieValue(sessionId: string) {
+  if (!isAdminChatSessionId(sessionId)) {
+    throw new Error("Cannot sign an invalid admin chat session ID")
+  }
+  return `${sessionId}.${sessionSignature(sessionId)}`
+}
+
+function requestCookie(req: Request, name: string) {
+  for (const part of (req.headers.get("cookie") || "").split(";")) {
+    const separator = part.indexOf("=")
+    if (separator < 0 || part.slice(0, separator).trim() !== name) continue
+    try {
+      return decodeURIComponent(part.slice(separator + 1).trim())
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+export function getAdminChatSessionId(req: Request): string | null {
+  // Check configuration even when no cookie is present, so deployments without
+  // the signing key fail closed and report a configuration error explicitly.
+  sessionSecret()
+  const value = requestCookie(req, ADMIN_CHAT_SESSION_COOKIE)
+  if (!value) return null
+  const separator = value.indexOf(".")
+  if (separator < 0 || separator !== value.lastIndexOf(".")) return null
+  const sessionId = value.slice(0, separator)
+  const suppliedSignature = value.slice(separator + 1)
+  if (!isAdminChatSessionId(sessionId) || !suppliedSignature) return null
+
+  const expected = Buffer.from(sessionSignature(sessionId))
+  const supplied = Buffer.from(suppliedSignature)
+  return expected.length === supplied.length && timingSafeEqual(expected, supplied)
+    ? sessionId
+    : null
+}
+
+export const ADMIN_CHAT_SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "strict" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: ADMIN_CHAT_SESSION_COOKIE_PATH,
+  maxAge: Math.floor(ADMIN_CHAT_ABSOLUTE_LIFETIME_MS / 1000),
 }
 
 /**

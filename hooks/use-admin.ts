@@ -7,15 +7,12 @@ export function useAdmin() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const token = sessionStorage.getItem("admin_token")
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 5000)
 
     fetch("/api/admin/verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: token ? JSON.stringify({ token }) : undefined,
       signal: controller.signal,
     })
       .then((res) => res.json())

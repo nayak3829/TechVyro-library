@@ -126,7 +126,7 @@ export function PDFCard({ pdf, compact = false, showRank = false, rank }: PDFCar
                       className="text-[10px] px-1.5 py-0"
                       style={{
                         backgroundColor: pdf.category.color + "20",
-                        color: pdf.category.color,
+                        borderColor: pdf.category.color + "60",
                       }}
                     >
                       {pdf.category.name}
@@ -201,10 +201,10 @@ export function PDFCard({ pdf, compact = false, showRank = false, rank }: PDFCar
           {/* Category Badge */}
           {pdf.category && (
             <Badge
-              className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 font-medium shadow-lg border-0"
+              className="absolute top-2 left-2 border-border bg-slate-900 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-lg dark:bg-slate-100 dark:text-slate-950 sm:top-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-xs"
               style={{
-                backgroundColor: pdf.category.color,
-                color: "#fff",
+                borderLeftColor: pdf.category.color,
+                borderLeftWidth: "3px",
               }}
             >
               {pdf.category.name}
