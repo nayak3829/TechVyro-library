@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { WhatsAppPopup } from "@/components/whatsapp-popup"
+import { InitialSiteLoader } from "@/components/initial-site-loader"
 import { MobileNav } from "@/components/mobile-nav"
 import './globals.css'
 
@@ -111,6 +112,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased">
+        <InitialSiteLoader />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

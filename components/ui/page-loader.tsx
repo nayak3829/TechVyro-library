@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 interface PageLoaderProps {
@@ -11,13 +11,14 @@ interface PageLoaderProps {
 
 // Animated dots loader
 export function DotsLoader({ className }: { className?: string }) {
+  const reduceMotion = useReducedMotion()
   return (
     <div className={cn("flex items-center justify-center gap-1", className)}>
       {[0, 1, 2].map((i) => (
         <motion.div
           key={i}
           className="w-2 h-2 rounded-full bg-primary"
-          animate={{
+          animate={reduceMotion ? { opacity: 0.8 } : {
             scale: [1, 1.2, 1],
             opacity: [0.5, 1, 0.5],
           }}
@@ -43,7 +44,7 @@ export function SpinnerLoader({ className, size = "md" }: { className?: string; 
   return (
     <div
       className={cn(
-        "rounded-full border-primary/30 border-t-primary animate-spin",
+        "rounded-full border-primary/30 border-t-primary animate-spin motion-reduce:animate-none",
         sizeClasses[size],
         className
       )}
@@ -53,11 +54,12 @@ export function SpinnerLoader({ className, size = "md" }: { className?: string; 
 
 // Pulse loader
 export function PulseLoader({ className }: { className?: string }) {
+  const reduceMotion = useReducedMotion()
   return (
     <div className={cn("relative", className)}>
       <motion.div
         className="w-12 h-12 rounded-full bg-primary/20"
-        animate={{
+        animate={reduceMotion ? { opacity: 0.65 } : {
           scale: [1, 1.5, 1],
           opacity: [0.5, 0, 0.5],
         }}
@@ -76,33 +78,30 @@ export function PulseLoader({ className }: { className?: string }) {
 
 // TechVyro branded loader
 export function TechVyroLoader({ className, text = "Loading..." }: PageLoaderProps) {
+  const reduceMotion = useReducedMotion()
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-4", className)}>
-      <motion.div
-        className="relative"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-      >
-        <img
-          src="/techvyro-logo.jpg"
-          alt="TechVyro"
-          width={64}
-          height={64}
-          className="h-16 w-16 rounded-2xl object-contain shadow-lg shadow-primary/30"
+    <div className={cn("flex flex-col items-center justify-center gap-4", className)} aria-busy="true">
+      <div className="relative grid h-24 w-24 place-items-center">
+        <motion.div
+          aria-hidden="true"
+          className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary border-r-primary/40 motion-reduce:animate-none"
+          animate={reduceMotion ? undefined : { rotate: 360 }}
+          transition={{ duration: 1.25, repeat: Infinity, ease: "linear" }}
         />
         <motion.div
-          className="absolute inset-0 rounded-2xl border-2 border-primary/50"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.8, 0, 0.8],
-          }}
-          transition={{
-            duration: 1.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          aria-hidden="true"
+          className="absolute inset-2 rounded-full border border-primary/20"
+          animate={reduceMotion ? { opacity: 0.7 } : { scale: [0.96, 1.04, 0.96], opacity: [0.45, 0.9, 0.45] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
         />
-      </motion.div>
+        <img
+          src="/techvyro-logo.jpg"
+          alt=""
+          width={64}
+          height={64}
+          className="relative h-16 w-16 rounded-2xl object-contain shadow-lg shadow-primary/25"
+        />
+      </div>
       <div className="text-center">
         <p className="text-sm font-medium text-foreground">{text}</p>
         <DotsLoader className="mt-2" />
@@ -115,8 +114,11 @@ export function TechVyroLoader({ className, text = "Loading..." }: PageLoaderPro
 export function PageLoader({ className, text, showLogo = true }: PageLoaderProps) {
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label={text || "Loading page"}
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm",
+        "fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm",
         className
       )}
     >

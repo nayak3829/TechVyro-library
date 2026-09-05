@@ -42,10 +42,25 @@ export const metadata: Metadata = {
 const DEFAULT_WHATSAPP_URL = "https://whatsapp.com/channel/0029Vadk2XHLSmbX3oEVmX37"
 const HOMEPAGE_PDF_LIMIT = 60
 
-async function readSiteSetting(key: string) {
+async function getHomepageConfiguration(): Promise<{
+  generalSettings: Record<string, string>
+  homepageSettings: HomepageTextSettings
+  heroSettings: HeroSettings
+}> {
+  if (!isSupabaseConfigured()) {
+    return {
+      generalSettings: {},
+      homepageSettings: DEFAULT_HOMEPAGE_SETTINGS,
+      heroSettings: DEFAULT_HERO_SETTINGS,
+    }
+  }
+
   async function query() {
     const supabase = createAdminClient()
-    return supabase.from("site_settings").select("value").eq("key", key).maybeSingle()
+    return supabase
+      .from("site_settings")
+      .select("key,value")
+      .in("key", ["general_settings", "homepage_settings", "hero_settings"])
   }
 
   let result = await query()
@@ -53,37 +68,21 @@ async function readSiteSetting(key: string) {
     await new Promise(resolve => setTimeout(resolve, 750))
     result = await query()
   }
-  return result
-}
-
-async function getGeneralSettings(): Promise<Record<string, string>> {
-  if (!isSupabaseConfigured()) return {}
-  const { data, error } = await readSiteSetting("general_settings")
-  if (error) {
-    console.error("[homepage] failed to load general settings:", error.message)
-    return {}
+  if (result.error) {
+    console.error("[homepage] failed to load site settings:", result.error.message)
+    return {
+      generalSettings: {},
+      homepageSettings: DEFAULT_HOMEPAGE_SETTINGS,
+      heroSettings: DEFAULT_HERO_SETTINGS,
+    }
   }
-  return (data?.value as Record<string, string>) ?? {}
-}
 
-async function getHomepageSettings(): Promise<HomepageTextSettings> {
-  if (!isSupabaseConfigured()) return DEFAULT_HOMEPAGE_SETTINGS
-  const { data, error } = await readSiteSetting("homepage_settings")
-  if (error) {
-    console.error("[homepage] failed to load homepage settings:", error.message)
-    return DEFAULT_HOMEPAGE_SETTINGS
+  const values = new Map((result.data || []).map(row => [row.key, row.value]))
+  return {
+    generalSettings: (values.get("general_settings") as Record<string, string>) ?? {},
+    homepageSettings: normalizeHomepageSettings(values.get("homepage_settings")),
+    heroSettings: normalizeHeroSettings(values.get("hero_settings")),
   }
-  return normalizeHomepageSettings(data?.value)
-}
-
-async function getHeroSettings(): Promise<HeroSettings> {
-  if (!isSupabaseConfigured()) return DEFAULT_HERO_SETTINGS
-  const { data, error } = await readSiteSetting("hero_settings")
-  if (error) {
-    console.error("[homepage] failed to load hero settings:", error.message)
-    return DEFAULT_HERO_SETTINGS
-  }
-  return normalizeHeroSettings(data?.value)
 }
 
 async function getPDFs(): Promise<PDF[]> {
@@ -130,17 +129,16 @@ async function getCategories(): Promise<Category[]> {
 
 async function getStats() {
   const supabase = createAdminClient()
-  const [pdfStats, categoryCount, weeklyDownloads] = await Promise.all([
+  const [pdfStats, weeklyDownloads] = await Promise.all([
     getPublicPdfStats(supabase),
-    supabase.from("categories").select("id", { count: "exact", head: true }),
     getRecentDownloadCount(7),
   ])
-  if (pdfStats.error || categoryCount.error) {
-    console.error("[homepage] failed to load aggregate stats:", pdfStats.error?.message || categoryCount.error?.message)
+  if (pdfStats.error) {
+    console.error("[homepage] failed to load aggregate stats:", pdfStats.error.message)
   }
   return {
     totalPdfs: pdfStats.data?.totalPdfs ?? 0,
-    totalCategories: categoryCount.count ?? 0,
+    totalCategories: 0,
     totalDownloads: pdfStats.data?.totalDownloads ?? 0,
     totalViews: pdfStats.data?.totalViews ?? 0,
     avgRating: pdfStats.data?.avgRating ?? 0,
@@ -195,19 +193,18 @@ async function getFeaturedPDFs() {
   const supabase = await createClient()
   if (!supabase) return { popular: [], trending: [], recent: [], topRated: [] }
   const query = () => applyPublicPdfVisibility(supabase.from("pdfs").select(HOMEPAGE_PDF_SELECT))
-  const [popular, trending, recent, topRated] = await Promise.all([
+  const [popular, trending, topRated] = await Promise.all([
     query().gt("download_count", 0).order("download_count", { ascending: false }).limit(4),
     query().gt("view_count", 0).order("view_count", { ascending: false }).limit(4),
-    query().order("updated_at", { ascending: false }).limit(4),
     query().gt("average_rating", 0).order("average_rating", { ascending: false }).limit(4),
   ])
-  for (const [label, result] of Object.entries({ popular, trending, recent, topRated })) {
+  for (const [label, result] of Object.entries({ popular, trending, topRated })) {
     if (result.error) console.error(`[homepage] failed to load ${label} PDFs:`, result.error.message)
   }
   return {
     popular: mapHomepagePdfs(popular.data),
     trending: mapHomepagePdfs(trending.data),
-    recent: mapHomepagePdfs(recent.data),
+    recent: [],
     topRated: mapHomepagePdfs(topRated.data),
   }
 }
@@ -224,21 +221,32 @@ function groupPdfsByCategory(pdfs: PDF[]): Record<string, PDF[]> {
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const configured = isSupabaseConfigured()
-  const [pdfs, categories, generalSettings, homepageSettings, heroSettings, stats, homepageQuizzes, featured] = configured
+  const [pdfs, categories, configuration, rawStats, homepageQuizzes, featuredResult] = configured
     ? await Promise.all([
         getPDFs(),
         getCategories(),
-        getGeneralSettings(),
-        getHomepageSettings(),
-        getHeroSettings(),
+        getHomepageConfiguration(),
         getStats(),
         getHomepageQuizzes(),
         getFeaturedPDFs(),
       ])
-    : [[], [], {}, DEFAULT_HOMEPAGE_SETTINGS, DEFAULT_HERO_SETTINGS, {
+    : [[], [], {
+        generalSettings: {},
+        homepageSettings: DEFAULT_HOMEPAGE_SETTINGS,
+        heroSettings: DEFAULT_HERO_SETTINGS,
+      }, {
         totalPdfs: 0, totalCategories: 0, totalDownloads: 0, totalViews: 0,
         avgRating: 0, thisWeekUploads: 0, thisWeekDownloads: 0,
       }, [], { popular: [], trending: [], recent: [], topRated: [] }]
+
+  const { generalSettings, homepageSettings, heroSettings } = configuration
+  const stats = { ...rawStats, totalCategories: categories.length }
+  const featured = {
+    ...featuredResult,
+    recent: [...pdfs]
+      .sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))
+      .slice(0, 4),
+  }
 
   const configuredWhatsapp = (generalSettings as Record<string, unknown>).whatsappChannelUrl
   const whatsappUrl = typeof configuredWhatsapp === "string" && isSafeHttpUrl(configuredWhatsapp)
