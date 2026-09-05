@@ -18,3 +18,4 @@
 - [PDF content taxonomy](pdf-content-taxonomy.md) — generic study hierarchy supplements, never replaces, relational categories and the folder structure.
 - [Community PDF intake safety](community-pdf-intake-safety.md) — anonymous uploads need storage-layer limits, explicit bucket provenance, and clean-only public policy.
 - [Postgres RPC name ambiguity](postgres-rpc-name-ambiguity.md) — qualify PL/pgSQL parameters and avoid ambiguous partial-index conflict targets on PostgreSQL 17.
+- [Personal PDF library integrity](personal-pdf-library-integrity.md) — derive ownership on the server, hide non-public PDFs, and record downloads only after successful file generation.

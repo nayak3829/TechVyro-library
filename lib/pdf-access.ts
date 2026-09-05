@@ -49,13 +49,14 @@ export function communityPdfPassesSafety(pdf: PDFPolicyRecord): boolean {
 export async function getPDFRequestIdentity(request: Request): Promise<{
   isAdmin: boolean
   isAuthenticated: boolean
+  userId: string | null
 }> {
   const isAdmin = verifyAdminToken(extractToken(request))
-  if (isAdmin) return { isAdmin: true, isAuthenticated: true }
+  if (isAdmin) return { isAdmin: true, isAuthenticated: true, userId: null }
 
   const supabase = await createClient()
-  if (!supabase) return { isAdmin: false, isAuthenticated: false }
+  if (!supabase) return { isAdmin: false, isAuthenticated: false, userId: null }
 
   const { data, error } = await supabase.auth.getUser()
-  return { isAdmin: false, isAuthenticated: !error && Boolean(data.user) }
+  return { isAdmin: false, isAuthenticated: !error && Boolean(data.user), userId: !error ? data.user?.id || null : null }
 }

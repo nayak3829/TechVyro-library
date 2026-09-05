@@ -19,7 +19,6 @@ import { saveRecentlyViewed } from "@/components/home/recently-viewed-section"
 import { useAuth } from "@/hooks/use-auth"
 import type { PDF } from "@/lib/types"
 
-const BOOKMARK_KEY = "techvyro_bookmarks"
 const READING_TIME_KEY = "techvyro_reading_time"
 
 interface PDFViewerProps {
@@ -117,14 +116,21 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
       categoryName: pdf.category?.name,
       categoryColor: pdf.category?.color,
     })
+    void fetch("/api/library/activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pdfId: pdf.id, event: "view" }),
+    }).catch(() => {})
   }, [pdf.id, pdf.title, pdf.category?.name, pdf.category?.color])
 
-  // Load bookmark state
+  // Load the same saved state used by My Library.
   useEffect(() => {
-    try {
-      const bookmarks: string[] = JSON.parse(localStorage.getItem(BOOKMARK_KEY) || "[]")
-      setIsBookmarked(bookmarks.includes(pdf.id))
-    } catch {}
+    let active = true
+    fetch("/api/favorites")
+      .then(response => response.json())
+      .then(data => { if (active) setIsBookmarked(Array.isArray(data.favorites) && data.favorites.includes(pdf.id)) })
+      .catch(() => {})
+    return () => { active = false }
   }, [pdf.id])
 
   // Reading time tracker
@@ -152,20 +158,20 @@ export function PDFViewer({ pdf, relatedPDFs = [], isAdmin = false }: PDFViewerP
     }
   }, [pdf.id])
 
-  function toggleBookmark() {
+  async function toggleBookmark() {
     try {
-      const bookmarks: string[] = JSON.parse(localStorage.getItem(BOOKMARK_KEY) || "[]")
-      let updated: string[]
-      if (isBookmarked) {
-        updated = bookmarks.filter(id => id !== pdf.id)
-        toast.success("Bookmark removed")
-      } else {
-        updated = [...bookmarks, pdf.id]
-        toast.success("Bookmark saved!")
-      }
-      localStorage.setItem(BOOKMARK_KEY, JSON.stringify(updated))
-      setIsBookmarked(!isBookmarked)
-    } catch {}
+      const response = await fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdfId: pdf.id }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Could not update saved PDFs")
+      setIsBookmarked(data.action === "added")
+      toast.success(data.action === "added" ? "Saved to My Library" : "Removed from My Library")
+    } catch {
+      toast.error("Could not update My Library")
+    }
   }
 
   async function handleDownload() {

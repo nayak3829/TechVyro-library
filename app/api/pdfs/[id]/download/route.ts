@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { applyPublicPdfVisibility, canDownloadPDF, canViewPDF, getPDFRequestIdentity } from "@/lib/pdf-access"
 import { isValidAnalyticsEventKey } from "@/lib/analytics-events"
+import { recordUserPdfActivity } from "@/lib/user-pdf-library"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -45,6 +46,7 @@ export async function POST(request: Request, { params }: RouteProps) {
       console.error("[pdf/download] Atomic counter failed:", error)
       return NextResponse.json({ error: "Failed to track download" }, { status: 500 })
     }
+    await recordUserPdfActivity(identity.userId, id, "download")
     return NextResponse.json({ success: true, count })
   } catch (error) {
     console.error("[v0] Error incrementing download count:", error)

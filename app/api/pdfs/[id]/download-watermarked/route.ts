@@ -5,6 +5,7 @@ import { applyPublicPdfVisibility, canDownloadPDF, canViewPDF, getPDFRequestIden
 import { isValidAnalyticsEventKey } from "@/lib/analytics-events"
 import { getWatermarkSettings } from "@/lib/watermark-settings"
 import { validPdfStorageLocation } from "@/lib/pdf-storage"
+import { recordUserPdfActivity } from "@/lib/user-pdf-library"
 
 interface RouteProps {
   params: Promise<{ id: string }>
@@ -117,6 +118,7 @@ export async function GET(request: Request, { params }: RouteProps) {
     if (countError) {
       console.error("[pdf/download-watermarked] Atomic counter failed:", countError)
     }
+    await recordUserPdfActivity(identity.userId, id, "download")
 
     // Create filename
     const safeFilename = pdf.title.replace(/[^a-zA-Z0-9\s]/g, "").trim().replace(/\s+/g, "_") || "TechVyro_PDF"

@@ -103,6 +103,11 @@ export function HeaderAuthControl({ user, loading, onSignOut }: HeaderAuthContro
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
+              <Link href="/library" className="gap-2 cursor-pointer rounded-lg">
+                <BookOpen className="h-4 w-4 text-blue-500" />My Library
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href="/quiz" className="gap-2 cursor-pointer rounded-lg">
                 <Trophy className="h-4 w-4 text-amber-500" />Quiz Portal
               </Link>
@@ -546,6 +551,12 @@ export function Header() {
           </div>
 
           {/* Contribute - direct link */}
+          {user && (
+            <Button variant="ghost" size="sm" asChild className="hidden xl:flex px-3 gap-1.5 hover:bg-blue-500/10 hover:text-blue-600 text-sm font-medium">
+              <Link href="/library"><BookOpen className="h-4 w-4" />My Library</Link>
+            </Button>
+          )}
+
           <Button variant="ghost" size="sm" asChild className="hidden lg:flex px-3 gap-1.5 hover:bg-primary/10 hover:text-primary text-sm font-medium">
             <Link href="/submit"><Upload className="h-4 w-4" />Contribute</Link>
           </Button>
@@ -648,6 +659,7 @@ export function Header() {
             {[
               { href: "/", icon: Home, label: "Home", color: "text-primary" },
               { href: "/#content", icon: BookOpen, label: "All PDFs", color: "text-blue-500" },
+              { href: "/library", icon: FolderOpen, label: "My Library", color: "text-cyan-600" },
               { href: "/quiz", icon: Trophy, label: "Quiz Portal", color: "text-amber-500" },
               { href: "/test-series", icon: Zap, label: "Mock Test", color: "text-violet-500" },
               { href: "/about", icon: Info, label: "About Us", color: "text-emerald-500" },
