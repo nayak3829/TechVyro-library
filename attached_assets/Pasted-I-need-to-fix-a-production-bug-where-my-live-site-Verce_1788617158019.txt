@@ -1,0 +1,48 @@
+I need to fix a production bug where my live site (Vercel) shows incorrect data 
+that my local/repo code should already be computing correctly.
+
+SYMPTOM: On techvyro-library.vercel.app, the homepage stats section shows 
+"0 Total PDFs" and "0 Downloads" even though PDFs clearly exist and are 
+visible elsewhere on the same page. I suspect this is because not all 
+Supabase SQL migrations in /scripts have been run against the live database.
+
+DO THE FOLLOWING:
+
+1. CHECK DEPLOYED COMMIT
+   Confirm what commit is currently deployed on Vercel vs what's the latest 
+   commit in this repo (git log -1). If Vercel isn't on the latest commit, 
+   trigger a redeploy from the main branch.
+
+2. AUDIT SUPABASE MIGRATIONS
+   List every file in /scripts that matches *.sql, in numeric order.
+   Connect to the live Supabase database (using SUPABASE_SERVICE_ROLE_KEY 
+   from environment) and check which of the following actually exist there:
+     - The function `get_public_pdf_stats` (should be created by 
+       scripts/028_public_pdf_stats.sql)
+     - Tables/columns referenced in scripts numbered higher than whatever 
+       was last run (especially check scripts/036_community_pdf_submissions.sql 
+       and scripts/037_fix_analytics_event_key_ambiguity.sql)
+   Report back exactly which numbered migrations are missing from the live 
+   database.
+
+3. RUN MISSING MIGRATIONS
+   Run each missing migration file against the live Supabase database, 
+   in ascending numeric order, one at a time. Stop and report the exact 
+   error if any migration fails — do not skip a failing migration and 
+   continue to the next one, since later scripts may depend on earlier 
+   ones succeeding.
+
+4. VERIFY THE FIX
+   After migrations are applied, call the `get_public_pdf_stats` RPC 
+   directly against the live database and confirm it returns real numbers 
+   (total_pdfs should match the actual PDF count, not 0).
+   Then check that /api/stats/summary and /api/homepage-data on the 
+   deployed site return correct non-zero values.
+
+5. REPORT BACK
+   Give me a summary: which migrations were missing, which ran successfully, 
+   and confirmation that the homepage now shows real stats instead of zeros.
+
+Do not modify any application code in this task — this is purely about 
+syncing the live Supabase database schema/functions with what the repo 
+code already expects.
