@@ -1,0 +1,104 @@
+I want a complete, systematic audit and fix pass across the entire site — 
+frontend, backend, and database — checking even small issues, not just 
+major bugs. Work through this in the phases below, in order. After each 
+phase, tell me what you found and fixed before moving to the next phase.
+
+IMPORTANT GUARDRAILS — read /.agents/memory/*.md before starting. These 
+files document invariants this codebase already depends on (auth session 
+handling, server-authoritative quiz grading, community PDF safety checks, 
+aggregate stats via RPC, etc.). Do not "fix" something by violating one 
+of these documented rules — if a fix would conflict with a memory note, 
+flag it to me instead of proceeding.
+
+═══════════════════════════════════════
+PHASE 1 — Deployment & database sync
+═══════════════════════════════════════
+- Confirm the latest commit (git log -1) matches what's deployed on Vercel. 
+  Redeploy if not.
+- Check the live Supabase database against every file in /scripts (*.sql, 
+  in numeric order). List any migration whose function/table/column isn't 
+  present in the live database, and run the missing ones in order.
+- After syncing, verify these produce real (non-zero, where applicable) 
+  data on the live site: homepage stats, leaderboard, category counts, 
+  view/download counts on PDF cards.
+
+═══════════════════════════════════════
+PHASE 2 — Fix failing tests
+═══════════════════════════════════════
+- Run `pnpm test` and `pnpm test:e2e`. Fix every failing test.
+- Do not fix a failing test by weakening the assertion — if a test expects 
+  a 400 response and the route returns something else, fix the route's 
+  validation logic, not the test.
+- Confirm both suites are fully green before moving on.
+
+═══════════════════════════════════════
+PHASE 3 — Full manual walkthrough (every page, every role)
+═══════════════════════════════════════
+Go through as: (a) an anonymous visitor, (b) a logged-in student, (c) an 
+admin. For each role, visit every route and:
+- Click every button, link, tab, and filter
+- Submit every form with valid data, then again with invalid/empty data
+- Check the browser console for errors/warnings on every page
+- Check for broken images, missing alt text, layout shifts, and elements 
+  that overflow on mobile widths (360px, 390px) and small desktop (1024px)
+- Confirm loading states, empty states, and error states all render 
+  something sensible (not blank screens or raw error objects)
+
+Cover at minimum: home, browse, category pages, PDF detail pages, quiz 
+list, quiz player, quiz results, leaderboard, test-series pages, login/
+signup/reset-password, profile, library ("My Library"), notifications, 
+progress, submit (community upload), admin dashboard and every admin 
+sub-page (submissions, PDFs, quizzes, categories, settings, analytics).
+
+═══════════════════════════════════════
+PHASE 4 — API and data integrity
+═══════════════════════════════════════
+- Hit every route in /app/api with valid, invalid, missing, and malformed 
+  input. Confirm proper status codes (400 for bad input, 401/403 for 
+  auth failures, 404 for missing resources, 200/201 for success) and 
+  that error responses never leak stack traces or internal details.
+- Confirm rate limits and file-size/type limits actually reject what 
+  they claim to reject (test the upload and submission endpoints 
+  specifically with an oversized and a wrong-mime-type file).
+- Check every place that reads download/view counts, leaderboard scores, 
+  and analytics — confirm numbers shown to users match what's actually 
+  in the database, not stale or hardcoded values.
+
+═══════════════════════════════════════
+PHASE 5 — Auth and permissions
+═══════════════════════════════════════
+- As an anonymous user, try to directly hit every /admin and /api/admin/* 
+  route — confirm all are blocked.
+- As a logged-in non-admin student, try the same — confirm still blocked.
+- Confirm a student can only see/download/edit their own library data, 
+  never another user's, even by guessing IDs in the URL.
+- Confirm session persists correctly across a page refresh and across 
+  browser tabs, and that logout actually clears the session everywhere 
+  (cookie + any client cache).
+
+═══════════════════════════════════════
+PHASE 6 — Content honesty check
+═══════════════════════════════════════
+- Search the entire site for any testimonial, stat, badge, or claim 
+  (e.g. "Verified", "10,000+ students", specific subject mentions) that 
+  the current live data cannot actually support. Flag each one to me — 
+  don't silently delete real content, just list what doesn't match 
+  reality yet.
+
+═══════════════════════════════════════
+PHASE 7 — Performance and polish
+═══════════════════════════════════════
+- Run Lighthouse (or equivalent) on the homepage, a category page, and 
+  a PDF detail page. Fix anything scoring below 80 on Performance or 
+  Accessibility if the fix is low-risk.
+- Check for unused dependencies, unused CSS, and any obviously oversized 
+  images or PDFs not using lazy loading.
+- Confirm meta titles/descriptions and Open Graph tags are present and 
+  accurate on every public page (not just the homepage).
+
+═══════════════════════════════════════
+FINAL REPORT
+═══════════════════════════════════════
+Give me a single summary at the end: what was broken, what you fixed, 
+what you flagged but didn't touch (per the guardrail above or Phase 6), 
+and any remaining known issues with a suggested priority order.
