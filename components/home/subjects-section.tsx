@@ -46,11 +46,15 @@ export function SubjectsSection() {
     const shelf = shelfRef.current
     if (!shelf) return
     updateScrollControls()
-    const observer = new ResizeObserver(updateScrollControls)
-    observer.observe(shelf)
+    const observer = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(updateScrollControls)
+      : null
+    observer?.observe(shelf)
+    window.addEventListener("resize", updateScrollControls)
     shelf.addEventListener("scroll", updateScrollControls, { passive: true })
     return () => {
-      observer.disconnect()
+      observer?.disconnect()
+      window.removeEventListener("resize", updateScrollControls)
       shelf.removeEventListener("scroll", updateScrollControls)
     }
   }, [folders.length, updateScrollControls])

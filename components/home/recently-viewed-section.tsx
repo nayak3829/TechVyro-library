@@ -42,7 +42,9 @@ export function getRecentlyViewed(): RecentlyViewedItem[] {
 }
 
 function relativeTime(date: string) {
-  const diff = Date.now() - new Date(date).getTime()
+  const timestamp = Date.parse(date)
+  if (!Number.isFinite(timestamp)) return "Recently"
+  const diff = Math.max(0, Date.now() - timestamp)
   if (diff < 60_000) return "Just now"
   const mins = Math.floor(diff / 60_000)
   if (mins < 60) return `${mins}m ago`
@@ -92,14 +94,17 @@ export function RecentlyViewedSection({ pdfs, quizzes }: RecentlyViewedSectionPr
 
     for (const progress of quizProgress) {
       const answered = Object.keys(progress.answers).length
+      const total = Number(progress.totalQuestions)
+      const safeTotal = Number.isFinite(total) && total > 0 ? total : 0
+      const safeAnswered = safeTotal ? Math.min(safeTotal, Math.max(0, answered)) : Math.max(0, answered)
       combined.push({
         key: `quiz:${progress.quizId}`,
         id: progress.quizId,
         title: quizLookup.get(progress.quizId) || progress.title,
         type: "quiz",
         label: "In progress",
-        detail: `${answered} of ${progress.totalQuestions} answered`,
-        progress: Math.round((answered / progress.totalQuestions) * 100),
+        detail: safeTotal ? `${safeAnswered} of ${safeTotal} answered` : `${safeAnswered} answered`,
+        progress: safeTotal ? Math.min(100, Math.max(0, Math.round((safeAnswered / safeTotal) * 100))) : undefined,
       })
     }
 

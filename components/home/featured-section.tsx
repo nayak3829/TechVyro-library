@@ -207,7 +207,10 @@ export function FeaturedSection({ featured, initialQuizzes }: FeaturedSectionPro
               return (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => setActiveTab(tab.id)}
+                  aria-pressed={isActive}
+                  aria-label={`Show ${tab.label}`}
                   className={`flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 border ${
                     isActive
                       ? `${tab.activeBg} ${tab.color} ${tab.activeBorder} shadow-sm`
@@ -229,7 +232,10 @@ export function FeaturedSection({ featured, initialQuizzes }: FeaturedSectionPro
               return (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => setActiveTab(tab.id)}
+                  aria-pressed={isActive}
+                  aria-label={`Show ${tab.label}`}
                   className={`flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 border ${
                     isActive
                       ? `${tab.activeBg} ${tab.color} ${tab.activeBorder} shadow-sm`

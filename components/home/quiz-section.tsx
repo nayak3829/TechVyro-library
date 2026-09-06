@@ -21,6 +21,16 @@ interface LeaderboardEntry {
   created_at: string
 }
 
+function isLeaderboardEntry(value: unknown): value is LeaderboardEntry {
+  if (!value || typeof value !== "object") return false
+  const entry = value as Record<string, unknown>
+  const createdAt = typeof entry.created_at === "string" ? Date.parse(entry.created_at) : NaN
+  return typeof entry.id === "string" && typeof entry.name === "string" && entry.name.trim().length > 0
+    && typeof entry.quiz_title === "string" && typeof entry.score === "number" && Number.isFinite(entry.score)
+    && typeof entry.percentage === "number" && Number.isFinite(entry.percentage) && entry.percentage >= 0 && entry.percentage <= 100
+    && Number.isFinite(createdAt)
+}
+
 const categoryColors: Record<string, string> = {
   Mathematics: "bg-[#355b8c]",
   Physics: "bg-[#596b9b]",
@@ -34,14 +44,19 @@ const categoryColors: Record<string, string> = {
 
 export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[] }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [leaderboardError, setLeaderboardError] = useState(false)
   const quizzes = initialQuizzes.slice(0, 4)
 
   useEffect(() => {
-    fetch("/api/quiz-results")
-      .then(response => response.ok ? response.json() : { results: [] })
-      .catch(() => ({ results: [] }))
-      .then(resultsData => {
-      const results: LeaderboardEntry[] = resultsData.results || []
+    const controller = new AbortController()
+    fetch("/api/quiz-results", { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Leaderboard request failed")
+        return response.json() as Promise<unknown>
+      })
+      .then(payload => {
+      const results = payload && typeof payload === "object" && Array.isArray((payload as { results?: unknown }).results)
+        ? (payload as { results: unknown[] }).results.filter(isLeaderboardEntry) : []
       const uniqueUsers = new Map<string, LeaderboardEntry>()
       results
         .sort((a, b) => b.percentage - a.percentage)
@@ -51,7 +66,10 @@ export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[]
           }
         })
       setLeaderboard(Array.from(uniqueUsers.values()).slice(0, 5))
+      setLeaderboardError(false)
       })
+      .catch(error => { if ((error as Error).name !== "AbortError") setLeaderboardError(true) })
+    return () => controller.abort()
   }, [])
 
   const getRankIcon = (rank: number) => {
@@ -190,8 +208,8 @@ export function QuizSection({ initialQuizzes }: { initialQuizzes: HomepageQuiz[]
                   {leaderboard.length === 0 ? (
                     <div className="text-center py-6 sm:py-8">
                       <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-muted-foreground/50 mb-2 sm:mb-3" />
-                      <p className="text-xs sm:text-sm text-muted-foreground">No scores yet</p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Be the first to take a quiz!</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{leaderboardError ? "Leaderboard unavailable" : "No scores yet"}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">{leaderboardError ? "Please try again later." : "Complete a quiz to appear here."}</p>
                     </div>
                   ) : (
                     <div className="space-y-1.5 sm:space-y-2">

@@ -38,6 +38,18 @@ test("homepage fits a narrow phone without horizontal overflow", async ({ page }
   await expect(page.getByRole("button", { name: "Open search" })).toBeVisible()
 })
 
+test("homepage has one main landmark and never invents student reviews", async ({ page }) => {
+  await page.route("**/api/site-settings?key=testimonials", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ value: [{ id: 7, name: null }, { id: "bad", name: "Ignored", course: "SSC", comment: "", enabled: true, rating: 5 }] }),
+  }))
+  await page.goto("/")
+  await expect(page.getByRole("main")).toHaveCount(1)
+  await expect(page.getByText("Rahul Sharma")).toHaveCount(0)
+  await expect(page.getByText("Words from students")).toHaveCount(0)
+})
+
 test("homepage section links open Browse with the selected section filter", async ({ page }) => {
   await page.route("**/api/pdfs", async (route) => {
     await route.fulfill({

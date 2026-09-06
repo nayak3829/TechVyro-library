@@ -393,7 +393,7 @@ async function HomepageDataContent({ searchParams }: { searchParams: Promise<{ q
 
 function HomepageStreamFallback() {
   return (
-    <main role="status" aria-label="Loading homepage content" aria-busy="true">
+    <div role="status" aria-label="Loading homepage content" aria-busy="true">
       <section className="relative min-h-[620px] overflow-hidden bg-background px-4 py-20 sm:py-24">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(49,72,120,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(49,72,120,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
         <div className="container relative mx-auto grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
@@ -420,7 +420,7 @@ function HomepageStreamFallback() {
           {[0, 1, 2, 3].map(item => <Skeleton key={item} className="h-64 min-w-[270px] flex-1 rounded-2xl" />)}
         </div>
       </section>
-    </main>
+    </div>
   )
 }
 

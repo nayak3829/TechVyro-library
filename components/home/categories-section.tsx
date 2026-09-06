@@ -42,11 +42,15 @@ export function CategoriesSection({ categories: initialCategories, pdfsByCategor
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const fetchFolders = useCallback(async () => {
-    const res = await fetch("/api/content-structure")
+  const fetchFolders = useCallback(async (signal?: AbortSignal) => {
+    const res = await fetch("/api/content-structure", { signal })
     if (!res.ok) throw new Error("Unable to load subject structure")
-    const data = await res.json()
-    const parsed: ContentFolder[] = data.folders ?? []
+    const data: unknown = await res.json()
+    const rawFolders = data && typeof data === "object" ? (data as { folders?: unknown }).folders : []
+    const parsed: ContentFolder[] = Array.isArray(rawFolders)
+      ? rawFolders.filter((folder): folder is ContentFolder => Boolean(folder) && typeof folder === "object" && typeof (folder as ContentFolder).id === "string" && typeof (folder as ContentFolder).name === "string" && Array.isArray((folder as ContentFolder).categories))
+      : []
+    if (signal?.aborted) return
     setFolders(prev => {
       if (prev.length === 0 && parsed.length > 0) {
         setExpandedFolders(new Set([parsed[0].id]))
@@ -55,17 +59,23 @@ export function CategoriesSection({ categories: initialCategories, pdfsByCategor
     })
   }, [])
 
-  const fetchContent = useCallback(async () => {
+  const fetchContent = useCallback(async (signal?: AbortSignal) => {
     try {
-      await fetchFolders()
-      setLastUpdated(new Date())
-    } catch {}
+      await fetchFolders(signal)
+      if (!signal?.aborted) setLastUpdated(new Date())
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") console.error("[homepage] failed to load content structure")
+    }
   }, [fetchFolders])
 
   useEffect(() => {
-    fetchContent()
-    timerRef.current = setInterval(fetchContent, REFRESH_INTERVAL)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+    const controller = new AbortController()
+    void fetchContent(controller.signal)
+    timerRef.current = setInterval(() => void fetchContent(), REFRESH_INTERVAL)
+    return () => {
+      controller.abort()
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
   }, [fetchContent])
 
   const toggleFolder = (id: string) => {

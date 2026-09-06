@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { 
   Clock, FileText, Play, ArrowRight, Zap, Target, 
   BookOpen, Shield, Train, TrendingUp, Atom,
-  GraduationCap, Loader2, Lock, Globe, Brain
+  GraduationCap, Lock
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { deriveStudyPdfAvailability, type StudyPdfAvailability } from "@/lib/study-pdf-availability"
@@ -43,29 +43,12 @@ const CATEGORIES = [
   { id: "agriculture", label: "Agriculture", icon: GraduationCap, color: "#84cc16" },
 ]
 
-// Fallback data when API fails
-const FALLBACK_SERIES: TestSeries[] = [
-  {
-    id: "ssc-cgl-1", title: "SSC CGL Full Mock Test", slug: "ssc-cgl-general-knowledge",
-    description: "Complete SSC CGL preparation with practice tests",
-    total_tests: 1, total_questions: 0, duration: 60, is_free: true, category: "ssc", isSample: true
-  },
-  {
-    id: "ibps-po-1", title: "IBPS PO Complete Series", slug: "banking-reasoning-aptitude",
-    description: "Banking exam preparation with reasoning & aptitude",
-    total_tests: 1, total_questions: 0, duration: 60, is_free: true, category: "banking", isSample: true
-  },
-  {
-    id: "nda-full-1", title: "NDA & NA Mock Test Series", slug: "nda-general-knowledge",
-    description: "Defence exam preparation for NDA aspirants",
-    total_tests: 1, total_questions: 0, duration: 150, is_free: true, category: "defence", isSample: true
-  },
-  {
-    id: "rrb-ntpc-1", title: "RRB NTPC Complete Series", slug: "rrb-ntpc-general-knowledge",
-    description: "Railway exam preparation with full test series",
-    total_tests: 1, total_questions: 0, duration: 90, is_free: true, category: "railways", isSample: true
-  },
-]
+function isTestSeries(value: unknown): value is TestSeries {
+  if (!value || typeof value !== "object") return false
+  const item = value as Record<string, unknown>
+  return typeof item.id === "string" && typeof item.title === "string" && item.title.trim().length > 0
+    && typeof item.slug === "string" && item.slug.trim().length > 0 && typeof item.category === "string"
+}
 
 const getCategoryColor = (category: string): string => {
   const cat = CATEGORIES.find(c => c.id === category || c.label.toLowerCase() === category?.toLowerCase())
@@ -86,6 +69,9 @@ export function TestSeriesSection() {
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   const [studyPdfAvailability, setStudyPdfAvailability] = useState<StudyPdfAvailability | null>(null)
   const [shouldLoad, setShouldLoad] = useState(false)
+  const [error, setError] = useState(false)
+  const requestRef = useRef<AbortController | null>(null)
+  const timeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     const section = sectionRef.current
@@ -107,22 +93,31 @@ export function TestSeriesSection() {
   }, [])
 
   const fetchTestSeries = useCallback(async () => {
-    setLoading(true)
+    requestRef.current?.abort()
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
     const controller = new AbortController()
-    const timeout = window.setTimeout(() => controller.abort(), 12_000)
+    const requestSignal = controller.signal
+    requestRef.current = controller
+    setLoading(true)
+    setError(false)
+    timeoutRef.current = window.setTimeout(() => {
+      controller.abort()
+      setError(true)
+      setLoading(false)
+    }, 12_000)
     try {
-      const res = await fetch(`/api/extract?bulk=true&category=all`, { signal: controller.signal })
+      const res = await fetch(`/api/extract?bulk=true&category=all`, { signal: requestSignal })
       const contentType = (res.headers as Headers | undefined)?.get("content-type")
       if (res.ok === false || (contentType && !contentType.includes("application/json"))) {
         throw new Error("Test series are temporarily unavailable")
       }
       const data = await res.json()
       
-      if (data.success && data.testSeries?.length > 0) {
+      if (data && typeof data === "object" && (data as { success?: unknown }).success && Array.isArray((data as { testSeries?: unknown }).testSeries)) {
         // Get unique categories and count series per category
         const counts: Record<string, number> = {}
         const allSeries = Array.from(new Map(
-          (data.testSeries as TestSeries[]).map(series => [
+          (data.testSeries as unknown[]).filter(isTestSeries).map(series => [
             `${series._sourceApi || series._platformName || "sample"}:${series.id || series.slug}`,
             series,
           ]),
@@ -133,29 +128,36 @@ export function TestSeriesSection() {
           counts[cat] = (counts[cat] || 0) + 1
         }
         
-        // Take top 8 series for home page (mix of live and sample)
-        const liveSeries = allSeries.filter((s: TestSeries) => !s.isSample).slice(0, 6)
-        const sampleSeries = allSeries.filter((s: TestSeries) => s.isSample).slice(0, 2)
-        
-        setTestSeries([...liveSeries, ...sampleSeries].slice(0, 8))
+        setTestSeries(allSeries.slice(0, 8))
         setCategoryCounts(counts)
       } else {
-        // Use fallback if no data
-        setTestSeries(FALLBACK_SERIES)
-        setCategoryCounts({ ssc: 6, banking: 7, defence: 5, railways: 4, upsc: 4, "jee-neet": 3 })
+        setTestSeries([])
+        setCategoryCounts({})
       }
-    } catch {
-      setTestSeries(FALLBACK_SERIES)
-      setCategoryCounts({ ssc: 6, banking: 7, defence: 5, railways: 4, upsc: 4, "jee-neet": 3 })
+    } catch (caught) {
+      if ((caught as Error).name !== "AbortError") {
+        setTestSeries([])
+        setCategoryCounts({})
+        setError(true)
+      }
     } finally {
-      window.clearTimeout(timeout)
-      setLoading(false)
+      if (!requestSignal.aborted) setLoading(false)
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
     }
   }, [])
 
   useEffect(() => {
     if (!shouldLoad) return
-    fetchTestSeries()
+    void fetchTestSeries()
+    return () => {
+      requestRef.current?.abort()
+      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+      requestRef.current = null
+    }
   }, [fetchTestSeries, shouldLoad])
 
   useEffect(() => {
@@ -196,7 +198,7 @@ export function TestSeriesSection() {
             Practice Mock Tests
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm max-w-md sm:max-w-xl mx-auto px-2">
-            Free unlimited mock tests for all competitive exams - SSC, Banking, NDA, Railways & more
+            Browse currently available mock tests by exam category.
           </p>
         </div>
 
@@ -216,7 +218,7 @@ export function TestSeriesSection() {
                   borderColor: `${cat.color}30`,
                 }}
               >
-                <Icon className="h-3 w-3" />
+                <Icon aria-hidden="true" className="h-3 w-3" />
                 {cat.label}
                 {count > 0 && <span className="text-[10px] opacity-70">· {count} tests</span>}
                 {studyPdfsComingSoon && <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-700 dark:text-amber-300">PDFs soon</span>}
@@ -316,7 +318,7 @@ export function TestSeriesSection() {
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground mb-3 sm:mb-4 mt-auto">
                       <div className="flex items-center gap-1">
                         <FileText className="h-3 w-3" />
-                        <span>{series.total_tests || 10} Tests</span>
+                          <span>{Math.max(0, Number(series.total_tests) || 0)} tests</span>
                       </div>
                       {series.duration > 0 && (
                         <div className="flex items-center gap-1">
@@ -343,6 +345,15 @@ export function TestSeriesSection() {
               )
             })}
           </div>
+        )}
+        {!loading && error && (
+          <div className="mb-8 rounded-xl border border-dashed border-border bg-card p-6 text-center">
+            <p className="text-sm text-muted-foreground">Mock tests could not be loaded.</p>
+            <Button type="button" variant="link" onClick={() => void fetchTestSeries()} className="mt-1 text-primary">Try again</Button>
+          </div>
+        )}
+        {!loading && !error && testSeries.length === 0 && (
+          <div className="mb-8 rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">No mock tests are available yet.</div>
         )}
 
         {/* View All CTA */}

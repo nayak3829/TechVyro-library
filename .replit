@@ -44,8 +44,8 @@ externalPort = 80
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["sh", "-c", "HOSTNAME=0.0.0.0 PORT=5000 node .next/standalone/server.js"]
-build = ["sh", "-c", "pnpm run build && mkdir -p .next/standalone/.next && rm -rf .next/standalone/.next/static .next/standalone/public && cp -R .next/static .next/standalone/.next/static && cp -R public .next/standalone/public && rm -rf node_modules .next/cache"]
+run = ["sh", "-c", "HOSTNAME=0.0.0.0 PORT=5000 node .deploy/server.js"]
+build = ["sh", "-c", "pnpm run build && rm -rf .deploy && cp -R .next/standalone .deploy && mkdir -p .deploy/.next && cp -R .next/static .deploy/.next/static && rm -rf .deploy/public && cp -R public .deploy/public && size_kb=$(du -sk .deploy | cut -f1) && { [ \"$size_kb\" -lt 7340032 ] || { echo \"Deployment bundle exceeds 7 GiB safety limit\" >&2; exit 1; }; } && rm -rf node_modules .next"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
