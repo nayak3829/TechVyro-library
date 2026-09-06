@@ -33,7 +33,7 @@ function declaredObjectNames(source: string) {
 
 describe("FULL_SETUP fresh-project parity", () => {
   it("tracks every numbered SQL file once in dependency order", () => {
-    expect(migrationFiles).toHaveLength(47)
+    expect(migrationFiles).toHaveLength(48)
 
     let previousEnd = -1
     for (const file of migrationFiles) {
@@ -184,5 +184,17 @@ describe("FULL_SETUP fresh-project parity", () => {
     expect(cleanup).toContain("reservation cleanup in progress")
     expect(cleanup).toContain("claim_expired_community_uploads")
     expect(cleanup).toContain("TO service_role")
+  })
+
+  it("mirrors the final signed-upload-aware reservation expiry definition", () => {
+    const start = sql.lastIndexOf("-- BEGIN 047_align_community_upload_expiry.sql")
+    const end = sql.lastIndexOf("-- END 047_align_community_upload_expiry.sql")
+    const expiry = sql.slice(start, end)
+    expect(expiry).toContain("p_ttl_seconds integer DEFAULT 10800")
+    expect(expiry).toContain("p_ttl_seconds NOT BETWEEN 10800 AND 14400")
+    expect(expiry).toContain("pg_advisory_xact_lock")
+    expect(expiry).toContain("created_at >= v_since")
+    expect(expiry).toContain("TO service_role")
+    expect(sql).not.toContain("community_upload_cancellation")
   })
 })

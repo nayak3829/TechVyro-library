@@ -97,8 +97,23 @@ describe("community submission finalization handler", () => {
     const response = await POST(requestFor())
 
     expect(response.status).toBe(400)
-    expect(await response.json()).toEqual({ error: "Uploaded PDF was not found" })
+    expect(await response.json()).toEqual({ error: "Uploaded PDF was not found", code: "upload_not_found" })
     expect(state.remove).toHaveBeenCalledWith([filePath])
+  })
+
+  it("logs a safe diagnostic when storage reports object removal failure", async () => {
+    state.download = { data: null, error: { message: "storage unavailable" } }
+    state.remove.mockResolvedValue({ data: null, error: { message: "sensitive provider detail" } })
+    const log = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const response = await POST(requestFor())
+
+    expect(response.status).toBe(400)
+    expect(log).toHaveBeenCalledWith("Community submission object removal incomplete", {
+      event: "community_submission_object_removal_incomplete", path: filePath, storageError: true,
+    })
+    expect(JSON.stringify(log.mock.calls)).not.toContain("sensitive")
+    log.mockRestore()
   })
 
   it("removes an uploaded object with an invalid PDF signature", async () => {

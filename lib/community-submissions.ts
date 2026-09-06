@@ -13,6 +13,17 @@ export function isSubmissionSecurityConfigured() {
   return Boolean(process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16)
 }
 
+/** Logs safe booleans only; never include configuration values in diagnostics. */
+export function logSubmissionConfigurationDiagnostic(adminConfigured: boolean) {
+  console.error("Community submission service configuration unavailable", {
+    event: "community_submission_configuration_unavailable",
+    requirements: {
+      supabaseAdminConfigured: adminConfigured,
+      sessionSecretConfigured: isSubmissionSecurityConfigured(),
+    },
+  })
+}
+
 function text(value: unknown, label: string, maximum: number, optional = false) {
   if ((value === undefined || value === null || value === "") && optional) return null
   if (typeof value !== "string") throw new Error(`${label} is required`)

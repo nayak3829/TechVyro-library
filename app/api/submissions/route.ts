@@ -5,17 +5,30 @@ import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import {
   COMMUNITY_MAX_PDF_BYTES, COMMUNITY_PATH, UUID, hasPdfSignature,
-  isSubmissionSecurityConfigured, normalizeSubmission, privacyHash,
+  isSubmissionSecurityConfigured, logSubmissionConfigurationDiagnostic, normalizeSubmission, privacyHash,
 } from "@/lib/community-submissions"
 import { inspectPdfSafety } from "@/lib/pdf-safety"
 const NO_STORE = { headers: { "Cache-Control": "no-store" } }
 
 async function removeObject(path: string) {
-  try { await createAdminClient().storage.from("community-pdfs").remove([path]) } catch { /* best effort */ }
+  try {
+    const result = await createAdminClient().storage.from("community-pdfs").remove([path])
+    if (result.error) {
+      console.error("Community submission object removal incomplete", {
+        event: "community_submission_object_removal_incomplete", path, storageError: true,
+      })
+    }
+  } catch {
+    console.error("Community submission object removal incomplete", {
+      event: "community_submission_object_removal_incomplete", path, storageError: false, threw: true,
+    })
+  }
 }
 
 export async function POST(request: Request) {
-  if (!isAdminConfigured() || !isSubmissionSecurityConfigured()) {
+  const adminConfigured = isAdminConfigured()
+  if (!adminConfigured || !isSubmissionSecurityConfigured()) {
+    logSubmissionConfigurationDiagnostic(adminConfigured)
     return NextResponse.json({ error: "Submission service is temporarily unavailable" }, { status: 503, ...NO_STORE })
   }
   let safePath: string | null = null
@@ -37,7 +50,7 @@ export async function POST(request: Request) {
     const { data: blob, error: downloadError } = await db.storage.from("community-pdfs").download(filePath)
     if (downloadError || !blob) {
       await removeObject(filePath)
-      return NextResponse.json({ error: "Uploaded PDF was not found" }, { status: 400, ...NO_STORE })
+      return NextResponse.json({ error: "Uploaded PDF was not found", code: "upload_not_found" }, { status: 400, ...NO_STORE })
     }
     if (blob.size !== Number(claimedSize) || blob.size > COMMUNITY_MAX_PDF_BYTES || (blob.type && blob.type !== "application/pdf")) {
       await removeObject(filePath)

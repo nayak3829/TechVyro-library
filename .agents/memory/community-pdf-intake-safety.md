@@ -26,3 +26,9 @@ Submission finalization must be idempotent across an ambiguous commit/response-l
 **Why:** Retrying a successfully committed finalization can otherwise delete the object now referenced by the submission; cleanup can cause the same corruption if it races a finalization that started before expiry.
 
 **How to apply:** Return the existing reservation-bound submission on a consumed retry. Give cleanup workers short-lived exact claim tokens acquired with row locking, make finalization reject active claims retryably, and mark cleanup complete only after storage deletion succeeds.
+
+Signed-upload reservations must outlive every credential that can write their object, and a failed browser PUT must be treated as an ambiguous outcome rather than proof that no object exists.
+
+**Why:** A signed URL that remains usable after cleanup can recreate an object that no worker will claim, while a committed upload whose response was lost makes a non-upsert retry conflict forever.
+
+**How to apply:** Leave a safety margin between signed-URL expiry and reservation cleanup. After any PUT failure or conflict, attempt authoritative server finalization first; retry the upload only when the server confirms the reservation-bound object is absent.

@@ -122,4 +122,16 @@ describe("community submissions migration", () => {
     expect(cleanup).toContain("REVOKE ALL ON FUNCTION public.claim_expired_community_uploads")
     expect(cleanup).toContain("GRANT EXECUTE ON FUNCTION public.finish_community_upload_cleanup")
   })
+
+  it("keeps reservation expiry beyond the signed upload URL lifetime", () => {
+    const expiry = readFileSync("scripts/047_align_community_upload_expiry.sql", "utf8")
+    expect(expiry).toContain("p_ttl_seconds integer DEFAULT 10800")
+    expect(expiry).toContain("p_ttl_seconds NOT BETWEEN 10800 AND 14400")
+    expect(expiry).toContain("pg_advisory_xact_lock")
+    expect(expiry).toContain("created_at >= v_since")
+    expect(expiry).toContain("auth.role() <> 'service_role'")
+    expect(expiry).toContain("SET search_path = public, pg_temp")
+    expect(expiry).toContain("REVOKE ALL ON FUNCTION public.reserve_community_submission_slot")
+    expect(expiry).toContain("GRANT EXECUTE ON FUNCTION public.reserve_community_submission_slot")
+  })
 })

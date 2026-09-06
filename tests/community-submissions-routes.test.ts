@@ -58,9 +58,33 @@ describe("community submission route security contracts", () => {
       "app/api/admin/submissions/bulk/route.ts",
     ]) {
       const source = read(path)
-      expect(source).toContain("verifyAdminToken(extractToken(request))")
-      expect(source.indexOf("verifyAdminToken(extractToken(request))")).toBeLessThan(source.indexOf("createAdminClient()"))
+      const authCheck = path.endsWith("[id]/route.ts") || path.endsWith("bulk/route.ts")
+        ? "getVerifiedAdminReviewerPrincipal(extractToken(request))"
+        : "verifyAdminToken(extractToken(request))"
+      expect(source).toContain(authCheck)
+      const protectedOperation = authCheck.startsWith("getVerified")
+        ? 'rpc("moderate_community_submission"'
+        : "createAdminClient()"
+      expect(source.indexOf(authCheck)).toBeLessThan(source.indexOf(protectedOperation))
     }
+  })
+
+  it("records a server-authenticated moderation-session principal, never a client reviewer", () => {
+    const detail = read("app/api/admin/submissions/[id]/route.ts")
+    const bulk = read("app/api/admin/submissions/bulk/route.ts")
+    const auth = read("lib/admin-auth.ts")
+
+    for (const source of [detail, bulk]) {
+      expect(source).toContain("getVerifiedAdminReviewerPrincipal(extractToken(request))")
+      expect(source).toContain("p_reviewed_by: reviewer")
+      expect(source).not.toContain('p_reviewed_by: "admin"')
+      expect(source).not.toContain("body.reviewedBy")
+    }
+    // Shared admin-password authentication has no individual user identity.
+    // Its reviewer field is a keyed, non-secret fingerprint of a verified session.
+    expect(auth).toContain("authenticates a shared ADMIN_PASSWORD session, not")
+    expect(auth).toContain('return `admin-session:${fingerprint}`')
+    expect(auth).toContain('update("community-moderation-reviewer:v1\\0")')
   })
 
   it("requires rejection reasons and keeps notification failure nonfatal", () => {

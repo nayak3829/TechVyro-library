@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
+import { extractToken, getVerifiedAdminReviewerPrincipal } from "@/lib/admin-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { UUID } from "@/lib/community-submissions"
 import { publishInAppNotification } from "@/lib/notifications"
@@ -14,7 +14,8 @@ function safeModerationError(error: { message?: string }) {
   return "Could not moderate submission"
 }
 export async function POST(request: Request) {
-  if (!verifyAdminToken(extractToken(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401, ...NO_STORE })
+  const reviewer = getVerifiedAdminReviewerPrincipal(extractToken(request))
+  if (!reviewer) return NextResponse.json({ error: "Unauthorized" }, { status: 401, ...NO_STORE })
   const body = await request.json().catch(() => ({}))
   const ids = body.ids
   const reason = typeof body.reason === "string" ? body.reason.trim() : ""
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   const db = createAdminClient()
   const moderate = async (id: string) => {
     const { data, error } = await db.rpc("moderate_community_submission", {
-      p_submission_id: id, p_action: body.action, p_reason: reason || null, p_reviewed_by: "admin",
+      p_submission_id: id, p_action: body.action, p_reason: reason || null, p_reviewed_by: reviewer,
     })
     if (error) {
       return { id, success: false, error: safeModerationError(error) }

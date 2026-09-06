@@ -6,6 +6,7 @@ import {
   ADMIN_SESSION_COOKIE,
   createAdminToken,
   extractToken,
+  getVerifiedAdminReviewerPrincipal,
 } from "@/lib/admin-auth"
 
 const originalPassword = process.env.ADMIN_PASSWORD
@@ -60,6 +61,18 @@ describe("admin HttpOnly sessions", () => {
 
     expect(extractToken(request)).toBe(token)
     await expect(verify(request).then((response) => response.json())).resolves.toEqual({ valid: true })
+  })
+
+  it("derives a non-secret, stable reviewer principal only from verified admin sessions", () => {
+    process.env.ADMIN_PASSWORD = "test-password"
+    const token = createAdminToken("test-password")
+
+    const principal = getVerifiedAdminReviewerPrincipal(token)
+    expect(principal).toMatch(/^admin-session:[a-f0-9]{24}$/)
+    expect(getVerifiedAdminReviewerPrincipal(token)).toBe(principal)
+    expect(principal).not.toContain(token)
+    expect(principal).not.toContain(process.env.ADMIN_PASSWORD)
+    expect(getVerifiedAdminReviewerPrincipal("forged-token")).toBeNull()
   })
 
   it("rejects bearer and body credentials during verification", async () => {

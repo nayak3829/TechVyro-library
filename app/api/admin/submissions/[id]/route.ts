@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { extractToken, verifyAdminToken } from "@/lib/admin-auth"
+import { extractToken, getVerifiedAdminReviewerPrincipal, verifyAdminToken } from "@/lib/admin-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { UUID } from "@/lib/community-submissions"
 import { publishInAppNotification } from "@/lib/notifications"
@@ -42,7 +42,8 @@ export async function GET(request: Request, { params }: Context) {
 }
 
 export async function PATCH(request: Request, { params }: Context) {
-  if (!verifyAdminToken(extractToken(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401, ...NO_STORE })
+  const reviewer = getVerifiedAdminReviewerPrincipal(extractToken(request))
+  if (!reviewer) return NextResponse.json({ error: "Unauthorized" }, { status: 401, ...NO_STORE })
   const id = (await params).id
   if (!UUID.test(id)) return NextResponse.json({ error: "Invalid submission id" }, { status: 400, ...NO_STORE })
   const body = await request.json().catch(() => ({}))
@@ -50,7 +51,7 @@ export async function PATCH(request: Request, { params }: Context) {
   const reason = typeof body.reason === "string" ? body.reason.trim() : ""
   if (body.action === "reject" && (!reason || reason.length > 1000)) return NextResponse.json({ error: "A rejection reason is required" }, { status: 400, ...NO_STORE })
   const { data, error } = await createAdminClient().rpc("moderate_community_submission", {
-    p_submission_id: id, p_action: body.action, p_reason: reason || null, p_reviewed_by: "admin",
+    p_submission_id: id, p_action: body.action, p_reason: reason || null, p_reviewed_by: reviewer,
   })
   if (error) {
     const mapped = moderationError(error)

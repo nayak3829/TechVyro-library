@@ -28,10 +28,12 @@ describe("community submissions UI contracts", () => {
   })
 
   it("guards the entire upload lifecycle and resets successful submissions", () => {
-    expect(submit).toContain("if (submitting.current || pendingFinalization) return")
+    expect(submit).toContain("if (submitting.current || pendingFinalization || pendingUpload) return")
     expect(submit).toContain("submitting.current = true; setBusy(true)")
-    expect(submit).toContain("<fieldset disabled={busy || Boolean(pendingFinalization)}")
+    expect(submit).toContain("<fieldset disabled={busy || Boolean(pendingFinalization) || Boolean(pendingUpload)}")
     expect(submit).toContain("Retry saving submission")
+    expect(submit).toContain("Retry upload")
+    expect(submit).toContain("It still counts toward today&apos;s limit and expires automatically.")
     expect(submit).toContain("setHierarchy(emptyHierarchy)")
     expect(submit).toContain("setRights(false)")
     expect(submit).toContain("Thanks! Your submission is under review. We&apos;ll notify you once it&apos;s approved.")
@@ -70,6 +72,25 @@ describe("community submissions UI contracts", () => {
     expect(admin).toContain("Approval is disabled for suspicious submissions")
     expect(admin).toContain('detail.malware_status !== "suspicious"')
     expect(admin).toContain(">Reject</Button>")
+  })
+
+  it("separates exact-content duplicates from similar titles and blocks exact duplicate approval", () => {
+    const admin = source("app/admin/submissions/page.tsx")
+    expect(admin).toContain("setDuplicateContentWarning(json.duplicateContentWarning)")
+    expect(admin).toContain("Exact duplicate content detected")
+    expect(admin).toContain("Similar title already exists")
+    expect(admin).toContain('disabled={busy || Boolean(duplicateContentWarning)}')
+    expect(admin).toContain("exactly duplicates an existing published PDF")
+  })
+
+  it("cancels and ignores stale moderation list requests", () => {
+    const admin = source("app/admin/submissions/page.tsx")
+    expect(admin).toContain("const listAbortRef = useRef<AbortController | null>(null)")
+    expect(admin).toContain("listAbortRef.current?.abort()")
+    expect(admin).toContain("const request = ++listRequestRef.current")
+    expect(admin).toContain("signal: controller.signal")
+    expect(admin).toContain("request !== listRequestRef.current")
+    expect(admin).toContain("listRequestRef.current += 1")
   })
 
   it("links moderation from the main admin panel and profile status protects private paths", () => {

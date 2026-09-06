@@ -19,6 +19,17 @@ const emptyHierarchy: PdfContentFormValue = { contentType: "", contentCategory: 
 const cleanFilename = (name: string) => name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 200) || "Untitled document"
 const controls = /[\u0000-\u001f\u007f]/
 type PendingFinalization = { payload: Record<string, unknown> }
+type FinalizationOutcome =
+  | { kind: "success" }
+  | { kind: "upload_not_found"; message: string }
+  | { kind: "retryable"; message: string }
+  | { kind: "terminal"; message: string }
+type PendingUpload = {
+  signedUrl: string
+  reservationId: string
+  filePath: string
+  payload: Record<string, unknown>
+}
 
 function normalizeText(value: string, label: string, maximum: number, optional = false) {
   if (controls.test(value)) throw new Error(`${label} contains invalid control characters.`)
@@ -55,6 +66,7 @@ export default function SubmitPage() {
   const [busy, setBusy] = useState(false)
   const [success, setSuccess] = useState(false)
   const [pendingFinalization, setPendingFinalization] = useState<PendingFinalization | null>(null)
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null)
   const submitting = useRef(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const errorAlert = useRef<HTMLParagraphElement>(null)
@@ -79,7 +91,7 @@ export default function SubmitPage() {
     setError("")
     const selection = ++fileSelection.current
     analysisController.current?.abort()
-    if (!candidate || busy || pendingFinalization) return
+    if (!candidate || busy || pendingFinalization || pendingUpload) return
     if (candidate.size < 1 || candidate.size > MAX_BYTES) {
       setFile(null)
       return setError("PDF size must be between 1 byte and 50 MB.")
@@ -164,22 +176,25 @@ export default function SubmitPage() {
           ? `${detailLabel} field is now available.`
           : "Continue completing the document hierarchy."
 
-  async function saveFinalization(pending: PendingFinalization) {
+  function completeFinalization() {
+    setPendingUpload(null); setPendingFinalization(null)
+    setSuccess(true); setFile(null); setTitle(""); setHierarchy(emptyHierarchy); setDescription(""); setNote(""); setRights(false); setProgress(null)
+  }
+
+  async function saveFinalization(pending: PendingFinalization): Promise<FinalizationOutcome> {
     try {
       const final = await fetch("/api/submissions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pending.payload) })
       let body: Record<string, unknown> = {}
       try { body = await final.json() } catch { /* A malformed 5xx response is still retryable. */ }
       if (!final.ok) {
         const message = typeof body.error === "string" ? body.error : "Could not save your submission."
-        if (final.status >= 500) throw new Error(message)
-        setPendingFinalization(null)
-        throw new Error(message)
+        if (body.code === "upload_not_found") return { kind: "upload_not_found", message }
+        if (final.status >= 500) return { kind: "retryable", message }
+        return { kind: "terminal", message }
       }
-      setPendingFinalization(null)
-      setSuccess(true); setFile(null); setTitle(""); setHierarchy(emptyHierarchy); setDescription(""); setNote(""); setRights(false); setProgress(null)
+      return { kind: "success" }
     } catch (caught) {
-      setProgress(null)
-      setError(caught instanceof Error ? caught.message : "Could not save your submission. Please retry.")
+      return { kind: "retryable", message: caught instanceof Error ? caught.message : "Could not save your submission. Please retry." }
     }
   }
 
@@ -187,15 +202,55 @@ export default function SubmitPage() {
     if (!pendingFinalization || submitting.current) return
     submitting.current = true; setBusy(true); setError("")
     try {
-      await saveFinalization(pendingFinalization)
+      const outcome = await saveFinalization(pendingFinalization)
+      if (outcome.kind === "success") completeFinalization()
+      else if (outcome.kind === "retryable") { setProgress(null); setError(outcome.message) }
+      else {
+        setPendingFinalization(null); setProgress(null); setError(outcome.message)
+      }
     } finally {
       submitting.current = false; setBusy(false)
     }
   }
 
+  async function retryUpload() {
+    if (!pendingUpload || !file || submitting.current) return
+    submitting.current = true; setBusy(true); setError(""); setProgress(0)
+    try {
+      let uploadFailure: string | null = null
+      try {
+        await uploadFileToSignedStorage({
+          signedUrl: pendingUpload.signedUrl, file,
+          onProgress: (loaded, total) => setProgress(Math.round(loaded / total * 100)),
+        })
+      } catch (caught) {
+        uploadFailure = caught instanceof Error ? caught.message : "Upload failed."
+      }
+      const pending = { payload: pendingUpload.payload }
+      const outcome = await saveFinalization(pending)
+      if (outcome.kind === "success") completeFinalization()
+      else if (outcome.kind === "retryable") {
+        setPendingUpload(null); setPendingFinalization(pending); setProgress(null); setError(outcome.message)
+      } else if (outcome.kind === "upload_not_found") {
+        setProgress(null)
+        setError(`${uploadFailure || outcome.message} You can retry this upload or start over.`)
+      } else {
+        setPendingUpload(null); setPendingFinalization(null); setProgress(null); setError(outcome.message)
+      }
+    } finally {
+      submitting.current = false; setBusy(false)
+    }
+  }
+
+  function startOver() {
+    if (!pendingUpload || submitting.current) return
+    setPendingUpload(null); setFile(null); setProgress(null); setError("")
+    if (fileInput.current) fileInput.current.value = ""
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault()
-    if (submitting.current || pendingFinalization) return
+    if (submitting.current || pendingFinalization || pendingUpload) return
     submitting.current = true; setBusy(true); setError(""); setSuccess(false)
     const fail = (message: string) => { setError(message); submitting.current = false; setBusy(false) }
     if (!file) return fail("Please choose one PDF file.")
@@ -232,15 +287,30 @@ export default function SubmitPage() {
       const reserve = await fetch("/api/submissions/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: normalizedEmail, filename: file.name, fileSize: file.size, mime: file.type }) })
       const reserved = await reserve.json()
       if (!reserve.ok) throw new Error(reserve.status === 429 ? "You have reached the maximum of 5 submissions per day. Please try again tomorrow." : reserved.error || "Could not start your upload.")
-      setProgress(0)
-      await uploadFileToSignedStorage({ signedUrl: reserved.signedUrl, file, onProgress: (loaded, total) => setProgress(Math.round(loaded / total * 100)) })
       const metadata = formValueToMetadata(normalizedHierarchy)
-      const pending = { payload: {
+      const upload = {
+        signedUrl: reserved.signedUrl as string, reservationId: reserved.reservationId as string, filePath: reserved.filePath as string, payload: {
         reservationId: reserved.reservationId, filePath: reserved.filePath, fileSize: file.size, title: normalizedTitle, description: normalizedDescription,
         submitterName: normalizedName, submitterEmail: normalizedEmail, submitterNote: normalizedNote, copyrightConfirmed: true, ...metadata,
-      } }
-      setPendingFinalization(pending)
-      await saveFinalization(pending)
+      } } satisfies PendingUpload
+      setProgress(0)
+      let uploadFailure: string | null = null
+      try {
+        await uploadFileToSignedStorage({ signedUrl: upload.signedUrl, file, onProgress: (loaded, total) => setProgress(Math.round(loaded / total * 100)) })
+      } catch (uploadError) {
+        uploadFailure = uploadError instanceof Error ? uploadError.message : "Upload failed."
+      }
+      const pending = { payload: upload.payload }
+      const outcome = await saveFinalization(pending)
+      if (outcome.kind === "success") completeFinalization()
+      else if (outcome.kind === "retryable") {
+        setPendingUpload(null); setPendingFinalization(pending); setProgress(null); setError(outcome.message)
+      } else if (outcome.kind === "upload_not_found") {
+        setPendingUpload(upload); setPendingFinalization(null); setProgress(null)
+        setError(`${uploadFailure || outcome.message} You can retry this upload or start over.`)
+      } else {
+        setPendingUpload(null); setPendingFinalization(null); setProgress(null); setError(outcome.message)
+      }
     } catch (caught) { setProgress(null); setError(caught instanceof Error ? caught.message : "Upload failed. Please try again.") } finally { submitting.current = false; setBusy(false) }
   }
 
@@ -249,8 +319,8 @@ export default function SubmitPage() {
       <div className="mb-6"><p className="text-sm font-semibold text-primary">Community contributions</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Share study material</h1><p className="mt-2 text-muted-foreground">Upload a PDF for review. Nothing is published until an admin approves it. Maximum 5 submissions per day.</p></div>
       {success ? <div role="status" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6"><h2 ref={successStatus} tabIndex={-1} className="font-bold outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">Thanks! Your submission is under review. We&apos;ll notify you once it&apos;s approved.</h2><Button className="mt-4" variant="outline" onClick={() => setSuccess(false)}>Submit another PDF</Button></div> :
       <form aria-describedby={error ? "submission-error" : undefined} onSubmit={submit} className="space-y-6 rounded-2xl border border-border/60 bg-card p-5 shadow-lg sm:p-7">
-        <fieldset disabled={busy || Boolean(pendingFinalization)} className="space-y-6 disabled:opacity-70">
-        <div><label htmlFor="pdf" role="button" tabIndex={busy || pendingFinalization ? -1 : 0} aria-describedby="pdf-guidance" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); fileInput.current?.click() } }} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); chooseFile(event.dataTransfer.files[0]) }} className="block cursor-pointer rounded-xl border-2 border-dashed border-border p-7 text-center outline-none transition-colors hover:border-primary/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"><strong>{file ? file.name : "Choose a PDF or drop it here"}</strong></label><p id="pdf-guidance" className="mt-2 text-center text-xs text-muted-foreground">PDF only (application/pdf) · one non-empty file · up to 50 MB</p><input ref={fileInput} id="pdf" aria-describedby="pdf-guidance" className="sr-only" type="file" accept="application/pdf" onChange={e => chooseFile(e.target.files?.[0])} />{analysisMessage && <p role="status" className="mt-2 text-xs text-muted-foreground">{analysisMessage}</p>}</div>
+        <fieldset disabled={busy || Boolean(pendingFinalization) || Boolean(pendingUpload)} className="space-y-6 disabled:opacity-70">
+        <div><label htmlFor="pdf" role="button" tabIndex={busy || pendingFinalization || pendingUpload ? -1 : 0} aria-describedby="pdf-guidance" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); fileInput.current?.click() } }} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); chooseFile(event.dataTransfer.files[0]) }} className="block cursor-pointer rounded-xl border-2 border-dashed border-border p-7 text-center outline-none transition-colors hover:border-primary/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"><strong>{file ? file.name : "Choose a PDF or drop it here"}</strong></label><p id="pdf-guidance" className="mt-2 text-center text-xs text-muted-foreground">PDF only (application/pdf) · one non-empty file · up to 50 MB</p><input ref={fileInput} id="pdf" aria-describedby="pdf-guidance" className="sr-only" type="file" accept="application/pdf" onChange={e => chooseFile(e.target.files?.[0])} />{analysisMessage && <p role="status" className="mt-2 text-xs text-muted-foreground">{analysisMessage}</p>}</div>
         <div><label htmlFor="submission-title" className="block text-sm font-medium">Title <span className="text-destructive">*</span></label><Input id="submission-title" aria-describedby="title-help" required value={title} onChange={e => { automaticTitle.current = ""; setTitle(e.target.value) }} className="mt-1.5" maxLength={200} /><p id="title-help" className="mt-1 text-xs text-muted-foreground">Required · maximum 200 characters</p></div>
         <div role="group" aria-labelledby="hierarchy-heading" aria-describedby="hierarchy-status" className="grid gap-4 sm:grid-cols-2">
           <p id="hierarchy-heading" className="sr-only">Document hierarchy</p>
@@ -273,7 +343,8 @@ export default function SubmitPage() {
         <p aria-live="polite" className="sr-only">{busy ? progress !== null ? `Uploading ${progress}%` : "Preparing your submission" : ""}</p>
         {progress !== null && <p role="status" className="text-sm text-primary">Uploading… {progress}%</p>}{error && <p id="submission-error" ref={errorAlert} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2">{error}</p>}
         {pendingFinalization && <Button type="button" onClick={retrySaving} aria-describedby={error ? "submission-error" : undefined} disabled={busy} className="min-h-11 w-full">Retry saving submission</Button>}
-        <Button type="submit" aria-describedby={error ? "submission-error" : undefined} disabled={busy || Boolean(pendingFinalization)} className="min-h-11 w-full">{busy ? progress !== null ? "Uploading…" : "Submitting…" : "Submit for review"}</Button>
+         {pendingUpload && <div><p className="mb-3 text-sm text-muted-foreground">Starting over abandons this reservation. It still counts toward today&apos;s limit and expires automatically.</p><div className="grid gap-3 sm:grid-cols-2"><Button type="button" onClick={retryUpload} disabled={busy} className="min-h-11">Retry upload</Button><Button type="button" variant="outline" onClick={startOver} disabled={busy} className="min-h-11">Start over</Button></div></div>}
+         <Button type="submit" aria-describedby={error ? "submission-error" : undefined} disabled={busy || Boolean(pendingFinalization) || Boolean(pendingUpload)} className="min-h-11 w-full">{busy ? progress !== null ? "Uploading…" : "Submitting…" : "Submit for review"}</Button>
       </form>}
     </div></main><Footer /></>
 }

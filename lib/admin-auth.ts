@@ -168,6 +168,30 @@ export function verifyAdminToken(token: string | null | undefined): boolean {
   }
 }
 
+/**
+ * The current admin scheme authenticates a shared ADMIN_PASSWORD session, not
+ * an individual account. Record a keyed, session-stable pseudonym rather than
+ * the client-provided identity (or the shared password) for audit fields.
+ *
+ * This intentionally identifies the authenticated admin session only; it
+ * cannot distinguish people who share that session/password.
+ */
+export function getVerifiedAdminReviewerPrincipal(token: string | null | undefined): string | null {
+  if (!verifyAdminToken(token)) return null
+
+  const adminPassword = process.env.ADMIN_PASSWORD
+  // verifyAdminToken above guarantees both values, but retain this guard so
+  // this helper remains safe if its verification implementation changes.
+  if (!token || !adminPassword) return null
+
+  const fingerprint = createHmac("sha256", adminPassword)
+    .update("community-moderation-reviewer:v1\0")
+    .update(token)
+    .digest("hex")
+    .slice(0, 24)
+  return `admin-session:${fingerprint}`
+}
+
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for")
     ?.split(",")
