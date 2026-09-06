@@ -19,6 +19,7 @@ describe("community PDF public policy coverage", () => {
       const source = read(path)
       expect(source).toContain("storage_bucket")
       expect(source).toContain("malware_status")
+      expect(source).toContain("processing_status")
     }
   })
 

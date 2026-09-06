@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const action = body.action
   if (!["publish", "reject", "retry"].includes(action)) return NextResponse.json({ error: "Action must be publish, reject, or retry" }, { status: 400 })
   const db = createAdminClient()
-  const { data: pdf, error: readError } = await db.from("pdfs").select("id,title,publish_status,visibility,storage_bucket,malware_status,review_warnings,notification_preference,scheduled_at").eq("id", id).maybeSingle()
+  const { data: pdf, error: readError } = await db.from("pdfs").select("id,title,publish_status,visibility,storage_bucket,malware_status,processing_status,review_warnings,notification_preference,scheduled_at").eq("id", id).maybeSingle()
   if (readError) return NextResponse.json({ error: "Failed to load PDF" }, { status: 500 })
   if (!pdf) return NextResponse.json({ error: "PDF not found" }, { status: 404 })
   if (action === "retry") {

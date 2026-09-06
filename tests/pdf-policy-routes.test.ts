@@ -33,7 +33,10 @@ function listingQuery() {
       rows = rows.filter((row) => row[column as keyof typeof row] === value)
       return query
     },
-    or: () => query,
+    or(value: string) {
+      state.listingFilters.push(["or", value])
+      return query
+    },
     order: () => query,
     range: () => query,
     then(resolve: (result: { data: Array<Omit<(typeof rows)[number], "malware_status">>; error: null }) => unknown) {
@@ -180,6 +183,7 @@ describe("PDF route privacy policy", () => {
     expect(state.listingFilters).toContainEqual(["visibility", "public"])
     expect(state.listingFilters).toContainEqual(["publish_status", "published"])
     expect(state.listingFilters).toContainEqual(["malware_status", "clean"])
+    expect(state.listingFilters).toContainEqual(["or", "storage_bucket.is.null,storage_bucket.neq.community-pdfs,and(storage_bucket.eq.community-pdfs,processing_status.eq.completed)"])
   })
 
   it("returns every visibility level to an authenticated admin listing", async () => {

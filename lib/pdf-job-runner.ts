@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import { cleanupExpiredCommunityUploads } from "@/lib/community-upload-cleanup"
 import { validPdfStorageLocation } from "@/lib/pdf-storage"
 import { sendTelegramMessage } from "@/lib/telegram"
 import { escapeTelegramHtml } from "@/lib/admin-chat-validation"
@@ -10,10 +11,23 @@ const MAX_ATTEMPTS = 5
 const MAX_DIGEST_ITEMS = 20
 const SAFE_PDF_PATH = /^[0-9]{10,20}-[^/\\]+\.pdf$/i
 const SAFE_THUMBNAIL_PATH = /^thumbnails\/[0-9]{10,20}-[^/\\]+\.(?:jpg|jpeg|webp|svg)$/i
+const SAFE_COMMUNITY_PDF_PATH = /^community\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i
 const randomUUID = () => globalThis.crypto.randomUUID()
 
 export function isSafePdfJobObjectPath(bucket: unknown, path: unknown): path is string {
-  return bucket === "pdfs" && typeof path === "string" && (SAFE_PDF_PATH.test(path) || SAFE_THUMBNAIL_PATH.test(path))
+  if (typeof path !== "string") return false
+  return (bucket === "pdfs" && (SAFE_PDF_PATH.test(path) || SAFE_THUMBNAIL_PATH.test(path))) ||
+    (bucket === "community-pdfs" && SAFE_COMMUNITY_PDF_PATH.test(path))
+}
+
+/** Delete an unreferenced object only from the bucket recorded by its cleanup job. */
+export async function cleanupPdfJobObject(db: any, bucket: unknown, path: unknown) {
+  if (!isSafePdfJobObjectPath(bucket, path) || (bucket !== "pdfs" && bucket !== "community-pdfs")) {
+    throw new Error("Unsafe cleanup path")
+  }
+  const { data: refs } = await db.from("pdfs").select("id").eq("storage_bucket", bucket)
+    .or(`file_path.eq.${path},thumbnail_path.eq.${path}`).limit(1)
+  if (!refs?.length && (await db.storage.from(bucket).remove([path])).error) throw new Error("Storage cleanup failed")
 }
 
 export function hasServerVerifiedPdfHash(value: unknown): value is string {
@@ -71,9 +85,7 @@ async function claimNotification(db: ReturnType<typeof createAdminClient>, id: s
 async function run(db: ReturnType<typeof createAdminClient>, job: Job, token: string) {
   if (job.job_type === "cleanup") {
     const { bucket, path } = job.payload
-    if (!isSafePdfJobObjectPath(bucket, path)) throw new Error("Unsafe cleanup path")
-    const { data: refs } = await db.from("pdfs").select("id").or(`file_path.eq.${path},thumbnail_path.eq.${path}`).limit(1)
-    if (!refs?.length && (await db.storage.from("pdfs").remove([path])).error) throw new Error("Storage cleanup failed")
+    await cleanupPdfJobObject(db, bucket, path)
     return
   }
   if (!job.pdf_id) throw new Error("PDF job is missing pdf_id")
@@ -208,6 +220,9 @@ export async function runDuePdfJobs(limit = MAX_BATCH) {
 export async function maybeRunPdfMaintenance() {
   if (maintenanceAt > Date.now()) return
   maintenanceAt = Date.now() + 30_000
-  void runDuePdfJobs().catch(() => {})
+  void Promise.allSettled([
+    runDuePdfJobs(),
+    cleanupExpiredCommunityUploads(),
+  ])
 }
 let maintenanceAt = 0

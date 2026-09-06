@@ -107,6 +107,9 @@ export default function ProfilePage() {
   const [recentItems, setRecentItems] = useState<RecentlyViewedItem[]>([])
   const [submissions, setSubmissions] = useState<CommunitySubmission[] | null>(null)
   const [submissionsError, setSubmissionsError] = useState("")
+  const [submissionsPage, setSubmissionsPage] = useState(0)
+  const [submissionsHasMore, setSubmissionsHasMore] = useState(false)
+  const [submissionsLoadingMore, setSubmissionsLoadingMore] = useState(false)
 
   // Credits state
   const [credits, setCredits] = useState<{ credits: number; is_premium: boolean; referral_code: string; referred_by?: string } | null>(null)
@@ -147,15 +150,22 @@ export default function ProfilePage() {
     }
   }
 
-  const fetchSubmissions = useCallback(async () => {
+  const fetchSubmissions = useCallback(async (page = 1, append = false) => {
     setSubmissionsError("")
+    if (append) setSubmissionsLoadingMore(true)
     try {
-      const response = await fetch("/api/submissions/mine")
+      const response = await fetch(`/api/submissions/mine?page=${page}&limit=20`)
       if (!response.ok) throw new Error("Could not load your submissions.")
       const json = await response.json()
-      setSubmissions(json.submissions || [])
+      const nextSubmissions = json.submissions || []
+      setSubmissions(current => append ? [...(current || []), ...nextSubmissions] : nextSubmissions)
+      setSubmissionsPage(page)
+      // The endpoint returns a page rather than a total; a full page may have another page.
+      setSubmissionsHasMore(nextSubmissions.length === 20)
     } catch (caught) {
       setSubmissionsError(caught instanceof Error ? caught.message : "Could not load your submissions.")
+    } finally {
+      if (append) setSubmissionsLoadingMore(false)
     }
   }, [])
 
@@ -631,10 +641,13 @@ export default function ProfilePage() {
             {/* MY SUBMISSIONS */}
             {tab === "submissions" && (
               <div>
+                <p className="sr-only" role="status" aria-live="polite">
+                  {submissions === null ? "Loading submissions" : submissionsLoadingMore ? "Loading more submissions" : `${submissions?.length || 0} submissions loaded`}
+                </p>
                 {submissions === null && !submissionsError ? (
-                  <div className="flex items-center justify-center py-12 gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Loading submissions…</div>
+                  <div role="status" aria-live="polite" className="flex items-center justify-center py-12 gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Loading submissions…</div>
                 ) : submissionsError ? (
-                  <div className="py-10 text-center"><p className="text-sm text-destructive">{submissionsError}</p><Button variant="outline" size="sm" className="mt-3" onClick={fetchSubmissions}>Try Again</Button></div>
+                  <div className="py-10 text-center"><p role="alert" className="text-sm text-destructive">{submissionsError}</p><Button variant="outline" size="sm" className="mt-3" onClick={() => fetchSubmissions(1)}>Try Again</Button></div>
                 ) : submissions?.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-14 gap-3 text-center"><FileText className="h-8 w-8 text-primary" /><p className="font-semibold">No submissions yet</p><p className="text-sm text-muted-foreground">PDFs you share for review will appear here.</p><Button asChild size="sm"><Link href="/submit">Contribute a PDF</Link></Button></div>
                 ) : <div className="space-y-2">{submissions?.map(submission => (
@@ -644,7 +657,7 @@ export default function ProfilePage() {
                     {submission.status === "rejected" && submission.rejection_reason && <p className="mt-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">Reason: {submission.rejection_reason}</p>}
                     {submission.status === "approved" && submission.approved_pdf_id && <Link className="mt-2 inline-flex text-xs font-semibold text-primary hover:underline" href={`/pdf/${submission.approved_pdf_id}`}>View approved PDF</Link>}
                   </div>
-                ))}</div>}
+                ))}{submissionsHasMore && <div className="pt-2 text-center"><Button variant="outline" onClick={() => fetchSubmissions(submissionsPage + 1, true)} disabled={submissionsLoadingMore}>{submissionsLoadingMore ? "Loading more…" : "Load more submissions"}</Button></div>}</div>}
               </div>
             )}
 

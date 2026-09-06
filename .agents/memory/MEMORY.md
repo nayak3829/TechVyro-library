@@ -24,3 +24,4 @@
 - [Sensitive JSON column isolation](sensitive-json-column-isolation.md) — row-level policies cannot hide answer keys nested inside an otherwise readable JSON column.
 - [Cookie capability origin checks](cookie-capability-origin-checks.md) — SameSite cookies do not replace explicit origin checks on privileged or participant-bound endpoints.
 - [Lighthouse metadata verification](lighthouse-metadata-verification.md) — confirm App Router metadata in HTML and the runtime DOM before trusting a Lighthouse 13 absence report.
+- [Consolidated SQL parity](consolidated-sql-parity.md) — object-name checks miss constraints, function attributes, backfills, and final grants; verify semantic state and rerun safety.

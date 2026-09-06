@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: RouteProps) {
     const identity = await getPDFRequestIdentity(request)
     let pdfQuery = supabase
       .from("pdfs")
-      .select("file_path, storage_bucket, malware_status, visibility, scheduled_at, publish_status")
+      .select("file_path, storage_bucket, malware_status, processing_status, visibility, scheduled_at, publish_status")
       .eq("id", id)
     if (!identity.isAdmin) pdfQuery = applyPublicPdfVisibility(pdfQuery)
     const { data: pdf, error } = await pdfQuery.single()
@@ -27,10 +27,6 @@ export async function GET(request: Request, { params }: RouteProps) {
     if (!canViewPDF(pdf, identity.isAdmin)) {
       return NextResponse.json({ error: "PDF not found" }, { status: 404 })
     }
-    if (pdf.storage_bucket === "community-pdfs" && pdf.malware_status !== "clean") {
-      return NextResponse.json({ error: "PDF not found" }, { status: 404 })
-    }
-
     if (!validPdfStorageLocation(pdf.storage_bucket, pdf.file_path)) return NextResponse.json({ error: "PDF not found" }, { status: 404 })
     const { data: file, error: downloadError } = await supabase.storage.from(pdf.storage_bucket).download(pdf.file_path)
     if (downloadError || !file) {
@@ -60,7 +56,7 @@ export async function POST(request: Request, { params }: RouteProps) {
     const identity = await getPDFRequestIdentity(request)
     let pdfQuery = supabase
       .from("pdfs")
-      .select("visibility, scheduled_at, publish_status, malware_status")
+      .select("storage_bucket, visibility, scheduled_at, publish_status, malware_status, processing_status")
       .eq("id", id)
     if (!identity.isAdmin) pdfQuery = applyPublicPdfVisibility(pdfQuery)
     const { data: pdf, error: pdfError } = await pdfQuery.single()

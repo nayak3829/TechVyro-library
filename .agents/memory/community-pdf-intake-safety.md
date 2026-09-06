@@ -20,3 +20,9 @@ Public PDF analysis may prefill title, description, and hierarchy, but those val
 **Why:** Contributors expect document details to appear automatically after file selection, while extracted metadata can be incomplete or wrong and must remain reviewable.
 
 **How to apply:** Provide an immediate filename-derived title, improve it from bounded local analysis when available, infer hierarchy only from confident signals, and keep submission APIs authoritative.
+
+Submission finalization must be idempotent across an ambiguous commit/response-loss, and expired-object cleanup must claim the reservation under a database row lock before deleting storage.
+
+**Why:** Retrying a successfully committed finalization can otherwise delete the object now referenced by the submission; cleanup can cause the same corruption if it races a finalization that started before expiry.
+
+**How to apply:** Return the existing reservation-bound submission on a consumed retry. Give cleanup workers short-lived exact claim tokens acquired with row locking, make finalization reject active claims retryably, and mark cleanup complete only after storage deletion succeeds.

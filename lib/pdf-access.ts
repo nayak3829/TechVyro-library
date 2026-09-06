@@ -10,6 +10,7 @@ export interface PDFPolicyRecord {
   publish_status?: "draft" | "needs_review" | "published" | "rejected" | null
   storage_bucket?: "pdfs" | "community-pdfs" | null
   malware_status?: "pending" | "clean" | "suspicious" | "blocked" | "unknown" | null
+  processing_status?: "queued" | "processing" | "completed" | "failed" | null
 }
 
 /**
@@ -27,6 +28,8 @@ export function applyPublicPdfVisibility(query: any, now: Date = new Date()): an
     .eq("visibility", "public")
     .eq("publish_status", "published")
     .eq("malware_status", "clean")
+    // Community uploads additionally remain hidden until processing finishes.
+    .or("storage_bucket.is.null,storage_bucket.neq.community-pdfs,and(storage_bucket.eq.community-pdfs,processing_status.eq.completed)")
     .or(`scheduled_at.is.null,scheduled_at.lte.${now.toISOString()}`)
 }
 
@@ -34,6 +37,7 @@ export function canViewPDF(pdf: PDFPolicyRecord, isAdmin: boolean): boolean {
   if (isAdmin) return true
   if (pdf.publish_status && pdf.publish_status !== "published") return false
   if (pdf.malware_status !== "clean") return false
+  if (!communityPdfPassesSafety(pdf)) return false
   if (pdf.visibility !== "public") return false
   return !pdf.scheduled_at || Date.parse(pdf.scheduled_at) <= Date.now()
 }
@@ -43,7 +47,8 @@ export function canDownloadPDF(pdf: PDFPolicyRecord): boolean {
 }
 
 export function communityPdfPassesSafety(pdf: PDFPolicyRecord): boolean {
-  return pdf.storage_bucket !== "community-pdfs" || pdf.malware_status === "clean"
+  return pdf.storage_bucket !== "community-pdfs" ||
+    (pdf.malware_status === "clean" && pdf.processing_status === "completed")
 }
 
 export async function getPDFRequestIdentity(request: Request): Promise<{

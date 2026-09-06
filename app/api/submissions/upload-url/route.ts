@@ -3,29 +3,9 @@ import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin"
 import {
   getCommunityRequestIp, isSubmissionSecurityConfigured, privacyHash, validateUploadRequest,
 } from "@/lib/community-submissions"
+import { cleanupExpiredCommunityUploads } from "@/lib/community-upload-cleanup"
 
 const NO_STORE = { headers: { "Cache-Control": "no-store" } }
-
-async function cleanExpiredUploads(db: ReturnType<typeof createAdminClient>) {
-  try {
-    // Keep reservation rows for quota accounting; only their storage objects
-    // are eligible for cleanup. The small bound avoids making intake depend on
-    // a backlog of abandoned uploads.
-    const { data: expired } = await db.from("community_submission_reservations")
-      .select("id,expected_path").is("consumed_at", null).is("cleaned_at", null)
-      .lt("expires_at", new Date().toISOString()).limit(20)
-    for (const reservation of expired || []) {
-      try {
-        await db.storage.from("community-pdfs").remove([reservation.expected_path])
-        await db.from("community_submission_reservations").update({ cleaned_at: new Date().toISOString() }).eq("id", reservation.id)
-      } catch {
-        // A transient cleanup failure must never prevent a valid submission.
-      }
-    }
-  } catch {
-    // Query failures are likewise nonfatal to reservation creation.
-  }
-}
 
 export async function POST(request: Request) {
   if (!isAdminConfigured() || !isSubmissionSecurityConfigured()) {
@@ -35,7 +15,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { email } = validateUploadRequest(body)
     const db = createAdminClient()
-    await cleanExpiredUploads(db)
+    await cleanupExpiredCommunityUploads(db)
     const { data: reservationId, error: reserveError } = await db.rpc("reserve_community_submission_slot", {
       p_email_hash: privacyHash("email", email),
       p_ip_hash: privacyHash("ip", getCommunityRequestIp(request)),

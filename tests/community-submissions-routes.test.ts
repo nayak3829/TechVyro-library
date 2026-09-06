@@ -6,15 +6,18 @@ const read = (path: string) => readFileSync(path, "utf8")
 describe("community submission route security contracts", () => {
   it("reserves quota before issuing a private path", () => {
     const source = read("app/api/submissions/upload-url/route.ts")
+    const cleanup = read("lib/community-upload-cleanup.ts")
     expect(source).toContain('rpc("reserve_community_submission_slot"')
     expect(source).toContain('privacyHash("email"')
     expect(source).toContain('privacyHash("ip"')
     expect(source).toContain("createSignedUploadUrl(filePath)")
     expect(source).toContain("community/${reservationId}.pdf")
-    expect(source).toContain("cleanExpiredUploads")
-    expect(source).toContain('is("cleaned_at", null)')
-    expect(source).toContain("limit(20)")
-    expect(source).toContain("cleaned_at: new Date().toISOString()")
+    expect(source).toContain("cleanupExpiredCommunityUploads")
+    expect(cleanup).toContain('rpc("claim_expired_community_uploads"')
+    expect(cleanup).toContain('rpc("finish_community_upload_cleanup"')
+    expect(cleanup).toContain("limit = 20")
+    expect(cleanup).toContain("p_claim_token: reservation.claim_token")
+    expect(cleanup).toContain("p_removed: !removal.error")
   })
 
   it("binds finalization to the reservation and validates downloaded bytes", () => {
@@ -28,6 +31,8 @@ describe("community submission route security contracts", () => {
     expect(source).toContain("inspectPdfSafety(bytes)")
     expect(source).toContain("p_malware_status: safety.malwareStatus")
     expect(source).toContain("p_review_warnings: safety.warnings")
+    expect(source).toContain("if (downloadError || !blob) {")
+    expect(source).toContain("await removeObject(filePath)")
   })
 
   it("derives optional user identity on the server", () => {
@@ -72,15 +77,23 @@ describe("community submission route security contracts", () => {
     expect(migration).toContain("CREATE OR REPLACE FUNCTION public.moderate_community_submission")
     expect(migration).toContain("INSERT INTO public.pdf_jobs")
     expect(detail).toContain("Submission did not pass PDF safety checks")
-    expect(detail).toContain("unsafe ? 422")
+    expect(detail).toContain('message.includes("safety review prevents approval")')
+    expect(detail).toContain("status: 422")
+    expect(detail).toContain("PDF approved:")
+    expect(detail).toContain("approved and is queued for processing")
+    expect(detail).not.toContain("A new PDF is now available.")
   })
 
   it("requires safe community sources publicly and unpublishes later findings", () => {
     for (const path of ["app/api/pdfs/[id]/view/route.ts", "app/api/pdfs/[id]/download-watermarked/route.ts"]) {
       const source = read(path)
-      expect(source).toContain('pdf.storage_bucket === "community-pdfs"')
-      expect(source).toContain('pdf.malware_status !== "clean"')
+      expect(source).toContain("canViewPDF")
+      expect(source).toContain("processing_status")
     }
+    const policy = read("lib/pdf-access.ts")
+    expect(policy).toContain("communityPdfPassesSafety(pdf)")
+    expect(policy).toContain('pdf.storage_bucket !== "community-pdfs"')
+    expect(policy).toContain('pdf.malware_status === "clean" && pdf.processing_status === "completed"')
     const worker = read("lib/pdf-job-runner.ts")
     expect(worker).toContain('pdf.storage_bucket === "community-pdfs" && analysis.malwareStatus === "suspicious"')
     expect(worker).toContain('visibility: "private", publish_status: "needs_review"')
@@ -89,12 +102,33 @@ describe("community submission route security contracts", () => {
   it("bounds bulk actions and reports each result", () => {
     const source = read("app/api/admin/submissions/bulk/route.ts")
     expect(source).toContain("ids.length > 50")
-    expect(source).toContain("for (const id of ids)")
+    expect(source).toContain("const concurrency = 5")
+    expect(source).toContain("ids.slice(index, index + concurrency).map(moderate)")
     expect(source).toContain("success: false")
     expect(source).toContain("success: true")
     expect(source).toContain("succeeded:")
     expect(source).toContain("failed:")
     expect(source).not.toContain("enqueuePdfJob")
+    expect(source).toContain("approved and is queued for processing")
+    expect(source).not.toContain("A new PDF is now available.")
+  })
+
+  it("caps list pagination and does not return its lookahead row", () => {
+    const source = read("app/api/admin/submissions/route.ts")
+    expect(source).toContain("offset > 10_000")
+    expect(source).toContain("range(offset, offset + limit)")
+    expect(source).toContain("submissions.slice(0, limit)")
+    expect(source).toContain("hasMore: submissions.length > limit")
+  })
+
+  it("limits detail fields and warns about exact existing content", () => {
+    const source = read("app/api/admin/submissions/[id]/route.ts")
+    expect(source).not.toContain('.select("*")')
+    expect(source).toContain("content_hash")
+    expect(source).toContain('.eq("content_hash", content_hash)')
+    expect(source).toContain("duplicateContentWarning")
+    expect(source).toContain("reservation-bound storage object")
+    expect(source).toContain("duplicate content")
   })
 
   it("marks all submission JSON responses as non-cacheable", () => {

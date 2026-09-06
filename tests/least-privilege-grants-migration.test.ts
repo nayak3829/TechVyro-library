@@ -88,6 +88,8 @@ describe("least-privilege grants migration", () => {
     )
     expect(fullSetup).not.toContain('CREATE POLICY "Public site settings allow-list"')
     expect(fullSetup).not.toMatch(/GRANT .*pdf_favorites.* TO (?:anon|authenticated)/)
-    expect(fullSetup).not.toMatch(/GRANT (?:SELECT|ALL).*public\.quizzes[\s\S]*?TO (?:anon|authenticated)/)
+    expect(fullSetup).not.toMatch(
+      /GRANT (?:SELECT|ALL)[^;]*public\.quizzes[^;]*TO (?:anon|authenticated)/,
+    )
   })
 })

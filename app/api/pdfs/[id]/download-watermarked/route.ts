@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: RouteProps) {
     // Get PDF metadata from database
     let pdfQuery = supabase
       .from("pdfs")
-      .select("*")
+      .select("id, title, file_path, storage_bucket, malware_status, processing_status, visibility, allow_download, scheduled_at, publish_status")
       .eq("id", id)
     if (!identity.isAdmin) pdfQuery = applyPublicPdfVisibility(pdfQuery)
     const { data: pdf, error: pdfError } = await pdfQuery.single()
@@ -38,9 +38,6 @@ export async function GET(request: Request, { params }: RouteProps) {
     }
     if (!canDownloadPDF(pdf)) {
       return NextResponse.json({ error: "Downloads are disabled for this PDF" }, { status: 403 })
-    }
-    if (pdf.storage_bucket === "community-pdfs" && pdf.malware_status !== "clean") {
-      return NextResponse.json({ error: "PDF not found" }, { status: 404 })
     }
     const eventKey = request.headers.get("Idempotency-Key")
     if (!isValidAnalyticsEventKey(eventKey, "download", id)) {

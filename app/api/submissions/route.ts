@@ -35,7 +35,10 @@ export async function POST(request: Request) {
     }
     const db = createAdminClient()
     const { data: blob, error: downloadError } = await db.storage.from("community-pdfs").download(filePath)
-    if (downloadError || !blob) return NextResponse.json({ error: "Uploaded PDF was not found" }, { status: 400, ...NO_STORE })
+    if (downloadError || !blob) {
+      await removeObject(filePath)
+      return NextResponse.json({ error: "Uploaded PDF was not found" }, { status: 400, ...NO_STORE })
+    }
     if (blob.size !== Number(claimedSize) || blob.size > COMMUNITY_MAX_PDF_BYTES || (blob.type && blob.type !== "application/pdf")) {
       await removeObject(filePath)
       return NextResponse.json({ error: "Uploaded PDF size or MIME type is invalid" }, { status: 400, ...NO_STORE })
